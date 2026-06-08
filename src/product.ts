@@ -1,5 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import Database from "better-sqlite3";
+
+import { openRepository } from "./repository.js";
 
 const PRODUCT_FILES = [
   {
@@ -181,4 +185,90 @@ export function scaffoldProductContext(workspaceRoot: string): ProductScaffoldRe
   }
 
   return { created, preserved };
+}
+
+export function persistProductMetadata(databasePath: string, created: string[], preserved: string[]): void {
+  const repository = openRepository(databasePath);
+
+  try {
+    const now = new Date().toISOString();
+    const totalFiles = created.length + preserved.length;
+
+    repository.setMetadata("product_context_updated_at", now);
+    repository.setMetadata("product_context_file_count", String(totalFiles));
+    repository.setMetadata("product_context_created_count", String(created.length));
+    repository.setMetadata("product_context_preserved_count", String(preserved.length));
+  } finally {
+    repository.close();
+  }
+}
+
+export type ParsedDecision = {
+  summary: string;
+};
+
+export function parseDecisionsFromFile(decisionsFilePath: string): ParsedDecision[] {
+  if (!existsSync(decisionsFilePath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(decisionsFilePath, "utf8");
+    const decisions: ParsedDecision[] = [];
+
+    const lines = content.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("### ") && trimmed.length > 4) {
+        const summary = trimmed.slice(4).trim();
+        if (summary.length > 0 && summary !== "Format") {
+          decisions.push({ summary });
+        }
+      }
+    }
+
+    return decisions;
+  } catch {
+    return [];
+  }
+}
+
+export function persistDecisions(databasePath: string, decisionsFilePath: string): number {
+  const decisions = parseDecisionsFromFile(decisionsFilePath);
+  const database = new Database(databasePath);
+
+  try {
+    database.pragma("journal_mode = WAL");
+    database.pragma("foreign_keys = ON");
+
+    const insertStmt = database.prepare(
+      `INSERT INTO decisions (scope_type, scope_id, summary, created_at)
+       VALUES (@scopeType, @scopeId, @summary, @createdAt)`,
+    );
+
+    const deleteStmt = database.prepare(
+      `DELETE FROM decisions WHERE scope_type = ? AND scope_id = ?`,
+    );
+
+    const now = new Date().toISOString();
+
+    const transaction = database.transaction(() => {
+      deleteStmt.run("product", "decisions.md");
+
+      for (const decision of decisions) {
+        insertStmt.run({
+          scopeType: "product",
+          scopeId: "decisions.md",
+          summary: decision.summary,
+          createdAt: now,
+        });
+      }
+    });
+
+    transaction();
+
+    return decisions.length;
+  } finally {
+    database.close();
+  }
 }

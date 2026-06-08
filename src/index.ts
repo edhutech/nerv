@@ -3,8 +3,10 @@
 import { Command } from "commander";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
+import { discoverContext } from "./context.js";
+import { openRepository } from "./repository.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -89,6 +91,17 @@ program
 
     const result = scaffoldProductContext(status.workspaceRoot!);
 
+    if (result.created.length > 0 || result.preserved.length > 0) {
+      persistProductMetadata(status.databasePath!, result.created, result.preserved);
+
+      const decisionsPath = join(status.workspaceRoot!, "product", "decisions.md");
+      const decisionCount = persistDecisions(status.databasePath!, decisionsPath);
+
+      if (decisionCount > 0) {
+        console.log(`Persisted ${decisionCount} decision(s) from decisions.md.`);
+      }
+    }
+
     if (result.created.length === 0 && result.preserved.length === 0) {
       console.log("No product files to scaffold.");
       return;
@@ -141,6 +154,13 @@ program
     const outputPath = join(status.workspaceRoot!, "repo", "development.md");
 
     writeFileSync(outputPath, content, "utf8");
+
+    const repository = openRepository(status.databasePath!);
+    try {
+      repository.setMetadata("repo_context_updated_at", new Date().toISOString());
+    } finally {
+      repository.close();
+    }
 
     console.log(`Generated ${outputPath}`);
     console.log(`Detected ${analysis.packageFiles.length} package/config file(s).`);
@@ -236,6 +256,21 @@ program
     console.log(`Nerv status: ${status.initialized ? "initialized" : "not initialized"}`);
     console.log(`Repo root: ${status.repoRoot}`);
     console.log(`Workspace path: ${status.workspaceRoot}`);
+
+    if (status.initialized) {
+      const context = discoverContext(status.workspaceRoot!, status.databasePath!);
+
+      console.log("");
+      console.log("Context availability:");
+      console.log(`  Product context: ${context.productContext.available ? "available" : "not available"}`);
+      if (context.productContext.updatedAt) {
+        console.log(`    Updated: ${context.productContext.updatedAt}`);
+      }
+      console.log(`  Repo context: ${context.repoContext.available ? "available" : "not available"}`);
+      if (context.repoContext.updatedAt) {
+        console.log(`    Updated: ${context.repoContext.updatedAt}`);
+      }
+    }
   });
 
 program

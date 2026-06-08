@@ -70,6 +70,7 @@ runTemporaryRepoChecks();
 runRepositoryChecks();
 runProductContextChecks();
 runRepoContextChecks();
+runContextMetadataChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -480,6 +481,128 @@ function runRepoContextChecks() {
           fail("repo works when git metadata is unavailable", "should report unavailable Git metadata", content);
         }
       },
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runContextMetadataChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-context-metadata-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    runCheck({
+      name: "product persists metadata in SQLite",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created 9 product file(s):"],
+      setup: () => {
+        spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+        spawnOrFail("init workspace before metadata check", ["init"], repoRoot);
+      },
+      verify: () => {
+        const database = new Database(join(repoRoot, ".nerv/nerv.db"), { readonly: true });
+        try {
+          const metadata = database.prepare("SELECT key, value FROM metadata WHERE key LIKE 'product_context_%'").all();
+          const metadataMap = new Map(metadata.map((row) => [row.key, row.value]));
+
+          if (!metadataMap.has("product_context_updated_at")) {
+            fail("product persists metadata in SQLite", "missing product_context_updated_at", "");
+          }
+          if (!metadataMap.has("product_context_file_count")) {
+            fail("product persists metadata in SQLite", "missing product_context_file_count", "");
+          }
+          if (metadataMap.get("product_context_file_count") !== "9") {
+            fail("product persists metadata in SQLite", `expected 9 files, got ${metadataMap.get("product_context_file_count")}`, "");
+          }
+        } finally {
+          database.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "product persists decisions from decisions.md",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Persisted 2 decision(s)"],
+      setup: () => {
+        const decisionsPath = join(repoRoot, ".nerv/product/decisions.md");
+        const content = readFileSync(decisionsPath, "utf8");
+        writeFileSync(decisionsPath, content + "\n### Use SQLite for storage\n\n### Use TypeScript for safety\n", "utf8");
+      },
+      verify: () => {
+        const database = new Database(join(repoRoot, ".nerv/nerv.db"), { readonly: true });
+        try {
+          const decisions = database.prepare("SELECT scope_type, scope_id, summary FROM decisions WHERE scope_type = 'product'").all();
+
+          if (decisions.length !== 2) {
+            fail("product persists decisions from decisions.md", `expected 2 decisions, got ${decisions.length}`, "");
+          }
+
+          const summaries = decisions.map((d) => d.summary).sort();
+          if (!summaries.includes("Use SQLite for storage") || !summaries.includes("Use TypeScript for safety")) {
+            fail("product persists decisions from decisions.md", `unexpected summaries: ${summaries.join(", ")}`, "");
+          }
+        } finally {
+          database.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "product clears removed decisions",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Preserved 9 existing file(s):"],
+      setup: () => {
+        writeFileSync(join(repoRoot, ".nerv/product/decisions.md"), "# Decisions\n", "utf8");
+      },
+      verify: () => {
+        const database = new Database(join(repoRoot, ".nerv/nerv.db"), { readonly: true });
+        try {
+          const decisions = database.prepare("SELECT summary FROM decisions WHERE scope_type = 'product'").all();
+
+          if (decisions.length !== 0) {
+            fail("product clears removed decisions", `expected 0 decisions, got ${decisions.length}`, "");
+          }
+        } finally {
+          database.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "repo persists metadata in SQLite",
+      args: ["repo"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Generated"],
+      verify: () => {
+        const database = new Database(join(repoRoot, ".nerv/nerv.db"), { readonly: true });
+        try {
+          const row = database.prepare("SELECT value FROM metadata WHERE key = 'repo_context_updated_at'").get();
+          if (!row || !row.value) {
+            fail("repo persists metadata in SQLite", "missing repo_context_updated_at", "");
+          }
+        } finally {
+          database.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "status shows context availability",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Context availability:", "Product context: available", "Repo context: available"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
