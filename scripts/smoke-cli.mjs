@@ -71,6 +71,7 @@ runRepositoryChecks();
 runProductContextChecks();
 runRepoContextChecks();
 runContextMetadataChecks();
+runWorkItemPersistenceChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -284,6 +285,40 @@ function runTemporaryRepoChecks() {
       includes: ["nerv init failed: existing .nerv/nerv.db does not match the expected Nerv schema"],
       setup: () => {
         createMalformedWorkspace(malformedRepoRoot);
+      },
+    });
+
+    runCheck({
+      name: "status migrates old work item schema",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Nerv status: initialized", `Repo root: ${repoRoot}`],
+      setup: () => {
+        createOldSchemaWorkspace(repoRoot);
+      },
+      verify: () => {
+        verifySchema("status migrates old work item schema", join(repoRoot, ".nerv/nerv.db"));
+        verifyColumns("status migrates old work item schema", join(repoRoot, ".nerv/nerv.db"), "builds", [
+          "intent",
+          "goal",
+          "user_value",
+          "scope",
+          "out_of_scope",
+          "acceptance_criteria",
+          "validation",
+          "risks",
+          "generated_markdown_path",
+        ]);
+        verifyColumns("status migrates old work item schema", join(repoRoot, ".nerv/nerv.db"), "tasks", [
+          "intent",
+          "scope",
+          "out_of_scope",
+          "acceptance_criteria",
+          "validation",
+          "risks",
+          "generated_markdown_path",
+        ]);
       },
     });
   } finally {
@@ -687,6 +722,102 @@ function verifySchema(name, databasePath) {
   }
 }
 
+function verifyColumns(name, databasePath, tableName, expectedColumns) {
+  const database = new Database(databasePath, { readonly: true, fileMustExist: true });
+
+  try {
+    const columnNames = new Set(database.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name));
+
+    for (const columnName of expectedColumns) {
+      if (!columnNames.has(columnName)) {
+        fail(name, `missing required column ${tableName}.${columnName}`, "");
+      }
+    }
+  } finally {
+    database.close();
+  }
+}
+
+function createOldSchemaWorkspace(repoRoot) {
+  rmSync(join(repoRoot, ".nerv"), { recursive: true, force: true });
+
+  mkdirSync(join(repoRoot, ".nerv/product"), { recursive: true });
+  mkdirSync(join(repoRoot, ".nerv/repo"), { recursive: true });
+  mkdirSync(join(repoRoot, ".nerv/agent/runs"), { recursive: true });
+  mkdirSync(join(repoRoot, ".nerv/agent/builds"), { recursive: true });
+
+  const database = new Database(join(repoRoot, ".nerv/nerv.db"));
+
+  try {
+    database.exec(`CREATE TABLE metadata (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+    database.exec(`CREATE TABLE builds (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      closed_at TEXT
+    )`);
+    database.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY,
+      build_id TEXT,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      closed_at TEXT,
+      FOREIGN KEY (build_id) REFERENCES builds(id)
+    )`);
+    database.exec(`CREATE TABLE runs (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      closed_at TEXT,
+      FOREIGN KEY (task_id) REFERENCES tasks(id)
+    )`);
+    database.exec(`CREATE TABLE checkpoints (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES runs(id)
+    )`);
+    database.exec(`CREATE TABLE reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES runs(id)
+    )`);
+    database.exec(`CREATE TABLE decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope_type TEXT NOT NULL,
+      scope_id TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+    database.exec(`CREATE TABLE status_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+    database
+      .prepare("INSERT INTO metadata (key, value, updated_at) VALUES (?, ?, ?)")
+      .run("schema_version", "1", "now");
+  } finally {
+    database.close();
+  }
+}
+
 function createMalformedWorkspace(repoRoot) {
   rmSync(join(repoRoot, ".git"), { recursive: true, force: true });
   rmSync(join(repoRoot, ".nerv"), { recursive: true, force: true });
@@ -721,6 +852,156 @@ function createMalformedWorkspace(repoRoot) {
     }
   } finally {
     database.close();
+  }
+}
+
+function runWorkItemPersistenceChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-workitem-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init repo for work item checks", ["init"], repoRoot);
+
+    const dbPath = join(repoRoot, ".nerv/nerv.db");
+    const repository = openRepository(dbPath);
+
+    try {
+      const buildId = repository.getNextId("BUILD");
+      const build = repository.createBuild({
+        id: buildId,
+        title: "Test Build",
+        intent: "Test intent for build",
+        goal: "Test goal",
+        user_value: "Test user value",
+        scope: "Test scope",
+        out_of_scope: "Test out of scope",
+        acceptance_criteria: "Test acceptance criteria",
+        validation: "Test validation",
+        risks: "Test risks",
+        generated_markdown_path: ".nerv/agent/builds/BUILD-001.md",
+      });
+
+      if (build.id !== "BUILD-001") {
+        fail("work item build creation", `expected BUILD-001, got ${build.id}`, "");
+      }
+      if (build.title !== "Test Build") {
+        fail("work item build creation", `expected title 'Test Build', got '${build.title}'`, "");
+      }
+      if (build.intent !== "Test intent for build") {
+        fail("work item build creation", `expected intent to be stored`, "");
+      }
+      if (build.generated_markdown_path !== ".nerv/agent/builds/BUILD-001.md") {
+        fail("work item build creation", `expected generated_markdown_path to be stored`, "");
+      }
+
+      console.log("ok - work item build creation");
+
+      const retrievedBuild = repository.getBuild("BUILD-001");
+      if (!retrievedBuild) {
+        fail("work item build retrieval", "build not found", "");
+      }
+      if (retrievedBuild.title !== "Test Build") {
+        fail("work item build retrieval", "title mismatch", "");
+      }
+
+      console.log("ok - work item build retrieval");
+
+      const builds = repository.listBuilds();
+      if (builds.length !== 1) {
+        fail("work item build listing", `expected 1 build, got ${builds.length}`, "");
+      }
+
+      console.log("ok - work item build listing");
+
+      repository.updateBuild("BUILD-001", { title: "Updated Build", status: "approved" });
+      const updatedBuild = repository.getBuild("BUILD-001");
+      if (updatedBuild.title !== "Updated Build") {
+        fail("work item build update", "title not updated", "");
+      }
+      if (updatedBuild.status !== "approved") {
+        fail("work item build update", "status not updated", "");
+      }
+
+      console.log("ok - work item build update");
+
+      const taskId = repository.getNextId("TASK");
+      const task = repository.createTask({
+        id: taskId,
+        build_id: "BUILD-001",
+        title: "Test Task",
+        intent: "Test task intent",
+        scope: "Test task scope",
+        out_of_scope: "Test task out of scope",
+        acceptance_criteria: "Test task acceptance criteria",
+        validation: "Test task validation",
+        risks: "Test task risks",
+        generated_markdown_path: ".nerv/agent/tasks/TASK-001.md",
+      });
+
+      if (task.id !== "TASK-001") {
+        fail("work item task creation", `expected TASK-001, got ${task.id}`, "");
+      }
+      if (task.build_id !== "BUILD-001") {
+        fail("work item task creation", "build_id not set", "");
+      }
+      if (task.intent !== "Test task intent") {
+        fail("work item task creation", "intent not stored", "");
+      }
+
+      console.log("ok - work item task creation");
+
+      const retrievedTask = repository.getTask("TASK-001");
+      if (!retrievedTask) {
+        fail("work item task retrieval", "task not found", "");
+      }
+
+      console.log("ok - work item task retrieval");
+
+      const tasks = repository.listTasks();
+      if (tasks.length !== 1) {
+        fail("work item task listing", `expected 1 task, got ${tasks.length}`, "");
+      }
+
+      console.log("ok - work item task listing");
+
+      const tasksByBuild = repository.listTasksByBuild("BUILD-001");
+      if (tasksByBuild.length !== 1) {
+        fail("work item task listing by build", `expected 1 task, got ${tasksByBuild.length}`, "");
+      }
+      if (tasksByBuild[0].id !== "TASK-001") {
+        fail("work item task listing by build", "wrong task returned", "");
+      }
+
+      console.log("ok - work item task listing by build");
+
+      repository.updateTask("TASK-001", { title: "Updated Task", status: "in_progress" });
+      const updatedTask = repository.getTask("TASK-001");
+      if (updatedTask.title !== "Updated Task") {
+        fail("work item task update", "title not updated", "");
+      }
+      if (updatedTask.status !== "in_progress") {
+        fail("work item task update", "status not updated", "");
+      }
+
+      console.log("ok - work item task update");
+
+      const taskWithoutBuild = repository.createTask({
+        id: "TASK-002",
+        title: "Standalone Task",
+      });
+      if (taskWithoutBuild.build_id !== null) {
+        fail("work item task without build", "build_id should be null", "");
+      }
+
+      console.log("ok - work item task without build");
+    } finally {
+      repository.close();
+    }
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 

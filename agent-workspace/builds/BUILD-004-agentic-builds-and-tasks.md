@@ -60,11 +60,17 @@ By the end of this Build, the repo should have:
 
 ## Suggested Agentic Tasks
 
-Do not complete this section until the Build is approved.
+- TASK-010: Add Work Item Persistence Model
+- TASK-011: Implement Agentic Task Creation
+- TASK-012: Implement Agentic Build Creation And Planning
+- TASK-013: Add Work Item Query Commands
 
-- TASK-001:
-- TASK-002:
-- TASK-003:
+## Progress
+
+- TASK-010: Proposed.
+- TASK-011: Proposed.
+- TASK-012: Proposed.
+- TASK-013: Proposed.
 
 ## Acceptance criteria
 

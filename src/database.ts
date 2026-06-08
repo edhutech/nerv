@@ -12,8 +12,39 @@ const REQUIRED_TABLES = [
 ] as const;
 
 const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string[]> = {
-  builds: ["id", "title", "status", "created_at", "updated_at", "closed_at"],
-  tasks: ["id", "build_id", "title", "status", "created_at", "updated_at", "closed_at"],
+  builds: [
+    "id",
+    "title",
+    "status",
+    "created_at",
+    "updated_at",
+    "closed_at",
+    "intent",
+    "goal",
+    "user_value",
+    "scope",
+    "out_of_scope",
+    "acceptance_criteria",
+    "validation",
+    "risks",
+    "generated_markdown_path",
+  ],
+  tasks: [
+    "id",
+    "build_id",
+    "title",
+    "status",
+    "created_at",
+    "updated_at",
+    "closed_at",
+    "intent",
+    "scope",
+    "out_of_scope",
+    "acceptance_criteria",
+    "validation",
+    "risks",
+    "generated_markdown_path",
+  ],
   runs: ["id", "task_id", "status", "created_at", "updated_at", "closed_at"],
   checkpoints: ["id", "run_id", "summary", "created_at"],
   reviews: ["id", "run_id", "outcome", "summary", "created_at"],
@@ -34,7 +65,16 @@ const SCHEMA_STATEMENTS = [
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    closed_at TEXT
+    closed_at TEXT,
+    intent TEXT,
+    goal TEXT,
+    user_value TEXT,
+    scope TEXT,
+    out_of_scope TEXT,
+    acceptance_criteria TEXT,
+    validation TEXT,
+    risks TEXT,
+    generated_markdown_path TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
@@ -44,6 +84,13 @@ const SCHEMA_STATEMENTS = [
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
+    intent TEXT,
+    scope TEXT,
+    out_of_scope TEXT,
+    acceptance_criteria TEXT,
+    validation TEXT,
+    risks TEXT,
+    generated_markdown_path TEXT,
     FOREIGN KEY (build_id) REFERENCES builds(id)
   )`,
   `CREATE TABLE IF NOT EXISTS runs (
@@ -86,6 +133,31 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
+const SCHEMA_VERSION = "2";
+
+const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
+  builds: [
+    "intent",
+    "goal",
+    "user_value",
+    "scope",
+    "out_of_scope",
+    "acceptance_criteria",
+    "validation",
+    "risks",
+    "generated_markdown_path",
+  ],
+  tasks: [
+    "intent",
+    "scope",
+    "out_of_scope",
+    "acceptance_criteria",
+    "validation",
+    "risks",
+    "generated_markdown_path",
+  ],
+};
+
 export function initializeDatabase(databasePath: string): void {
   const database = openDatabase(databasePath);
 
@@ -98,18 +170,9 @@ export function initializeDatabase(databasePath: string): void {
         database.exec(statement);
       }
 
+      migrateSchema(database);
       assertRequiredSchema(database);
-
-      database
-        .prepare(
-          `INSERT OR IGNORE INTO metadata (key, value, updated_at)
-           VALUES (@key, @value, @updatedAt)`,
-        )
-        .run({
-          key: "schema_version",
-          value: "1",
-          updatedAt: new Date().toISOString(),
-        });
+      setSchemaVersion(database);
     });
 
     initialize();
@@ -119,9 +182,19 @@ export function initializeDatabase(databasePath: string): void {
 }
 
 export function hasRequiredSchema(databasePath: string): boolean {
-  const database = openDatabase(databasePath, { readonly: true, fileMustExist: true });
+  const database = openDatabase(databasePath, { fileMustExist: true });
 
   try {
+    database.pragma("journal_mode = WAL");
+    database.pragma("foreign_keys = ON");
+
+    migrateSchema(database);
+
+    if (hasRequiredSchemaInDatabase(database)) {
+      setSchemaVersion(database);
+      return true;
+    }
+
     return hasRequiredSchemaInDatabase(database);
   } catch {
     return false;
@@ -164,6 +237,46 @@ function hasRequiredColumns(database: Database.Database, tableName: (typeof REQU
   );
 
   return REQUIRED_COLUMNS[tableName].every((columnName) => columnNames.has(columnName));
+}
+
+function migrateSchema(database: Database.Database): void {
+  for (const [tableName, columnNames] of Object.entries(MIGRATED_COLUMNS)) {
+    if (!hasTable(database, tableName)) {
+      continue;
+    }
+
+    const existingColumnNames = getColumnNames(database, tableName);
+
+    for (const columnName of columnNames) {
+      if (!existingColumnNames.has(columnName)) {
+        database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} TEXT`);
+      }
+    }
+  }
+}
+
+function setSchemaVersion(database: Database.Database): void {
+  database
+    .prepare(
+      `INSERT INTO metadata (key, value, updated_at)
+       VALUES (@key, @value, @updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    )
+    .run({
+      key: "schema_version",
+      value: SCHEMA_VERSION,
+      updatedAt: new Date().toISOString(),
+    });
+}
+
+function hasTable(database: Database.Database, tableName: string): boolean {
+  const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName);
+  return row !== undefined;
+}
+
+function getColumnNames(database: Database.Database, tableName: string): Set<string> {
+  type SqliteColumnRow = { name: string };
+  return new Set((database.prepare(`PRAGMA table_info(${tableName})`).all() as SqliteColumnRow[]).map((row) => row.name));
 }
 
 function openDatabase(databasePath: string, options?: Database.Options): Database.Database {
