@@ -145,7 +145,7 @@ Findings:
 Risks:
 
 - Repo validation command hints are intentionally lightweight and may need package-manager-aware formatting before run generation.
-- Decision persistence intentionally uses only `### ` headings; richer decision parsing is deferred until real decision lifecycle needs exist.
+- Decision persistence intentionally uses only `###` headings; richer decision parsing is deferred until real decision lifecycle needs exist.
 
 Review result:
 
@@ -174,7 +174,7 @@ Final summary:
 - Added repo analysis for package/config files, package scripts, validation hints, top-level folders and Git status when available.
 - Added initialized-workspace fallback so `nerv repo` works when Git metadata is unavailable.
 - Persisted product and repo context metadata in SQLite.
-- Persisted product decisions from `decisions.md` using coarse `### ` heading extraction while preserving markdown as the human source of truth.
+- Persisted product decisions from `decisions.md` using coarse `###` heading extraction while preserving markdown as the human source of truth.
 - Added `discoverContext()` so later run generation can discover available context files and timestamps.
 - Updated `nerv status` to show concise product and repo context availability.
 
