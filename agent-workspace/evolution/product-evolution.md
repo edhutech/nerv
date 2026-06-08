@@ -27,3 +27,11 @@ Impact:
 - Added a buildable minimal CLI entrypoint for future command work.
 - Related Build: BUILD-001 Project And CLI Foundation
 - Commit hash: f6c0e2b
+
+Closed TASK-002: Add Commander CLI Entrypoint And Command Skeleton
+
+Impact:
+- Added the Commander-based `nerv` CLI command surface for the MVP scope.
+- Added explicit placeholder behavior so commands are discoverable without pretending to perform real work.
+- Related Build: BUILD-001 Project And CLI Foundation
+- Commit hash: 9dabd5a

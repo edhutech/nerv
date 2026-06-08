@@ -143,14 +143,20 @@ Validation performed:
 
 Pending work:
 
-- Review TASK-002.
+- None for RUN-002.
 
 Suggested next step:
 
-- Review TASK-002.
+- Commit the TASK-002 close records, then start TASK-003.
 
 Suggested commit message:
 
 ```txt
 TASK-002 Add Commander CLI command skeleton
+```
+
+Commit:
+
+```txt
+9dabd5a TASK-002 Add Commander CLI command skeleton
 ```

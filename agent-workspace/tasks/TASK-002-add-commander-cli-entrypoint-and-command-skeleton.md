@@ -2,7 +2,7 @@
 
 ## Status
 
-Reviewed
+Closed
 
 ## Parent Build
 
@@ -143,8 +143,7 @@ Validation performed:
 
 Pending work:
 
-- Commit TASK-001 close docs and TASK-002 implementation once the user approves committing.
-- Close TASK-002 after commit.
+- None for TASK-002.
 - Implement TASK-003 after TASK-002 is committed and closed.
 
 ## Review
@@ -241,4 +240,57 @@ TASK-002 Add Commander CLI command skeleton
 
 ## Close summary
 
-Pending.
+Closed on 2026-06-07.
+
+Commit:
+
+```txt
+9dabd5a TASK-002 Add Commander CLI command skeleton
+```
+
+Final summary:
+
+- Added Commander as the CLI framework dependency.
+- Implemented the `nerv` CLI entrypoint in `src/index.ts`.
+- Added MVP command skeletons for `init`, `product`, `new task`, `new build`, `build plan`, `start`, `current`, `checkpoint`, `review`, `close`, `tasks`, `builds`, `runs`, `status` and `clean`.
+- Added explicit not-implemented placeholder behavior for action commands.
+- Fixed Commander version compatibility with the package's Node `>=20` engine by using `commander@^14.0.3`.
+
+User or developer value delivered:
+
+- Nerv now has a visible CLI command surface matching the MVP scope.
+- Later tasks can replace placeholders with real local-first behavior incrementally.
+
+Files changed:
+
+- `package.json`
+- `pnpm-lock.yaml`
+- `src/index.ts`
+- `agent-workspace/tasks/TASK-002-add-commander-cli-entrypoint-and-command-skeleton.md`
+- `agent-workspace/runs/RUN-002-task-002-add-commander-cli-entrypoint-and-command-skeleton.md`
+- `agent-workspace/builds/BUILD-001-project-and-cli-foundation.md`
+
+Validation evidence:
+
+- `pnpm install --frozen-lockfile` passed.
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `node dist/index.js --help` passed.
+- `node dist/index.js init --help` passed.
+- `node dist/index.js status --help` passed.
+- `node dist/index.js new --help` passed.
+- `node dist/index.js build --help` passed.
+- Placeholder commands exit with code `1` and explicit not-implemented messages.
+
+Related Build update:
+
+- BUILD-001 has its second task closed.
+- TASK-003 is next for minimal quality gates and CLI smoke validation.
+
+Product evolution update:
+
+- Added a product evolution note for closing TASK-002.
+
+Follow-up tasks:
+
+- TASK-003: Add Minimal Quality Gates And CLI Smoke Validation

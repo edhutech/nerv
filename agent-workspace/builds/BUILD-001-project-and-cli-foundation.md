@@ -65,8 +65,8 @@ Do not complete this section until the Build is approved.
 ## Progress
 
 - TASK-001: Closed on 2026-06-07 with commit `f6c0e2b`.
-- TASK-002: Ready for review after RUN-002.
-- TASK-003: Pending.
+- TASK-002: Closed on 2026-06-07 with commit `9dabd5a`.
+- TASK-003: Next.
 
 ## Acceptance criteria
 
