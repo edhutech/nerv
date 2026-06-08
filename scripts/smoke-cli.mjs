@@ -69,6 +69,7 @@ for (const check of checks) {
 runTemporaryRepoChecks();
 runRepositoryChecks();
 runProductContextChecks();
+runRepoContextChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -380,6 +381,105 @@ function runProductContextChecks() {
       cwd: nonGitDir,
       exitCode: 1,
       includes: ["nerv product must be run inside a Git repository."],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runRepoContextChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-context-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    runCheck({
+      name: "repo generates development context",
+      args: ["repo"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Generated", ".nerv/repo/development.md"],
+      setup: () => {
+        spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+        spawnOrFail("init workspace before repo check", ["init"], repoRoot);
+        writeFileSync(join(repoRoot, "package.json"), JSON.stringify({
+          name: "test",
+          scripts: {
+            build: "tsc",
+            test: "jest",
+            lint: "eslint ."
+          }
+        }), "utf8");
+      },
+      verify: () => {
+        const devDocPath = join(repoRoot, ".nerv/repo/development.md");
+        verifyPath("repo generates development context", devDocPath, "file");
+        
+        const content = readFileSync(devDocPath, "utf8");
+        if (!content.includes("package.json")) {
+          fail("repo generates development context", "missing package.json in development.md", content);
+        }
+        if (!content.includes("build")) {
+          fail("repo generates development context", "missing build script in development.md", content);
+        }
+        if (!content.includes("test")) {
+          fail("repo generates development context", "missing test script in development.md", content);
+        }
+      },
+    });
+
+    runCheck({
+      name: "repo works without package.json",
+      args: ["repo"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Generated", ".nerv/repo/development.md"],
+      setup: () => {
+        rmSync(join(repoRoot, "package.json"), { force: true });
+      },
+      verify: () => {
+        const devDocPath = join(repoRoot, ".nerv/repo/development.md");
+        verifyPath("repo works without package.json", devDocPath, "file");
+        
+        const content = readFileSync(devDocPath, "utf8");
+        if (!content.includes("No scripts detected")) {
+          fail("repo works without package.json", "should report no scripts detected", content);
+        }
+      },
+    });
+
+    runCheck({
+      name: "repo fails when workspace not initialized",
+      args: ["repo"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Nerv is not initialized in this repo. Run `nerv init` first."],
+      setup: () => {
+        rmSync(join(repoRoot, ".nerv"), { recursive: true, force: true });
+      },
+    });
+
+    runCheck({
+      name: "repo works when git metadata is unavailable",
+      args: ["repo"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Generated", "Git available: no"],
+      setup: () => {
+        spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+        spawnOrFail("init workspace before missing git metadata check", ["init"], repoRoot);
+        rmSync(join(repoRoot, ".git"), { recursive: true, force: true });
+      },
+      verify: () => {
+        const devDocPath = join(repoRoot, ".nerv/repo/development.md");
+        verifyPath("repo works when git metadata is unavailable", devDocPath, "file");
+
+        const content = readFileSync(devDocPath, "utf8");
+        if (!content.includes("Not a Git repository or Git is not available.")) {
+          fail("repo works when git metadata is unavailable", "should report unavailable Git metadata", content);
+        }
+      },
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

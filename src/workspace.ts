@@ -61,6 +61,30 @@ export function getWorkspaceStatus(startDirectory: string): WorkspaceStatus {
   };
 }
 
+export function getInitializedWorkspaceStatus(startDirectory: string): WorkspaceStatus {
+  const gitStatus = getWorkspaceStatus(startDirectory);
+
+  if (gitStatus.repoRoot !== null || gitStatus.initialized) {
+    return gitStatus;
+  }
+
+  const workspaceRepoRoot = findInitializedWorkspaceRoot(startDirectory);
+
+  if (workspaceRepoRoot === null) {
+    return gitStatus;
+  }
+
+  const workspaceRoot = join(workspaceRepoRoot, WORKSPACE_DIRECTORY);
+  const databasePath = join(workspaceRoot, "nerv.db");
+
+  return {
+    repoRoot: workspaceRepoRoot,
+    workspaceRoot,
+    databasePath,
+    initialized: true,
+  };
+}
+
 export function ensureWorkspace(repoRoot: string): WorkspaceStatus {
   for (const relativeDirectory of REQUIRED_SUBDIRECTORIES) {
     mkdirSync(join(repoRoot, relativeDirectory), { recursive: true });
@@ -89,6 +113,23 @@ function isWorkspaceInitialized(repoRoot: string): boolean {
   const databasePath = join(repoRoot, WORKSPACE_DIRECTORY, "nerv.db");
 
   return isFile(databasePath) && hasRequiredSchema(databasePath);
+}
+
+function findInitializedWorkspaceRoot(startDirectory: string): string | null {
+  let currentDirectory = resolve(startDirectory);
+
+  while (true) {
+    if (isWorkspaceInitialized(currentDirectory)) {
+      return currentDirectory;
+    }
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory || currentDirectory === parse(currentDirectory).root) {
+      return null;
+    }
+
+    currentDirectory = parentDirectory;
+  }
 }
 
 function isDirectory(path: string): boolean {

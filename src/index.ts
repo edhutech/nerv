@@ -2,8 +2,11 @@
 
 import { Command } from "commander";
 
-import { ensureWorkspace, getWorkspaceStatus } from "./workspace.js";
+import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
 import { scaffoldProductContext } from "./product.js";
+import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const program = new Command();
 
@@ -104,6 +107,46 @@ program
         console.log(`  - ${file}`);
       }
     }
+  });
+
+program
+  .command("repo")
+  .description("Generate lightweight repo development context.")
+  .action(() => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv repo must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const analysis = analyzeRepo(status.repoRoot);
+    const content = generateDevelopmentDoc(analysis);
+    const outputPath = join(status.workspaceRoot!, "repo", "development.md");
+
+    writeFileSync(outputPath, content, "utf8");
+
+    console.log(`Generated ${outputPath}`);
+    console.log(`Detected ${analysis.packageFiles.length} package/config file(s).`);
+    console.log(`Detected ${Object.keys(analysis.scripts).length} script(s).`);
+    console.log(`Detected ${analysis.topLevelFolders.length} top-level folder(s).`);
+    console.log(`Git available: ${analysis.gitAvailable ? "yes" : "no"}`);
   });
 
 const newCommand = program

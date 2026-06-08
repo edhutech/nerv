@@ -63,7 +63,7 @@ By the end of this Build, the repo should have:
 ## Progress
 
 - TASK-007: Closed on 2026-06-08.
-- TASK-008: Planned on 2026-06-08.
+- TASK-008: Closed on 2026-06-08.
 - TASK-009: Planned on 2026-06-08.
 
 ## Acceptance criteria
