@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Closed
 
 ## Build Goal
 
@@ -97,6 +97,117 @@ The Build should be validated by:
 ## Dependencies
 
 - BUILD-001: Project And CLI Foundation.
+
+## Review
+
+Reviewed on 2026-06-08.
+
+Acceptance criteria check:
+
+- [x] `nerv init` is idempotent.
+- [x] Database state is created only inside the current repo.
+- [x] `nerv status` can report initialized or not initialized state.
+- [x] The schema supports later MVP lifecycle records.
+
+Scope check:
+
+- Passed. All three tasks stayed within their approved scope.
+- No full lifecycle commands were added.
+- No migration framework was introduced.
+- No ORM was adopted.
+
+Validation check:
+
+Commands performed:
+
+```bash
+pnpm build
+pnpm typecheck
+pnpm smoke
+```
+
+Results:
+
+- Build: passed.
+- Typecheck: passed.
+- Smoke: passed (15 checks covering init, status, schema, and ID generation).
+
+Manual validation performed:
+
+- Created a temporary repo, ran `nerv init`, confirmed idempotent rerun.
+- Verified `nerv status` reports `initialized` after init.
+- Verified schema tables exist: builds, checkpoints, decisions, metadata, reviews, runs, status_history, tasks.
+- Verified malformed schema rejection: `nerv status` → `not initialized`, `nerv init` → clear error.
+
+Risks:
+
+- `better-sqlite3` requires native build availability. `pnpm.onlyBuiltDependencies` is configured.
+- Schema may need adjustment as lifecycle commands become concrete.
+
+Evidence:
+
+- `src/workspace.ts`: repo root detection and idempotent workspace creation.
+- `src/database.ts`: explicit schema with `CREATE TABLE IF NOT EXISTS` and column validation.
+- `src/repository.ts`: atomic ID generation with `Math.max` reconciliation.
+- `scripts/smoke-cli.mjs`: 15 smoke checks including regressions for malformed schema and stale counters.
+
+Review result:
+
+- Ready to close. All tasks verified, all acceptance criteria met.
+
+## Close summary
+
+Closed on 2026-06-08.
+
+Commits:
+
+```txt
+11e2296 TASK-004 Add workspace detection, init, and status
+2d28223 TASK-005 Add SQLite bootstrap schema and database initialization
+1c10204 TASK-006 Add repository helpers and stable ID generation
+1b8453e workflow: link commits in TASK-004 and TASK-005 close records
+```
+
+Final summary:
+
+- Implemented `nerv init` with idempotent workspace creation scoped to the current Git repo.
+- Implemented `nerv status` reporting initialized or not initialized state.
+- Created `.nerv/` directory structure: `.nerv/product/`, `.nerv/repo/`, `.nerv/agent/runs/`, `.nerv/agent/builds/`.
+- Created `.nerv/nerv.db` with explicit SQLite schema for builds, tasks, runs, checkpoints, reviews, decisions, status_history and metadata.
+- Added `src/repository.ts` with atomic ID generation producing zero-padded IDs (`BUILD-001`, `TASK-001`, `RUN-001`).
+- Added column-level schema validation so malformed existing databases are rejected with clear errors.
+- Reconciled metadata counters with existing rows using `Math.max` to avoid collisions from stale counters.
+- Expanded smoke validation to 15 checks covering init, status, schema, and ID generation regressions.
+
+User or developer value delivered:
+
+- Developers can initialize Nerv inside any Git repo and get durable local state immediately.
+- Developers can check whether a repo already has Nerv local state with `nerv status`.
+- ID generation is stable and collision-resistant even when metadata counters are stale.
+
+Files changed:
+
+- `src/workspace.ts`
+- `src/database.ts`
+- `src/repository.ts`
+- `src/index.ts`
+- `scripts/smoke-cli.mjs`
+- `package.json`
+- `pnpm-lock.yaml`
+- `README.md`
+- `agent-workspace/tasks/TASK-004-add-workspace-detection-nerv-init-and-nerv-status.md`
+- `agent-workspace/tasks/TASK-005-add-sqlite-bootstrap-schema-and-database-initialization.md`
+- `agent-workspace/tasks/TASK-006-add-repository-helpers-and-stable-id-generation.md`
+- `agent-workspace/builds/BUILD-002-local-workspace-and-sqlite-state.md`
+
+Validation evidence:
+
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `pnpm smoke` passed (15 checks).
+- Manual init idempotency: passed.
+- Manual schema table inspection: passed (8 tables present).
+- Malformed schema regression: `status` → `not initialized`, `init` → clear error.
 
 ## Notes
 
