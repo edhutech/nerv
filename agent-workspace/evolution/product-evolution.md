@@ -43,3 +43,11 @@ Impact:
 - Documented current validation scripts and the intentional absence of `test` and `lint` scripts.
 - Related Build: BUILD-001 Project And CLI Foundation
 - Commit hash: abf72c1
+
+Closed BUILD-001: Project And CLI Foundation
+
+Impact:
+- Established Nerv as a buildable Node.js, TypeScript and pnpm CLI project.
+- Added the Commander-based MVP command skeleton and repeatable CLI validation.
+- All planned BUILD-001 tasks are closed and the repo is ready for BUILD-002.
+- Related tasks: TASK-001, TASK-002, TASK-003
