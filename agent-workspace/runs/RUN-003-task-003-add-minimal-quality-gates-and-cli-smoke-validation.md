@@ -140,14 +140,20 @@ Validation performed:
 
 Pending work:
 
-- Review TASK-003.
+- None for RUN-003.
 
 Suggested next step:
 
-- Review TASK-003.
+- Commit the TASK-003 close records, then review and close BUILD-001.
 
 Suggested commit message:
 
 ```txt
 TASK-003 Add CLI smoke validation
+```
+
+Commit:
+
+```txt
+abf72c1 TASK-003 Add CLI smoke validation
 ```

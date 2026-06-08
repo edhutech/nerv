@@ -2,7 +2,7 @@
 
 ## Status
 
-Reviewed
+Closed
 
 ## Parent Build
 
@@ -141,8 +141,7 @@ Validation performed:
 
 Pending work:
 
-- Commit TASK-003 once the user approves committing.
-- Close TASK-003 after commit.
+- None for TASK-003.
 
 ## Review
 
@@ -231,4 +230,55 @@ TASK-003 Add CLI smoke validation
 
 ## Close summary
 
-Pending.
+Closed on 2026-06-07.
+
+Commit:
+
+```txt
+abf72c1 TASK-003 Add CLI smoke validation
+```
+
+Final summary:
+
+- Added `scripts/smoke-cli.mjs` as a lightweight repeatable smoke validation path for the built CLI.
+- Added `pnpm smoke` and `pnpm validate` package scripts.
+- Added `README.md` validation notes for `build`, `typecheck`, `smoke` and `validate`.
+- Documented that `pnpm test` and `pnpm lint` are intentionally absent for the current MVP foundation.
+- Kept validation lightweight without adding a test framework, lint tooling, CI or Git hooks.
+
+User or developer value delivered:
+
+- BUILD-001 can now be verified with a single `pnpm validate` command.
+- The CLI foundation has repeatable checks for help output and placeholder command behavior before later Builds add real functionality.
+
+Files changed:
+
+- `package.json`
+- `README.md`
+- `scripts/smoke-cli.mjs`
+- `agent-workspace/tasks/TASK-003-add-minimal-quality-gates-and-cli-smoke-validation.md`
+- `agent-workspace/runs/RUN-003-task-003-add-minimal-quality-gates-and-cli-smoke-validation.md`
+- `agent-workspace/builds/BUILD-001-project-and-cli-foundation.md`
+
+Validation evidence:
+
+- `pnpm install --frozen-lockfile` passed.
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `pnpm smoke` passed.
+- `pnpm validate` passed.
+- `pnpm run test` and `pnpm run lint` are intentionally absent and documented.
+
+Related Build update:
+
+- BUILD-001 has all three planned tasks closed.
+- BUILD-001 is ready for Build-level review and close.
+
+Product evolution update:
+
+- Added a product evolution note for closing TASK-003.
+
+Follow-up tasks:
+
+- Review and close BUILD-001.
+- Start BUILD-002 after BUILD-001 is closed.

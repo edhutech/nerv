@@ -35,3 +35,11 @@ Impact:
 - Added explicit placeholder behavior so commands are discoverable without pretending to perform real work.
 - Related Build: BUILD-001 Project And CLI Foundation
 - Commit hash: 9dabd5a
+
+Closed TASK-003: Add Minimal Quality Gates And CLI Smoke Validation
+
+Impact:
+- Added repeatable CLI smoke validation and an aggregate `pnpm validate` command for the CLI foundation.
+- Documented current validation scripts and the intentional absence of `test` and `lint` scripts.
+- Related Build: BUILD-001 Project And CLI Foundation
+- Commit hash: abf72c1
