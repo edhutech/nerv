@@ -3,6 +3,7 @@
 import { Command } from "commander";
 
 import { ensureWorkspace, getWorkspaceStatus } from "./workspace.js";
+import { scaffoldProductContext } from "./product.js";
 
 const program = new Command();
 
@@ -59,7 +60,51 @@ program
 program
   .command("product")
   .description("Create or update local product context.")
-  .action(() => notImplemented("product"));
+  .action(() => {
+    const status = getWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv product must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const result = scaffoldProductContext(status.workspaceRoot!);
+
+    if (result.created.length === 0 && result.preserved.length === 0) {
+      console.log("No product files to scaffold.");
+      return;
+    }
+
+    if (result.created.length > 0) {
+      console.log(`Created ${result.created.length} product file(s):`);
+      for (const file of result.created) {
+        console.log(`  - ${file}`);
+      }
+    }
+
+    if (result.preserved.length > 0) {
+      console.log(`Preserved ${result.preserved.length} existing file(s):`);
+      for (const file of result.preserved) {
+        console.log(`  - ${file}`);
+      }
+    }
+  });
 
 const newCommand = program
   .command("new")

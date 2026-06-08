@@ -6,6 +6,7 @@ Nerv is a local-first Agent Work Harness for developers who work with coding age
 
 - `nerv init` creates repo-local `.nerv/` workspace directories and bootstraps `.nerv/nerv.db` with the initial SQLite schema.
 - `nerv status` reports whether the current Git repo is initialized.
+- `nerv product` scaffolds stable human-editable product context files under `.nerv/product/`.
 
 ## Development Validation
 

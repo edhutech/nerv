@@ -56,11 +56,15 @@ By the end of this Build, the repo should have:
 
 ## Suggested Agentic Tasks
 
-Do not complete this section until the Build is approved.
+- TASK-007: Implement Product Context Scaffold Command
+- TASK-008: Add Lightweight Repo Development Context
+- TASK-009: Persist Context Metadata And Status Integration
 
-- TASK-001:
-- TASK-002:
-- TASK-003:
+## Progress
+
+- TASK-007: Closed on 2026-06-08.
+- TASK-008: Planned on 2026-06-08.
+- TASK-009: Planned on 2026-06-08.
 
 ## Acceptance criteria
 

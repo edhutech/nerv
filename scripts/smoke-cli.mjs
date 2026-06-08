@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -68,6 +68,7 @@ for (const check of checks) {
 
 runTemporaryRepoChecks();
 runRepositoryChecks();
+runProductContextChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -282,6 +283,103 @@ function runTemporaryRepoChecks() {
       setup: () => {
         createMalformedWorkspace(malformedRepoRoot);
       },
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runProductContextChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-product-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+  const nonGitDir = join(tempRoot, "non-git");
+
+  mkdirSync(repoRoot, { recursive: true });
+  mkdirSync(nonGitDir, { recursive: true });
+
+  try {
+    runCheck({
+      name: "product scaffolds product files in initialized repo",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created 9 product file(s):"],
+      setup: () => {
+        spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+        spawnOrFail("init workspace before product check", ["init"], repoRoot);
+      },
+      verify: () => {
+        const productDir = join(repoRoot, ".nerv/product");
+        const expectedFiles = [
+          "product.md",
+          "problem.md",
+          "users.md",
+          "prd.md",
+          "roadmap.md",
+          "scope.md",
+          "decisions.md",
+          "architecture.md",
+          "evolution.md",
+        ];
+
+        for (const file of expectedFiles) {
+          verifyPath("product scaffolds product files in initialized repo", join(productDir, file), "file");
+        }
+      },
+    });
+
+    runCheck({
+      name: "product preserves existing files",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Preserved 9 existing file(s):"],
+      setup: () => {
+        writeFileSync(join(repoRoot, ".nerv/product/product.md"), "Custom product context\n", "utf8");
+      },
+      verify: () => {
+        const productDir = join(repoRoot, ".nerv/product");
+        const expectedFiles = [
+          "product.md",
+          "problem.md",
+          "users.md",
+          "prd.md",
+          "roadmap.md",
+          "scope.md",
+          "decisions.md",
+          "architecture.md",
+          "evolution.md",
+        ];
+
+        for (const file of expectedFiles) {
+          verifyPath("product preserves existing files", join(productDir, file), "file");
+        }
+
+        const productContent = readFileSync(join(productDir, "product.md"), "utf8");
+
+        if (productContent !== "Custom product context\n") {
+          fail("product preserves existing files", "existing product.md content was overwritten", productContent);
+        }
+      },
+    });
+
+    runCheck({
+      name: "product fails when workspace not initialized",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Nerv is not initialized in this repo. Run `nerv init` first."],
+      setup: () => {
+        rmSync(join(repoRoot, ".nerv"), { recursive: true, force: true });
+      },
+    });
+
+    runCheck({
+      name: "product fails when not in git repo",
+      args: ["product"],
+      cwd: nonGitDir,
+      exitCode: 1,
+      includes: ["nerv product must be run inside a Git repository."],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
