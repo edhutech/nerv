@@ -221,7 +221,7 @@ Closed on 2026-06-08.
 Commit:
 
 ```txt
-No commit linked yet.
+1363723 TASK-009 Persist context metadata and status integration
 ```
 
 Final summary:
