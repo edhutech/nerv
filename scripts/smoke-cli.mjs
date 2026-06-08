@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import Database from "better-sqlite3";
 
+import { openRepository } from "../dist/repository.js";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = resolve(root, "dist/index.js");
 
@@ -65,6 +67,123 @@ for (const check of checks) {
 }
 
 runTemporaryRepoChecks();
+runRepositoryChecks();
+
+function runRepositoryChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
+  const repoA = join(tempRoot, "repo-a");
+  const repoB = join(tempRoot, "repo-b");
+
+  mkdirSync(repoA, { recursive: true });
+  mkdirSync(repoB, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoA], { encoding: "utf8" });
+    spawnSync("git", ["init", repoB], { encoding: "utf8" });
+    spawnOrFail("init repo-a for id checks", ["init"], repoA);
+    spawnOrFail("init repo-b for id checks", ["init"], repoB);
+
+    const dbA = join(repoA, ".nerv/nerv.db");
+    const dbB = join(repoB, ".nerv/nerv.db");
+
+    const repositoryA = openRepository(dbA);
+    const repositoryB = openRepository(dbB);
+
+    try {
+      const idsA = [
+        repositoryA.getNextId("BUILD"),
+        repositoryA.getNextId("BUILD"),
+        repositoryA.getNextId("TASK"),
+        repositoryA.getNextId("RUN"),
+      ];
+
+      const idsB = [
+        repositoryB.getNextId("BUILD"),
+        repositoryB.getNextId("TASK"),
+      ];
+
+      const expectedA = ["BUILD-001", "BUILD-002", "TASK-001", "RUN-001"];
+      const expectedB = ["BUILD-001", "TASK-001"];
+
+      for (let i = 0; i < expectedA.length; i++) {
+        if (idsA[i] !== expectedA[i]) {
+          fail("sequential id generation", `expected ${expectedA[i]}, got ${idsA[i]}`, "");
+        }
+      }
+
+      for (let i = 0; i < expectedB.length; i++) {
+        if (idsB[i] !== expectedB[i]) {
+          fail("repo-local id generation", `expected ${expectedB[i]}, got ${idsB[i]}`, "");
+        }
+      }
+
+      console.log("ok - sequential id generation");
+      console.log("ok - repo-local id generation");
+    } finally {
+      repositoryA.close();
+      repositoryB.close();
+    }
+
+    verifyMalformedCounterRecovery(dbA);
+    verifyStaleCounterCollisionAvoidance(dbA);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function verifyMalformedCounterRecovery(databasePath) {
+  const database = new Database(databasePath);
+
+  try {
+    database
+      .prepare("INSERT INTO builds (id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run("BUILD-002", "Existing build", "open", "now", "now");
+  } finally {
+    database.close();
+  }
+
+  const repository = openRepository(databasePath);
+
+  try {
+    repository.setMetadata("next_build_number", "not-a-number");
+    const id = repository.getNextId("BUILD");
+
+    if (id !== "BUILD-003") {
+      fail("malformed id counter recovery", `expected BUILD-003, got ${id}`, "");
+    }
+
+    console.log("ok - malformed id counter recovery");
+  } finally {
+    repository.close();
+  }
+}
+
+function verifyStaleCounterCollisionAvoidance(databasePath) {
+  const database = new Database(databasePath);
+
+  try {
+    database
+      .prepare("INSERT INTO tasks (id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run("TASK-010", "Existing task", "open", "now", "now");
+  } finally {
+    database.close();
+  }
+
+  const repository = openRepository(databasePath);
+
+  try {
+    repository.setMetadata("next_task_number", "1");
+    const id = repository.getNextId("TASK");
+
+    if (id !== "TASK-011") {
+      fail("stale id counter collision avoidance", `expected TASK-011, got ${id}`, "");
+    }
+
+    console.log("ok - stale id counter collision avoidance");
+  } finally {
+    repository.close();
+  }
+}
 
 function runTemporaryRepoChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-smoke-"));

@@ -68,6 +68,7 @@ Do not complete this section until the Build is approved.
 
 - TASK-004: Closed on 2026-06-08.
 - TASK-005: Closed on 2026-06-08.
+- TASK-006: Closed on 2026-06-08.
 
 ## Acceptance criteria
 
