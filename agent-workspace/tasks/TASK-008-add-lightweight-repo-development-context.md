@@ -250,7 +250,7 @@ Closed on 2026-06-08.
 Commit:
 
 ```txt
-No commit linked yet.
+c8710d2 TASK-008 Add lightweight repo development context
 ```
 
 Final summary:
