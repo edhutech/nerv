@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Reviewed
 
 ## Parent Build
 
@@ -105,11 +105,129 @@ At the end, provide:
 
 ### Checkpoint 001
 
-Pending.
+Implemented RUN-003 on 2026-06-07.
+
+What changed:
+
+- Added a lightweight CLI smoke validation script at `scripts/smoke-cli.mjs`.
+- Added `pnpm smoke` for repeatable CLI smoke checks.
+- Added `pnpm validate` to run build, typecheck and smoke checks together.
+- Added `README.md` development validation notes.
+- Documented that `pnpm test` and `pnpm lint` are intentionally not present yet.
+
+Files touched:
+
+- `package.json`
+- `README.md`
+- `scripts/smoke-cli.mjs`
+- `agent-workspace/tasks/TASK-003-add-minimal-quality-gates-and-cli-smoke-validation.md`
+- `agent-workspace/runs/RUN-003-task-003-add-minimal-quality-gates-and-cli-smoke-validation.md`
+- `agent-workspace/builds/BUILD-001-project-and-cli-foundation.md`
+
+Decisions made:
+
+- Use a plain Node.js smoke script instead of adding a test framework.
+- Keep `pnpm build` and `pnpm typecheck` as core validation.
+- Do not add `pnpm test` or `pnpm lint` yet because TASK-003 only needs lightweight smoke validation.
+- Smoke checks target the built `dist/index.js`, so validation does not depend on global installation.
+
+Validation performed:
+
+- `pnpm install --frozen-lockfile` passed.
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `pnpm smoke` passed.
+- `pnpm validate` passed.
+
+Pending work:
+
+- Commit TASK-003 once the user approves committing.
+- Close TASK-003 after commit.
 
 ## Review
 
-Pending.
+Reviewed on 2026-06-07.
+
+Acceptance criteria check:
+
+- [x] Build command passes.
+- [x] CLI help can be smoke-tested.
+- [x] Missing optional scripts are reported honestly.
+- [x] BUILD-001 acceptance criteria can be checked end to end.
+
+Scope check:
+
+- Passed. The work stayed within development validation scope.
+- No test framework was added.
+- No lint tooling was added.
+- No CI setup or Git hooks were added.
+- No `.nerv/` state, SQLite, persistence or real command behavior was added.
+
+Validation check:
+
+Commands performed:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm typecheck
+pnpm smoke
+pnpm validate
+pnpm run test
+pnpm run lint
+git status --short --branch
+git diff --stat
+git diff -- package.json README.md scripts/smoke-cli.mjs
+git ls-files --others --exclude-standard
+git status --short --ignored
+```
+
+Results:
+
+- Install: passed. Lockfile is up to date.
+- Build: passed.
+- Typecheck: passed.
+- Smoke: passed.
+- Validate: passed.
+- Test: not present. `pnpm run test` reports missing script, as intentionally documented.
+- Lint: not present. `pnpm run lint` reports missing script, as intentionally documented.
+- Ignored generated files: `dist/` and `node_modules/` remain ignored.
+
+Smoke coverage:
+
+- Top-level help lists MVP command groups.
+- `init --help` works.
+- `status --help` works.
+- `new --help` exposes `task` and `build`.
+- `build --help` exposes `plan`.
+- `status` placeholder command exits with code `1` and an explicit not-implemented message.
+
+Git diff check:
+
+- Modified files: `package.json`, `agent-workspace/tasks/TASK-003-add-minimal-quality-gates-and-cli-smoke-validation.md`, `agent-workspace/builds/BUILD-001-project-and-cli-foundation.md`.
+- Added files: `README.md`, `scripts/smoke-cli.mjs`, `agent-workspace/runs/RUN-003-task-003-add-minimal-quality-gates-and-cli-smoke-validation.md`.
+- No dependency lockfile change was needed because no dependencies were added.
+
+Risks:
+
+- Smoke checks assert selected help text, so they may need updates when real command behavior or descriptions change.
+- `pnpm smoke` expects `dist/index.js` to already exist; `pnpm validate` runs build first and should be the normal full validation command.
+
+Evidence:
+
+- `pnpm validate` runs build, typecheck and smoke checks together successfully.
+- `README.md` documents available validation scripts and explicitly notes that `test` and `lint` are intentionally absent.
+- `scripts/smoke-cli.mjs` uses the built local CLI, so validation does not depend on global installation.
+
+Review result:
+
+- Ready to commit. No remaining changes required for TASK-003.
+
+Suggested commit message:
+
+```txt
+TASK-003 Add CLI smoke validation
+```
 
 ## Close summary
 
