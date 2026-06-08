@@ -221,7 +221,7 @@ Closed on 2026-06-08.
 Commit:
 
 ```txt
-No commit linked yet.
+ba5803e TASK-007 Implement product context scaffold command
 ```
 
 Final summary:
