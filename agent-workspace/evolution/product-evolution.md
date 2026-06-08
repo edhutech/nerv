@@ -51,3 +51,69 @@ Impact:
 - Added the Commander-based MVP command skeleton and repeatable CLI validation.
 - All planned BUILD-001 tasks are closed and the repo is ready for BUILD-002.
 - Related tasks: TASK-001, TASK-002, TASK-003
+
+## 2026-06-08
+
+Closed TASK-004: Add Workspace Detection, `nerv init`, And `nerv status`
+
+Impact:
+- Added repo-local workspace detection using the current Git repository root.
+- Implemented idempotent `nerv init` and minimal `nerv status` behavior.
+- Related Build: BUILD-002 Local Workspace And SQLite State
+- Commit hash: 11e2296
+
+Closed TASK-005: Add SQLite Bootstrap Schema And Database Initialization
+
+Impact:
+- Added the initial SQLite schema for builds, tasks, runs, checkpoints, reviews, decisions, status history and metadata.
+- Made database initialization safe to rerun and hardened malformed schema handling.
+- Related Build: BUILD-002 Local Workspace And SQLite State
+- Commit hash: 2d28223
+
+Closed TASK-006: Add Repository Helpers And Stable ID Generation
+
+Impact:
+- Added a thin SQLite repository helper layer.
+- Added stable sequential IDs for builds, tasks and runs with malformed/stale counter protection.
+- Related Build: BUILD-002 Local Workspace And SQLite State
+- Commit hash: 1c10204
+
+Closed BUILD-002: Local Workspace And SQLite State
+
+Impact:
+- Established `.nerv/` and `.nerv/nerv.db` as the local-first Nerv state foundation.
+- Added repo-scoped initialization, status reporting, durable schema and stable ID generation.
+- Unblocked future lifecycle commands that need persistent local state.
+- Related tasks: TASK-004, TASK-005, TASK-006
+
+Closed TASK-007: Implement Product Context Scaffold Command
+
+Impact:
+- Implemented `nerv product` to scaffold stable human-editable product docs under `.nerv/product/`.
+- Added non-overwrite behavior with smoke coverage that verifies edited content is preserved.
+- Related Build: BUILD-003 Product And Repo Context Flow
+- Commit hash: ba5803e
+
+Closed TASK-008: Add Lightweight Repo Development Context
+
+Impact:
+- Implemented `nerv repo` to generate `.nerv/repo/development.md` with lightweight package, script, folder and Git context.
+- Added graceful behavior when Git metadata is unavailable in an initialized workspace.
+- Related Build: BUILD-003 Product And Repo Context Flow
+- Commit hash: c8710d2
+
+Closed TASK-009: Persist Context Metadata And Status Integration
+
+Impact:
+- Persisted product/repo context freshness metadata and product decision headings in SQLite.
+- Added context discovery and concise context availability output in `nerv status`.
+- Related Build: BUILD-003 Product And Repo Context Flow
+- Commit hash: 1363723
+
+Closed BUILD-003: Product And Repo Context Flow
+
+Impact:
+- Added usable product context creation and lightweight repo awareness to the Nerv CLI.
+- Made context availability visible and durable for future `run.md` generation.
+- Preserved the local-first, human-editable Markdown model while storing useful structured metadata in SQLite.
+- Related tasks: TASK-007, TASK-008, TASK-009

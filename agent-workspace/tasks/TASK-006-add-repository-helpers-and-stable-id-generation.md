@@ -240,7 +240,7 @@ Closed on 2026-06-08.
 Commit:
 
 ```txt
-No commit linked yet.
+1c10204 TASK-006 Add repository helpers and stable ID generation
 ```
 
 Final summary:
