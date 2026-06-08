@@ -234,7 +234,7 @@ Closed on 2026-06-08.
 Commit:
 
 ```txt
-No commit linked yet.
+11e2296 TASK-004 Add workspace detection, init, and status
 ```
 
 Final summary:

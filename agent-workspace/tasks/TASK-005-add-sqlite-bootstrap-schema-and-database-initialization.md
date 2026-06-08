@@ -253,7 +253,7 @@ Closed on 2026-06-08.
 Commit:
 
 ```txt
-No commit linked yet.
+2d28223 TASK-005 Add SQLite bootstrap schema and database initialization
 ```
 
 Final summary:
