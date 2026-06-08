@@ -62,6 +62,12 @@ Do not complete this section until the Build is approved.
 - TASK-002: Add Commander CLI Entrypoint And Command Skeleton
 - TASK-003: Add Minimal Quality Gates And CLI Smoke Validation
 
+## Progress
+
+- TASK-001: Closed on 2026-06-07 with commit `f6c0e2b`.
+- TASK-002: Ready for review after RUN-002.
+- TASK-003: Pending.
+
 ## Acceptance criteria
 
 The Build is complete when:

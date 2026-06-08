@@ -1,5 +1,9 @@
 # RUN-001
 
+## Status
+
+Complete
+
 ## Active Task
 
 TASK-001: Initialize TypeScript Package Foundation
@@ -95,3 +99,30 @@ Before finishing this Run, provide:
 - Pending work
 - Suggested next step
 - Suggested commit message
+
+## Completion summary
+
+Completed on 2026-06-07.
+
+What changed:
+
+- Added the initial Node.js, TypeScript and pnpm package foundation.
+- Added `package.json`, `tsconfig.json`, `src/index.ts`, `pnpm-lock.yaml` and `.gitignore`.
+- Updated TASK-001 with checkpoint, review and close records.
+
+Validation performed:
+
+- `pnpm install --frozen-lockfile`
+- `pnpm build`
+- `pnpm typecheck`
+- `node dist/index.js`
+
+Commit:
+
+```txt
+f6c0e2b TASK-001 Initialize TypeScript package foundation
+```
+
+Pending work:
+
+- Start TASK-002 in a new Run.

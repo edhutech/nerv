@@ -2,7 +2,7 @@
 
 ## Status
 
-Reviewed
+Closed
 
 ## Parent Build
 
@@ -140,8 +140,7 @@ Validation performed:
 
 Pending work:
 
-- Commit TASK-001 once the user approves committing.
-- Close TASK-001 after commit, or explicitly close without commit if the user chooses that path.
+- None for TASK-001.
 - Implement Commander command skeletons in TASK-002 after approval and a new Run.
 
 ## Review
@@ -284,4 +283,53 @@ TASK-001 Initialize TypeScript package foundation
 
 ## Close summary
 
-Pending.
+Closed on 2026-06-07.
+
+Commit:
+
+```txt
+f6c0e2b TASK-001 Initialize TypeScript package foundation
+```
+
+Final summary:
+
+- Created the initial Nerv Node.js package foundation.
+- Added TypeScript configuration for a strict, buildable CLI codebase.
+- Added a minimal executable source entrypoint.
+- Added pnpm lockfile and ignore rules for generated/local files.
+- Kept Commander command skeletons, SQLite and `.nerv/` state out of scope for later tasks.
+
+User or developer value delivered:
+
+- Nerv now exists as real software scaffolding instead of only planning Markdown.
+- Later BUILD-001 tasks can add Commander routing and smoke validation on top of a working TypeScript foundation.
+
+Files changed:
+
+- `.gitignore`
+- `package.json`
+- `pnpm-lock.yaml`
+- `src/index.ts`
+- `tsconfig.json`
+- `agent-workspace/tasks/TASK-001-initialize-typescript-package-foundation.md`
+
+Validation evidence:
+
+- `pnpm install --frozen-lockfile` passed.
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `node dist/index.js` passed and printed the expected foundation message.
+
+Related Build update:
+
+- BUILD-001 has its first task closed.
+- TASK-002 is the next task for adding Commander CLI command skeletons.
+
+Product evolution update:
+
+- Added a product evolution note for closing TASK-001.
+
+Follow-up tasks:
+
+- TASK-002: Add Commander CLI Entrypoint And Command Skeleton
+- TASK-003: Add Minimal Quality Gates And CLI Smoke Validation
