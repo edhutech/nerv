@@ -11,6 +11,11 @@
   "files": [
     "dist"
   ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -18,12 +23,15 @@
     "validate": "pnpm build && pnpm typecheck && pnpm smoke"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.1",
     "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "better-sqlite3": "^12.4.1",
     "commander": "^14.0.3"
   }
 }

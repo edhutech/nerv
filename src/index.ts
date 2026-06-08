@@ -2,6 +2,8 @@
 
 import { Command } from "commander";
 
+import { ensureWorkspace, getWorkspaceStatus } from "./workspace.js";
+
 const program = new Command();
 
 function notImplemented(commandName: string): void {
@@ -19,7 +21,40 @@ program
 program
   .command("init")
   .description("Initialize Nerv in the current repo.")
-  .action(() => notImplemented("init"));
+  .action(() => {
+    const status = getWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv init must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    const repoRoot = status.repoRoot;
+    const wasInitialized = status.initialized;
+    let initializedWorkspace;
+
+    try {
+      initializedWorkspace = ensureWorkspace(repoRoot);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      program.error(`nerv init failed: ${message}`, {
+        code: "NERV_INIT_FAILED",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    console.log(
+      wasInitialized
+        ? `Nerv is already initialized in ${initializedWorkspace.repoRoot}.`
+        : `Initialized Nerv in ${initializedWorkspace.repoRoot}.`,
+    );
+  });
 
 program
   .command("product")
@@ -101,7 +136,19 @@ program
 program
   .command("status")
   .description("Show Nerv workspace status.")
-  .action(() => notImplemented("status"));
+  .action(() => {
+    const status = getWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      console.log("Nerv status: not initialized");
+      console.log("Reason: current directory is not inside a Git repository.");
+      return;
+    }
+
+    console.log(`Nerv status: ${status.initialized ? "initialized" : "not initialized"}`);
+    console.log(`Repo root: ${status.repoRoot}`);
+    console.log(`Workspace path: ${status.workspaceRoot}`);
+  });
 
 program
   .command("clean")

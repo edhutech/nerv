@@ -60,9 +60,14 @@ By the end of this Build, the repo should have:
 
 Do not complete this section until the Build is approved.
 
-- TASK-001:
-- TASK-002:
-- TASK-003:
+- TASK-004: Add Workspace Detection, `nerv init`, And `nerv status`
+- TASK-005: Add SQLite Bootstrap Schema And Database Initialization
+- TASK-006: Add Repository Helpers And Stable ID Generation
+
+## Progress
+
+- TASK-004: Closed on 2026-06-08.
+- TASK-005: Closed on 2026-06-08.
 
 ## Acceptance criteria
 
