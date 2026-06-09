@@ -8,6 +8,7 @@ import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
 import { createTaskFromIntent } from "./task.js";
+import { createBuildFromIntent, planBuildTasks } from "./build.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -234,7 +235,48 @@ newCommand
   .command("build")
   .argument("<intent>", "Build intent to turn into a group of Agentic Tasks.")
   .description("Create an Agentic Build from intent.")
-  .action(() => notImplemented("new build"));
+  .action((intent: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv new build must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    try {
+      const result = createBuildFromIntent(status.databasePath!, status.workspaceRoot!, intent);
+
+      console.log(`Created ${result.build.id}: ${result.build.title}`);
+      console.log(`Intent: ${intent}`);
+      console.log(`Status: ${result.build.status}`);
+      console.log(`Markdown: ${result.markdownPath}`);
+      console.log("");
+      console.log("Next steps:");
+      console.log(`  nerv build plan ${result.build.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      program.error(message, {
+        code: "NERV_BUILD_CREATION_FAILED",
+        exitCode: 1,
+      });
+    }
+  });
 
 const buildCommand = program
   .command("build")
@@ -244,7 +286,61 @@ buildCommand
   .command("plan")
   .argument("<buildId>", "Build ID to plan, for example BUILD-001.")
   .description("Plan Agentic Tasks for an approved Build.")
-  .action(() => notImplemented("build plan"));
+  .action((buildId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv build plan must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    try {
+      const result = planBuildTasks(status.databasePath!, status.workspaceRoot!, buildId);
+
+      if (result.skipped) {
+        console.log(`Build ${buildId} already has ${result.tasks.length} planned task(s).`);
+        console.log("");
+        console.log("Planned tasks:");
+        for (const task of result.tasks) {
+          console.log(`  - ${task.id}: ${task.title}`);
+        }
+        return;
+      }
+
+      console.log(`Planned ${result.tasks.length} task(s) for ${buildId}: ${result.build.title}`);
+      console.log("");
+      console.log("Planned tasks:");
+      for (const task of result.tasks) {
+        console.log(`  - ${task.id}: ${task.title}`);
+        console.log(`    Markdown: ${task.generated_markdown_path}`);
+      }
+      console.log("");
+      console.log("Next steps:");
+      console.log(`  nerv start ${result.tasks[0]?.id || "<task-id>"}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      program.error(message, {
+        code: "NERV_BUILD_PLAN_FAILED",
+        exitCode: 1,
+      });
+    }
+  });
 
 program
   .command("start")

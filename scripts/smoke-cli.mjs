@@ -73,6 +73,7 @@ runRepoContextChecks();
 runContextMetadataChecks();
 runWorkItemPersistenceChecks();
 runTaskCreationChecks();
+runBuildCreationChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1081,6 +1082,107 @@ function runTaskCreationChecks() {
       cwd: repoRoot,
       exitCode: 0,
       includes: ["Created TASK-003"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runBuildCreationChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-build-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before build check", ["init"], repoRoot);
+
+    runCheck({
+      name: "new build creates build in initialized repo",
+      args: ["new", "build", "Implement user authentication system"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created BUILD-001", "Implement user authentication system", "Next steps:"],
+      verify: () => {
+        const buildFile = join(repoRoot, ".nerv/agent/builds/BUILD-001.md");
+        verifyPath("new build creates build in initialized repo", buildFile, "file");
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const build = repository.getBuild("BUILD-001");
+          if (!build) {
+            fail("new build creates build in initialized repo", "build not found in database", "");
+          }
+          if (build.title !== "Implement user authentication system") {
+            fail("new build creates build in initialized repo", `title mismatch: ${build.title}`, "");
+          }
+          if (build.intent !== "Implement user authentication system") {
+            fail("new build creates build in initialized repo", `intent mismatch: ${build.intent}`, "");
+          }
+          if (build.status !== "proposed") {
+            fail("new build creates build in initialized repo", `status mismatch: ${build.status}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "build plan creates tasks for build",
+      args: ["build", "plan", "BUILD-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Planned 3 task(s) for BUILD-001", "TASK-001", "TASK-002", "TASK-003"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const tasks = repository.listTasksByBuild("BUILD-001");
+          if (tasks.length !== 3) {
+            fail("build plan creates tasks for build", `expected 3 tasks, got ${tasks.length}`, "");
+          }
+          for (const task of tasks) {
+            if (task.build_id !== "BUILD-001") {
+              fail("build plan creates tasks for build", `task ${task.id} not linked to BUILD-001`, "");
+            }
+            const taskFile = join(repoRoot, ".nerv/agent/tasks", `${task.id}.md`);
+            verifyPath("build plan creates tasks for build", taskFile, "file");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "build plan is idempotent",
+      args: ["build", "plan", "BUILD-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["already has 3 planned task(s)"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const tasks = repository.listTasksByBuild("BUILD-001");
+          if (tasks.length !== 3) {
+            fail("build plan is idempotent", `expected 3 tasks, got ${tasks.length}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "build plan fails for non-existent build",
+      args: ["build", "plan", "BUILD-999"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["not found"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
