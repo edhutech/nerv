@@ -140,4 +140,4 @@ Impact:
 - Added repository helpers for creating, retrieving and listing Run records in SQLite.
 - Added active Run metadata helpers and deterministic Task selection for future `nerv start <query>` behavior.
 - Related Build: BUILD-005 Run Generation And Agent Entrypoint
-- Commit hash: not committed
+- Commit hash: ff8dbbb
