@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { createInterface } from "node:readline/promises";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
 import { scaffoldProductContext, persistProductMetadata, persistDecisions } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
-import { createTaskFromIntent } from "./task.js";
+import { createTaskFromIntent, detectLargeIntent } from "./task.js";
 import { createBuildFromIntent, planBuildTasks } from "./build.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -180,7 +181,8 @@ newCommand
   .argument("<intent>", "Task intent to turn into scoped agentic work.")
   .description("Create an Agentic Task from intent.")
   .option("--force", "Force task creation even if large intent is detected.")
-  .action((intent: string, options: { force?: boolean }) => {
+  .option("--yes", "Create a Build instead when large intent is detected.")
+  .action(async (intent: string, options: { force?: boolean; yes?: boolean }) => {
     const status = getInitializedWorkspaceStatus(process.cwd());
 
     if (status.repoRoot === null) {
@@ -205,6 +207,33 @@ newCommand
     }
 
     try {
+      if (!options.force && detectLargeIntent(intent)) {
+        if (options.yes || await shouldCreateBuildFromLargeIntent()) {
+          const result = createBuildFromIntent(status.databasePath!, status.workspaceRoot!, intent);
+
+          console.log(`Created ${result.build.id}: ${result.build.title}`);
+          console.log(`Intent: ${intent}`);
+          console.log(`Status: ${result.build.status}`);
+          console.log(`Markdown: ${result.markdownPath}`);
+          console.log("");
+          console.log("Next steps:");
+          console.log(`  nerv build plan ${result.build.id}`);
+          return;
+        }
+
+        program.error(
+          `This intent appears to be large enough to warrant an Agentic Build.\n` +
+            `Use \`nerv new build "${intent}"\` to create a Build first, then plan tasks.\n` +
+            `If you want to create a task anyway, use --force.`,
+          {
+            code: "NERV_TASK_INTENT_TOO_LARGE",
+            exitCode: 1,
+          },
+        );
+
+        return;
+      }
+
       const result = createTaskFromIntent(status.databasePath!, status.workspaceRoot!, intent, {
         force: options.force,
       });
@@ -230,6 +259,24 @@ newCommand
       });
     }
   });
+
+async function shouldCreateBuildFromLargeIntent(): Promise<boolean> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    return false;
+  }
+
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+
+  try {
+    const answer = await readline.question(
+      "This looks too large for one Agentic Task. Create an Agentic Build instead? [y/N] ",
+    );
+
+    return answer.trim().toLowerCase().startsWith("y");
+  } finally {
+    readline.close();
+  }
+}
 
 newCommand
   .command("build")
@@ -544,4 +591,4 @@ program
   .description("Clean safe generated Nerv artifacts.")
   .action(() => notImplemented("clean"));
 
-program.parse();
+await program.parseAsync();

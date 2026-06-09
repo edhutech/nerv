@@ -1070,6 +1070,33 @@ function runTaskCreationChecks() {
     });
 
     runCheck({
+      name: "new task --yes creates build for large intent",
+      args: ["new", "task", "--yes", "Build a complete authentication system with OAuth and SAML"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created BUILD-001", "Next steps:", "nerv build plan BUILD-001"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const build = repository.getBuild("BUILD-001");
+          if (!build) {
+            fail("new task --yes creates build for large intent", "build not found in database", "");
+          }
+          if (build.intent !== "Build a complete authentication system with OAuth and SAML") {
+            fail("new task --yes creates build for large intent", `intent mismatch: ${build.intent}`, "");
+          }
+          const tasks = repository.listTasks();
+          if (tasks.length !== 1) {
+            fail("new task --yes creates build for large intent", `expected no extra task, got ${tasks.length}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
       name: "new task --force bypasses large intent detection",
       args: ["new", "task", "--force", "Build a complete authentication system with OAuth and SAML"],
       cwd: repoRoot,

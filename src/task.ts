@@ -89,7 +89,7 @@ export function createTaskFromIntent(
   }
 }
 
-function detectLargeIntent(intent: string): boolean {
+export function detectLargeIntent(intent: string): boolean {
   const lowerIntent = intent.toLowerCase();
 
   for (const phrase of LARGE_INTENT_PHRASES) {
