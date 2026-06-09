@@ -76,6 +76,7 @@ runTaskCreationChecks();
 runBuildCreationChecks();
 runQueryChecks();
 runStartChecks();
+runCurrentAndRunsChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1526,6 +1527,73 @@ function runStartChecks() {
           repository.close();
         }
       },
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runCurrentAndRunsChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-current-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before current check", ["init"], repoRoot);
+
+    runCheck({
+      name: "current shows no current run message",
+      args: ["current"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["No current run."],
+    });
+
+    runCheck({
+      name: "runs shows empty list message",
+      args: ["runs"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["No runs found."],
+    });
+
+    spawnOrFail("create task for current check", ["new", "task", "Add sample feature"], repoRoot);
+    spawnOrFail("start run for current check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "current shows active run",
+      args: ["current"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["RUN-001:", "TASK-001", "Add sample feature", "Status: active", ".nerv/agent/runs/RUN-001/run.md"],
+    });
+
+    runCheck({
+      name: "runs lists created runs",
+      args: ["runs"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 run(s):", "RUN-001:", "TASK-001", "Add sample feature", "Status: active"],
+    });
+
+    spawnOrFail("start second run for current check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "runs lists multiple runs",
+      args: ["runs"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 2 run(s):", "RUN-001:", "RUN-002:"],
+    });
+
+    runCheck({
+      name: "current shows most recent run",
+      args: ["current"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["RUN-002:", "TASK-001"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

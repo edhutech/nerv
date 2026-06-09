@@ -66,7 +66,9 @@ By the end of this Build, the repo should have:
 
 - TASK-014: Closed. Run persistence helpers, current Run metadata and deterministic Task selection are implemented.
 - TASK-015: Closed. `nerv start <query>` creates runs and generates focused `run.md` with scope, context, validation, and lifecycle instructions.
-- TASK-016: Pending.
+- TASK-016: Closed. `nerv current` and `nerv runs` commands are implemented with graceful edge case handling.
+
+**BUILD-005 is complete.**
 
 ## Acceptance criteria
 

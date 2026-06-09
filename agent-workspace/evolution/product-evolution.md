@@ -152,3 +152,24 @@ Impact:
 - The generated `run.md` is the single agent entrypoint with scope, context, acceptance criteria, validation, checkpoint, review, close and Git awareness sections.
 - Related Build: BUILD-005 Run Generation And Agent Entrypoint
 - Commit hash: 78a6ea6
+
+## 2026-06-09
+
+Closed TASK-016: Implement nerv current And nerv runs
+
+Impact:
+
+- Implemented `nerv current` to show the active Run with task details and run file path.
+- Implemented `nerv runs` to list all Runs with task details.
+- Added graceful handling for stale metadata and missing task references.
+- Related Build: BUILD-005 Run Generation And Agent Entrypoint
+- Commit hash: c53e972
+
+Closed BUILD-005: Run Generation And Agent Entrypoint
+
+Impact:
+
+- Implemented `nerv start <query>` to create Runs and generate focused `run.md` agent entrypoints.
+- Implemented `nerv current` and `nerv runs` for active Run discovery and Run listing.
+- All planned BUILD-005 tasks are closed and the repo is ready for BUILD-006.
+- Related tasks: TASK-014, TASK-015, TASK-016

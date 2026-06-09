@@ -444,7 +444,63 @@ program
 program
   .command("current")
   .description("Show the current active Run.")
-  .action(() => notImplemented("current"));
+  .action(() => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv current must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const currentRunId = repository.getCurrentRunId();
+
+      if (!currentRunId) {
+        console.log("No current run.");
+        return;
+      }
+
+      const run = repository.getRun(currentRunId);
+
+      if (!run) {
+        console.log(`Current run ${currentRunId} not found.`);
+        return;
+      }
+
+      const task = repository.getTask(run.task_id);
+
+      if (!task) {
+        console.log(`Current run ${run.id} references missing task ${run.task_id}.`);
+        return;
+      }
+
+      const runMarkdownPath = join(status.workspaceRoot!, "agent", "runs", run.id, "run.md");
+
+      console.log(`${run.id}: ${task.id} - ${task.title}`);
+      console.log(`  Status: ${run.status}`);
+      console.log(`  Run file: ${runMarkdownPath}`);
+    } finally {
+      repository.close();
+    }
+  });
 
 program
   .command("checkpoint")
@@ -598,7 +654,56 @@ program
 program
   .command("runs")
   .description("List Runs.")
-  .action(() => notImplemented("runs"));
+  .action(() => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv runs must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const runs = repository.listRuns();
+
+      if (runs.length === 0) {
+        console.log("No runs found.");
+        return;
+      }
+
+      console.log(`Found ${runs.length} run(s):`);
+      console.log("");
+
+      for (const run of runs) {
+        const task = repository.getTask(run.task_id);
+        const taskTitle = task ? task.title : "(missing task)";
+        const taskLabel = task ? task.id : run.task_id;
+
+        console.log(`${run.id}: ${taskLabel} - ${taskTitle}`);
+        console.log(`  Status: ${run.status}`);
+        console.log("");
+      }
+    } finally {
+      repository.close();
+    }
+  });
 
 program
   .command("status")
