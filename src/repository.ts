@@ -51,6 +51,15 @@ export type TaskRecord = {
   generated_markdown_path: string | null;
 };
 
+export type RunRecord = {
+  id: string;
+  task_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+};
+
 export type CreateBuildInput = {
   id: string;
   title: string;
@@ -80,6 +89,12 @@ export type CreateTaskInput = {
   generated_markdown_path?: string;
 };
 
+export type CreateRunInput = {
+  id: string;
+  task_id: string;
+  status?: string;
+};
+
 export type Repository = {
   close(): void;
   getNextId(type: IdType): string;
@@ -95,8 +110,14 @@ export type Repository = {
   getTask(id: string): TaskRecord | null;
   listTasks(): TaskRecord[];
   searchTasks(query: string): TaskRecord[];
+  selectTaskForRun(query: string): TaskRecord;
   listTasksByBuild(buildId: string): TaskRecord[];
   updateTask(id: string, updates: Partial<Omit<TaskRecord, "id" | "created_at">>): void;
+  createRun(input: CreateRunInput): RunRecord;
+  getRun(id: string): RunRecord | null;
+  listRuns(): RunRecord[];
+  getCurrentRunId(): string | null;
+  setCurrentRunId(runId: string): void;
 };
 
 export function openRepository(databasePath: string): Repository {
@@ -189,6 +210,19 @@ export function openRepository(databasePath: string): Repository {
 
   const updateTaskStmt = database.prepare(
     `UPDATE tasks SET build_id = @buildId, title = @title, status = @status, updated_at = @updatedAt, closed_at = @closedAt, intent = @intent, scope = @scope, out_of_scope = @outOfScope, acceptance_criteria = @acceptanceCriteria, validation = @validation, risks = @risks, generated_markdown_path = @generatedMarkdownPath WHERE id = @id`,
+  );
+
+  const createRunStmt = database.prepare(
+    `INSERT INTO runs (id, task_id, status, created_at, updated_at, closed_at)
+     VALUES (@id, @taskId, @status, @createdAt, @updatedAt, @closedAt)`,
+  );
+
+  const getRunStmt = database.prepare(
+    `SELECT * FROM runs WHERE id = ?`,
+  );
+
+  const listRunsStmt = database.prepare(
+    `SELECT * FROM runs ORDER BY id DESC`,
   );
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
@@ -367,6 +401,36 @@ export function openRepository(databasePath: string): Repository {
     return searchTasksByTextStmt.all(pattern, pattern) as TaskRecord[];
   };
 
+  const selectTaskForRun = (query: string): TaskRecord => {
+    const trimmed = query.trim();
+
+    if (!trimmed) {
+      throw new Error("Task query is required.");
+    }
+
+    if (/^TASK-\d+$/i.test(trimmed)) {
+      const task = getTask(trimmed.toUpperCase());
+      if (!task) {
+        throw new Error(`No task found matching "${trimmed}".`);
+      }
+
+      return task;
+    }
+
+    const tasks = searchTasks(trimmed);
+
+    if (tasks.length === 0) {
+      throw new Error(`No task found matching "${trimmed}".`);
+    }
+
+    if (tasks.length > 1) {
+      const matches = tasks.map((task) => `${task.id}: ${task.title}`).join("\n");
+      throw new Error(`Task query "${trimmed}" is ambiguous. Matching tasks:\n${matches}`);
+    }
+
+    return tasks[0];
+  };
+
   const listTasksByBuild = (buildId: string): TaskRecord[] => {
     return listTasksByBuildStmt.all(buildId) as TaskRecord[];
   };
@@ -403,6 +467,38 @@ export function openRepository(databasePath: string): Repository {
     });
   });
 
+  const createRun = database.transaction((input: CreateRunInput): RunRecord => {
+    const now = new Date().toISOString();
+    const record: RunRecord = {
+      id: input.id,
+      task_id: input.task_id,
+      status: input.status ?? "active",
+      created_at: now,
+      updated_at: now,
+      closed_at: null,
+    };
+
+    createRunStmt.run({
+      id: record.id,
+      taskId: record.task_id,
+      status: record.status,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+      closedAt: record.closed_at,
+    });
+
+    return record;
+  });
+
+  const getRun = (id: string): RunRecord | null => {
+    const row = getRunStmt.get(id) as RunRecord | undefined;
+    return row ?? null;
+  };
+
+  const listRuns = (): RunRecord[] => {
+    return listRunsStmt.all() as RunRecord[];
+  };
+
   return {
     close() {
       database.close();
@@ -428,8 +524,18 @@ export function openRepository(databasePath: string): Repository {
     getTask,
     listTasks,
     searchTasks,
+    selectTaskForRun,
     listTasksByBuild,
     updateTask,
+    createRun,
+    getRun,
+    listRuns,
+    getCurrentRunId(): string | null {
+      return this.getMetadata("current_run_id");
+    },
+    setCurrentRunId(runId: string): void {
+      this.setMetadata("current_run_id", runId);
+    },
   };
 }
 

@@ -130,3 +130,14 @@ Impact:
 - Made context availability visible and durable for future `run.md` generation.
 - Preserved the local-first, human-editable Markdown model while storing useful structured metadata in SQLite.
 - Related tasks: TASK-007, TASK-008, TASK-009
+
+## 2026-06-09
+
+Closed TASK-014: Add Run Persistence And Task Selection Helpers
+
+Impact:
+
+- Added repository helpers for creating, retrieving and listing Run records in SQLite.
+- Added active Run metadata helpers and deterministic Task selection for future `nerv start <query>` behavior.
+- Related Build: BUILD-005 Run Generation And Agent Entrypoint
+- Commit hash: not committed

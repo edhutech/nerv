@@ -1000,6 +1000,80 @@ function runWorkItemPersistenceChecks() {
       }
 
       console.log("ok - work item task without build");
+
+      const exactSelectedTask = repository.selectTaskForRun("TASK-001");
+      if (exactSelectedTask.id !== "TASK-001") {
+        fail("run task selection by exact id", `expected TASK-001, got ${exactSelectedTask.id}`, "");
+      }
+
+      console.log("ok - run task selection by exact id");
+
+      const textSelectedTask = repository.selectTaskForRun("Standalone");
+      if (textSelectedTask.id !== "TASK-002") {
+        fail("run task selection by text", `expected TASK-002, got ${textSelectedTask.id}`, "");
+      }
+
+      console.log("ok - run task selection by text");
+
+      try {
+        repository.selectTaskForRun("Task");
+        fail("run task selection rejects ambiguous query", "expected ambiguous query to throw", "");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("ambiguous")) {
+          fail("run task selection rejects ambiguous query", `unexpected error: ${message}`, "");
+        }
+      }
+
+      console.log("ok - run task selection rejects ambiguous query");
+
+      try {
+        repository.selectTaskForRun("Missing task");
+        fail("run task selection rejects missing query", "expected missing query to throw", "");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("No task found")) {
+          fail("run task selection rejects missing query", `unexpected error: ${message}`, "");
+        }
+      }
+
+      console.log("ok - run task selection rejects missing query");
+
+      const runId = repository.getNextId("RUN");
+      const run = repository.createRun({ id: runId, task_id: "TASK-001" });
+      if (run.id !== "RUN-001") {
+        fail("work item run creation", `expected RUN-001, got ${run.id}`, "");
+      }
+      if (run.task_id !== "TASK-001") {
+        fail("work item run creation", "task_id not set", "");
+      }
+      if (run.status !== "active") {
+        fail("work item run creation", `expected active status, got ${run.status}`, "");
+      }
+
+      console.log("ok - work item run creation");
+
+      const retrievedRun = repository.getRun("RUN-001");
+      if (!retrievedRun) {
+        fail("work item run retrieval", "run not found", "");
+      }
+
+      console.log("ok - work item run retrieval");
+
+      const runs = repository.listRuns();
+      if (runs.length !== 1) {
+        fail("work item run listing", `expected 1 run, got ${runs.length}`, "");
+      }
+
+      console.log("ok - work item run listing");
+
+      repository.setCurrentRunId("RUN-001");
+      const currentRunId = repository.getCurrentRunId();
+      if (currentRunId !== "RUN-001") {
+        fail("current run metadata", `expected RUN-001, got ${currentRunId}`, "");
+      }
+
+      console.log("ok - current run metadata");
     } finally {
       repository.close();
     }

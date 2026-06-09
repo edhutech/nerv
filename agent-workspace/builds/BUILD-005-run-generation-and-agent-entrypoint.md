@@ -58,11 +58,15 @@ By the end of this Build, the repo should have:
 
 ## Suggested Agentic Tasks
 
-Do not complete this section until the Build is approved.
+- TASK-014: Add Run Persistence And Task Selection Helpers
+- TASK-015: Implement nerv start And Run Markdown Generation
+- TASK-016: Implement nerv current And nerv runs
 
-- TASK-001:
-- TASK-002:
-- TASK-003:
+## Progress
+
+- TASK-014: Closed. Run persistence helpers, current Run metadata and deterministic Task selection are implemented.
+- TASK-015: Pending.
+- TASK-016: Pending.
 
 ## Acceptance criteria
 
