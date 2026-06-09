@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Closed
 
 ## Build Goal
 
@@ -71,6 +71,43 @@ By the end of this Build, the repo should have:
 - TASK-011: Closed on 2026-06-08. Commit `d8b26da`.
 - TASK-012: Closed on 2026-06-08. Commit `1f5e476`.
 - TASK-013: Closed on 2026-06-08. Commit `0225ee5`.
+- BUILD-004 review fix: Closed on 2026-06-08. Commit `a7e5d42`.
+
+## Review
+
+Reviewed on 2026-06-08. BUILD-004 satisfies its acceptance criteria:
+
+- A user can create a stored Agentic Task from intent with `nerv new task "..."`.
+- A user can create a stored Agentic Build from larger intent with `nerv new build "..."` or `nerv new task --yes "..."` when large intent is detected.
+- Large-intent detection keeps Tasks as the execution scope by rejecting oversized task creation unless `--force` is explicit.
+- Accepted large intents become Builds first, and planning remains explicit through `nerv build plan BUILD-001`.
+- Build planning creates linked Agentic Tasks and generated task Markdown.
+- `nerv tasks [query]` and `nerv builds [query]` can list and find created work.
+
+The blocking review issue was the DEC-008 confirmation-flow mismatch: large `nerv new task` intent previously only rejected with guidance instead of offering Build creation. Commit `a7e5d42` resolves this by adding interactive confirmation and a deterministic `--yes` path.
+
+Validation passed with `pnpm validate`.
+
+## Close summary
+
+BUILD-004 is complete and closed.
+
+Delivered:
+
+- Work item persistence for Builds and Tasks, including relationships and generated Markdown paths.
+- `nerv new task "..."` with large-intent detection and `--force` override.
+- Large-intent Build handoff via interactive confirmation or `--yes`.
+- `nerv new build "..."` for stored Agentic Builds.
+- `nerv build plan BUILD-001` for deterministic scoped task planning.
+- `nerv tasks [query]` and `nerv builds [query]` for work item discovery.
+
+Closing commits:
+
+- `9220b6a`: TASK-010 Add work item persistence model
+- `d8b26da`: TASK-011 Implement agentic task creation
+- `1f5e476`: TASK-012 Implement agentic build creation and planning
+- `0225ee5`: TASK-013 Add nerv tasks and nerv builds query commands
+- `a7e5d42`: BUILD-004 Add large-intent build confirmation flow
 
 ## Acceptance criteria
 
