@@ -210,7 +210,7 @@ Closed on 2026-06-09.
 
 **Commit status:**
 
-Pending commit.
+Committed as 1b10933.
 
 **Final summary:**
 
