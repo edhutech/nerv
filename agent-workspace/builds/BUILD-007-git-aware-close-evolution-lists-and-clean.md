@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Closed
 
 ## Build Goal
 
@@ -62,11 +62,21 @@ By the end of this Build, the repo should have:
 
 ## Suggested Agentic Tasks
 
-Do not complete this section until the Build is approved.
+- TASK-020: Add Close State And `nerv close`
+- TASK-021: Update Build Progress And Product Evolution On Close
+- TASK-022: Finalize List And Status Commands For Closed Work
+- TASK-023: Implement Safe `nerv clean`
+- TASK-024: Harden Close/Clean Integration And BUILD-007 Evidence
 
-- TASK-001:
-- TASK-002:
-- TASK-003:
+## Progress
+
+- TASK-020: Closed. Added close state and implemented `nerv close` with Git commit capture.
+- TASK-021: Closed. Updated Build progress and product evolution during close.
+- TASK-022: Closed. Finalized list and status commands for closed work.
+- TASK-023: Closed. Implemented conservative cleanup behavior.
+- TASK-024: Closed. Hardened close/clean integration and BUILD-007 evidence.
+
+**BUILD-007 is complete.**
 
 ## Acceptance criteria
 

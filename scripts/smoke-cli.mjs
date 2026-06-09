@@ -83,6 +83,7 @@ runCloseChecks();
 runCleanChecks();
 runEndToEndLifecycleChecks();
 runGitUnavailableChecks();
+runBuild007LifecycleChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -2410,6 +2411,141 @@ function runGitUnavailableChecks() {
         }
         if (!reviewContent.includes("Git diff unavailable.")) {
           fail("review saves without git", "missing unavailable Git diff", reviewContent);
+        }
+      },
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runBuild007LifecycleChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-build007-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace for BUILD-007 check", ["init"], repoRoot);
+    spawnOrFail("scaffold product for BUILD-007 check", ["product"], repoRoot);
+
+    spawnOrFail("create task for BUILD-007 check", ["new", "task", "Add BUILD-007 feature"], repoRoot);
+    spawnOrFail("start run for BUILD-007 check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "BUILD-007 full lifecycle",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Current run:", "RUN-001: TASK-001", "Status: active", "Lifecycle counts:", "Tasks: 1 open, 0 closed", "Runs: 1 open, 0 closed"],
+    });
+
+    spawnOrFail(
+      "checkpoint for BUILD-007 check",
+      ["checkpoint", "--summary", "Implemented feature", "--files", "src/index.ts"],
+      repoRoot,
+    );
+
+    spawnOrFail(
+      "review for BUILD-007 check",
+      ["review", "--outcome", "passed", "--summary", "All tests pass", "--validation", "passed", "--evidence", "Smoke tests pass"],
+      repoRoot,
+    );
+
+    spawnSync("git", ["add", "."], { cwd: repoRoot, encoding: "utf8" });
+    spawnSync("git", ["commit", "-m", "TASK-001: Add BUILD-007 feature", "--allow-empty"], { cwd: repoRoot, encoding: "utf8" });
+
+    runCheck({
+      name: "close with evolution and build progress",
+      args: ["close"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Closed RUN-001", "Status: closed", "Commit:", "Task TASK-001 also marked closed", "Product evolution updated:"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const run = repository.getRun("RUN-001");
+          if (!run || run.status !== "closed") {
+            fail("close with evolution and build progress", "run not closed", "");
+          }
+
+          const task = repository.getTask("TASK-001");
+          if (!task || task.status !== "closed") {
+            fail("close with evolution and build progress", "task not closed", "");
+          }
+
+          const closeRecord = repository.getCloseRecord("RUN-001");
+          if (!closeRecord || !closeRecord.commit_hash) {
+            fail("close with evolution and build progress", "commit hash not captured", "");
+          }
+        } finally {
+          repository.close();
+        }
+
+        const evolutionPath = join(repoRoot, ".nerv/product/evolution.md");
+        const evolutionContent = readFileSync(evolutionPath, "utf8");
+        if (!evolutionContent.includes("TASK-001")) {
+          fail("close with evolution and build progress", "evolution not updated", evolutionContent);
+        }
+      },
+    });
+
+    runCheck({
+      name: "status after close shows closed state",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Current run:", "No active run", "Lifecycle counts:", "Tasks: 0 open, 1 closed", "Runs: 0 open, 1 closed"],
+    });
+
+    runCheck({
+      name: "tasks list shows closed task",
+      args: ["tasks"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["TASK-001:", "Status: closed", "Closed:"],
+    });
+
+    runCheck({
+      name: "runs list shows closed run",
+      args: ["runs"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["RUN-001:", "Status: closed", "Closed:"],
+    });
+
+    runCheck({
+      name: "clean after close is safe",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Cleaned 1 generated artifact(s):", "RUN-001"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        if (!existsSync(dbPath)) {
+          fail("clean after close is safe", "database was deleted", "");
+        }
+
+        const repository = openRepository(dbPath);
+        try {
+          const run = repository.getRun("RUN-001");
+          if (!run || run.status !== "closed") {
+            fail("clean after close is safe", "run state lost after clean", "");
+          }
+
+          const task = repository.getTask("TASK-001");
+          if (!task || task.status !== "closed") {
+            fail("clean after close is safe", "task state lost after clean", "");
+          }
+        } finally {
+          repository.close();
+        }
+
+        const evolutionPath = join(repoRoot, ".nerv/product/evolution.md");
+        if (!existsSync(evolutionPath)) {
+          fail("clean after close is safe", "evolution file was deleted", "");
         }
       },
     });

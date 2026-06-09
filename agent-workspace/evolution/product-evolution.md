@@ -220,3 +220,79 @@ Impact:
 - All planned BUILD-006 tasks are closed and the repo is ready for BUILD-007.
 - Related tasks: TASK-017, TASK-018, TASK-019
 - Commit hash: 4807ecc
+
+## 2026-06-09
+
+Closed TASK-020: Add Close State And nerv close
+
+Impact:
+
+- Implemented `nerv close` with Git commit hash capture and review requirement validation.
+- Added close_records table to schema with migration support for existing databases.
+- Close validates that a passed review exists before allowing closure.
+- Captures current Git commit hash when available, warns gracefully when Git is unavailable.
+- Related Build: BUILD-007 Git-Aware Close, Evolution, Lists And Clean
+- Commit hash: 1b10933
+
+## 2026-06-09
+
+Closed TASK-021: Update Build Progress And Product Evolution On Close
+
+Impact:
+
+- Extended close behavior to update Build progress when Tasks close.
+- Auto-close Build when all Tasks are closed.
+- Append product evolution entries with Task, Run, Build, and commit context.
+- Added repository helpers for Build task counts.
+- Related Build: BUILD-007 Git-Aware Close, Evolution, Lists And Clean
+- Commit hash: bf0a2d4
+
+## 2026-06-09
+
+Closed TASK-022: Finalize List And Status Commands For Closed Work
+
+Impact:
+
+- Updated `nerv tasks`, `nerv builds`, `nerv runs` to show closed timestamps.
+- Enhanced `nerv status` to show current active run and lifecycle counts.
+- Developers have better visibility into work lifecycle with clear open/closed indicators.
+- Related Build: BUILD-007 Git-Aware Close, Evolution, Lists And Clean
+- Commit hash: 7998e61
+
+## 2026-06-09
+
+Closed TASK-023: Implement Safe nerv clean
+
+Impact:
+
+- Implemented `nerv clean` to safely remove generated agent artifacts.
+- Clean preserves database, product context, and repo context.
+- Clean is idempotent and reports what was cleaned.
+- Related Build: BUILD-007 Git-Aware Close, Evolution, Lists And Clean
+- Commit hash: 2cbb6f7
+
+## 2026-06-09
+
+Closed TASK-024: Harden Close/Clean Integration And BUILD-007 Evidence
+
+Impact:
+
+- Updated generated `run.md` close instructions to match actual `nerv close` behavior.
+- Added comprehensive end-to-end smoke coverage for full BUILD-007 lifecycle.
+- Verified Git unavailable behavior remains graceful for close.
+- Verified clean safety after close.
+- Related Build: BUILD-007 Git-Aware Close, Evolution, Lists And Clean
+- Commit hash: pending
+
+Closed BUILD-007: Git-Aware Close, Evolution, Lists And Clean
+
+Impact:
+
+- Completed the MVP lifecycle with `nerv close`, product evolution, and `nerv clean`.
+- Close connects Nerv work history to Git code history without taking over the developer's Git workflow.
+- Product evolution automatically records completed work with commit context.
+- List and status commands show clear open/closed lifecycle state.
+- Clean safely removes generated artifacts while preserving durable state.
+- All planned BUILD-007 tasks are closed and the MVP lifecycle is complete.
+- Related tasks: TASK-020, TASK-021, TASK-022, TASK-023, TASK-024
+- Commit hash: pending

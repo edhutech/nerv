@@ -139,16 +139,35 @@ nerv review --outcome failed --summary "What failed"
 
 After review passes:
 
-- Commit changes with a descriptive message
-- Update task status to closed
-- Update build progress if applicable
-- Record commit hash in task close summary
+1. Commit changes with a descriptive message:
+   ```
+   git add .
+   git commit -m "TASK-XXX: Your commit message"
+   ```
+
+2. Close the run:
+   ```
+   nerv close --run ${run.id}
+   ```
+   
+   Or use the current run:
+   ```
+   nerv close
+   ```
+
+The close command will:
+- Verify a passed review exists
+- Capture the current Git commit hash automatically
+- Mark the Run and Task as closed
+- Update Build progress if applicable
+- Append to product evolution
 
 ## Git awareness
 
 - Commit after review and before close
 - Use descriptive commit messages
-- Link commit hash in close summary
+- The close command automatically captures the commit hash
+- If Git is unavailable, close still works but warns about missing commit
 
 ## Completion checklist
 
