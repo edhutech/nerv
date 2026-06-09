@@ -142,6 +142,8 @@ export type Repository = {
   listBuilds(): BuildRecord[];
   searchBuilds(query: string): BuildRecord[];
   getBuildTaskCount(buildId: string): number;
+  getBuildClosedTaskCount(buildId: string): number;
+  getBuildOpenTaskCount(buildId: string): number;
   updateBuild(id: string, updates: Partial<Omit<BuildRecord, "id" | "created_at">>): void;
   createTask(input: CreateTaskInput): TaskRecord;
   getTask(id: string): TaskRecord | null;
@@ -222,6 +224,14 @@ export function openRepository(databasePath: string): Repository {
 
   const getBuildTaskCountStmt = database.prepare(
     `SELECT COUNT(*) as count FROM tasks WHERE build_id = ?`,
+  );
+
+  const getBuildClosedTaskCountStmt = database.prepare(
+    `SELECT COUNT(*) as count FROM tasks WHERE build_id = ? AND status = 'closed'`,
+  );
+
+  const getBuildOpenTaskCountStmt = database.prepare(
+    `SELECT COUNT(*) as count FROM tasks WHERE build_id = ? AND status != 'closed'`,
   );
 
   const updateBuildStmt = database.prepare(
@@ -368,6 +378,16 @@ export function openRepository(databasePath: string): Repository {
 
   const getBuildTaskCount = (buildId: string): number => {
     const row = getBuildTaskCountStmt.get(buildId) as { count: number } | undefined;
+    return row?.count ?? 0;
+  };
+
+  const getBuildClosedTaskCount = (buildId: string): number => {
+    const row = getBuildClosedTaskCountStmt.get(buildId) as { count: number } | undefined;
+    return row?.count ?? 0;
+  };
+
+  const getBuildOpenTaskCount = (buildId: string): number => {
+    const row = getBuildOpenTaskCountStmt.get(buildId) as { count: number } | undefined;
     return row?.count ?? 0;
   };
 
@@ -685,6 +705,8 @@ export function openRepository(databasePath: string): Repository {
     listBuilds,
     searchBuilds,
     getBuildTaskCount,
+    getBuildClosedTaskCount,
+    getBuildOpenTaskCount,
     updateBuild,
     createTask,
     getTask,

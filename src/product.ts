@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 
 import Database from "better-sqlite3";
@@ -271,4 +271,40 @@ export function persistDecisions(databasePath: string, decisionsFilePath: string
   } finally {
     database.close();
   }
+}
+
+export type EvolutionEntry = {
+  taskId: string;
+  taskTitle: string;
+  buildId: string | null;
+  runId: string;
+  commitHash: string | null;
+  closedAt: string;
+};
+
+export function appendProductEvolution(workspaceRoot: string, entry: EvolutionEntry): string | null {
+  const evolutionPath = join(workspaceRoot, "product", "evolution.md");
+
+  if (!existsSync(evolutionPath)) {
+    return null;
+  }
+
+  const date = entry.closedAt.split("T")[0];
+  const commitInfo = entry.commitHash ? ` (commit: ${entry.commitHash.substring(0, 7)})` : "";
+  const buildInfo = entry.buildId ? ` from ${entry.buildId}` : "";
+
+  const evolutionEntry = `
+
+### ${date}: Closed ${entry.taskId}${commitInfo}
+
+**Task**: ${entry.taskTitle}
+**Build**: ${entry.buildId ?? "None"}
+**Run**: ${entry.runId}
+
+Completed${buildInfo}. Task closed on ${date}.
+`;
+
+  appendFileSync(evolutionPath, evolutionEntry, "utf8");
+
+  return evolutionPath;
 }

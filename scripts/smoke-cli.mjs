@@ -2000,6 +2000,111 @@ function runCloseChecks() {
       exitCode: 1,
       includes: ["cannot be closed without a passed review"],
     });
+
+    const buildTempRoot = mkdtempSync(join(tmpdir(), "nerv-close-build-smoke-"));
+    const buildRepoRoot = join(buildTempRoot, "repo");
+    mkdirSync(buildRepoRoot, { recursive: true });
+
+    try {
+      spawnSync("git", ["init", buildRepoRoot], { encoding: "utf8" });
+      spawnOrFail("init workspace for build close check", ["init"], buildRepoRoot);
+      spawnOrFail("scaffold product for build close check", ["product"], buildRepoRoot);
+
+      spawnOrFail("create build for close check", ["new", "build", "Add build close test"], buildRepoRoot);
+      spawnOrFail("plan build for close check", ["build", "plan", "BUILD-001"], buildRepoRoot);
+
+      spawnOrFail("start first task for build close check", ["start", "TASK-001"], buildRepoRoot);
+      spawnOrFail(
+        "review first task for build close check",
+        ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "First task done", "--validation", "passed"],
+        buildRepoRoot,
+      );
+      spawnSync("git", ["add", "."], { cwd: buildRepoRoot, encoding: "utf8" });
+      spawnSync("git", ["commit", "-m", "TASK-001 done", "--allow-empty"], { cwd: buildRepoRoot, encoding: "utf8" });
+
+      runCheck({
+        name: "close updates build progress",
+        args: ["close", "--run", "RUN-001"],
+        cwd: buildRepoRoot,
+        exitCode: 0,
+        includes: ["Closed RUN-001", "Build BUILD-001 progress:"],
+        verify: () => {
+          const dbPath = join(buildRepoRoot, ".nerv/nerv.db");
+          const repository = openRepository(dbPath);
+          try {
+            const build = repository.getBuild("BUILD-001");
+            if (!build) {
+              fail("close updates build progress", "build not found", "");
+            }
+            if (build.status === "closed") {
+              fail("close updates build progress", "build should not be closed yet", "");
+            }
+          } finally {
+            repository.close();
+          }
+
+          const evolutionPath = join(buildRepoRoot, ".nerv/product/evolution.md");
+          const evolutionContent = readFileSync(evolutionPath, "utf8");
+          if (!evolutionContent.includes("TASK-001")) {
+            fail("close updates build progress", "evolution missing TASK-001", evolutionContent);
+          }
+        },
+      });
+
+      spawnOrFail("start second task for build close check", ["start", "TASK-002"], buildRepoRoot);
+      spawnOrFail(
+        "review second task for build close check",
+        ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second task done", "--validation", "passed"],
+        buildRepoRoot,
+      );
+      spawnSync("git", ["add", "."], { cwd: buildRepoRoot, encoding: "utf8" });
+      spawnSync("git", ["commit", "-m", "TASK-002 done", "--allow-empty"], { cwd: buildRepoRoot, encoding: "utf8" });
+
+      runCheck({
+        name: "close second task updates build progress",
+        args: ["close", "--run", "RUN-002"],
+        cwd: buildRepoRoot,
+        exitCode: 0,
+        includes: ["Closed RUN-002", "Build BUILD-001 progress: 2/3"],
+      });
+
+      spawnOrFail("start third task for build close check", ["start", "TASK-003"], buildRepoRoot);
+      spawnOrFail(
+        "review third task for build close check",
+        ["review", "--run", "RUN-003", "--outcome", "passed", "--summary", "Third task done", "--validation", "passed"],
+        buildRepoRoot,
+      );
+      spawnSync("git", ["add", "."], { cwd: buildRepoRoot, encoding: "utf8" });
+      spawnSync("git", ["commit", "-m", "TASK-003 done", "--allow-empty"], { cwd: buildRepoRoot, encoding: "utf8" });
+
+      runCheck({
+        name: "close marks build closed when all tasks done",
+        args: ["close", "--run", "RUN-003"],
+        cwd: buildRepoRoot,
+        exitCode: 0,
+        includes: ["Closed RUN-003", "Build BUILD-001 also marked closed"],
+        verify: () => {
+          const dbPath = join(buildRepoRoot, ".nerv/nerv.db");
+          const repository = openRepository(dbPath);
+          try {
+            const build = repository.getBuild("BUILD-001");
+            if (!build) {
+              fail("close marks build closed when all tasks done", "build not found", "");
+            }
+            if (build.status !== "closed") {
+              fail("close marks build closed when all tasks done", `build status: ${build.status}`, "");
+            }
+            if (!build.closed_at) {
+              fail("close marks build closed when all tasks done", "build closed_at not set", "");
+            }
+          } finally {
+            repository.close();
+          }
+        },
+      });
+    } finally {
+      rmSync(buildTempRoot, { recursive: true, force: true });
+    }
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }

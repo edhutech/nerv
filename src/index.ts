@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -1004,6 +1004,32 @@ program
 
       repository.setMetadata("current_run_id", "");
 
+      let buildUpdateMessage: string | null = null;
+      if (task?.build_id) {
+        const build = repository.getBuild(task.build_id);
+        if (build && build.status !== "closed") {
+          const totalTasks = repository.getBuildTaskCount(task.build_id);
+          const closedTasks = repository.getBuildClosedTaskCount(task.build_id);
+          const openTasks = repository.getBuildOpenTaskCount(task.build_id);
+
+          if (openTasks === 0 && closedTasks === totalTasks && totalTasks > 0) {
+            repository.updateBuild(task.build_id, { status: "closed", closed_at: now });
+            buildUpdateMessage = `Build ${task.build_id} also marked closed (all ${totalTasks} task(s) complete).`;
+          } else {
+            buildUpdateMessage = `Build ${task.build_id} progress: ${closedTasks}/${totalTasks} task(s) closed.`;
+          }
+        }
+      }
+
+      const evolutionPath = appendProductEvolution(status.workspaceRoot!, {
+        taskId: task?.id ?? run.task_id,
+        taskTitle: task?.title ?? "Unknown task",
+        buildId: task?.build_id ?? null,
+        runId: runId,
+        commitHash: commitHash,
+        closedAt: closeRecord.closed_at,
+      });
+
       console.log(`Closed ${runId}.`);
       console.log(`  Status: closed`);
       console.log(`  Closed at: ${closeRecord.closed_at}`);
@@ -1020,6 +1046,16 @@ program
       if (task) {
         console.log("");
         console.log(`Task ${task.id} also marked closed.`);
+      }
+
+      if (buildUpdateMessage) {
+        console.log("");
+        console.log(buildUpdateMessage);
+      }
+
+      if (evolutionPath) {
+        console.log("");
+        console.log(`Product evolution updated: ${evolutionPath}`);
       }
     } finally {
       repository.close();
