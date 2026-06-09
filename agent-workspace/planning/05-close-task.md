@@ -9,6 +9,7 @@ Prepare the close summary for the selected Task.
 ## Read first
 
 - `agent-workspace/method/close-template.md`
+- `agent-workspace/method/commit-system.md`
 - The selected Task file
 - The parent Build file if any
 - Product evolution file
@@ -22,6 +23,7 @@ A task should normally close after:
 - Validation was performed or clearly reported as unavailable
 - Git commit was created
 - Commit hash is known or explicitly marked as not committed
+- Commit hash was recorded safely, using a separate metadata commit if needed
 
 If the task belongs to a Build, update Build progress.
 

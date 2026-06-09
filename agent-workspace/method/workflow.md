@@ -54,21 +54,19 @@ agent-workspace/tasks/
 
 Use the task template.
 
-### 5. Start a Run
+### 5. Start the approved Task
 
-Create a Run file in:
+Work directly from the selected Task file in:
 
 ```txt
-agent-workspace/runs/
+agent-workspace/tasks/
 ```
 
-Use the run template.
-
-Ask the agent to work only from that Run file.
+The Task file is the active execution record. Do not create a manual Run file.
 
 ### 6. Checkpoint
 
-After meaningful progress, update the Task with:
+After meaningful progress, update the Task checkpoint log with:
 
 - What changed
 - Files touched
@@ -91,10 +89,9 @@ Before closing, verify:
 
 After review and before close:
 
-```bash
-git add .
-git commit -m "TASK-ID concise message"
-```
+Follow `agent-workspace/method/commit-system.md`.
+
+At minimum, inspect status, diff and recent commits before staging only the intended files.
 
 ### 9. Close
 
@@ -103,3 +100,7 @@ Update the Task close summary.
 If it belongs to a Build, update the Build status.
 
 If the Build is complete, update product evolution.
+
+## Deprecated Run layer
+
+Older files under `agent-workspace/runs/` are historical records only. The manual workflow no longer creates or updates Run files.

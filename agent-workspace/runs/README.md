@@ -1,17 +1,14 @@
-# Runs
+# Deprecated Manual Runs
 
-Store manual Run files here while building Nerv.
+This directory contains historical Run files from the earlier manual workflow.
 
-Use:
+The simplified manual `agent-workspace` flow no longer creates or updates Run files.
 
-```txt
-agent-workspace/method/run-template.md
-```
+Use this flow instead:
 
-A Run represents a working session for one approved Agentic Task.
+1. Build defines grouped work.
+2. Task defines one executable unit of work.
+3. The Task file is the active execution record.
+4. Checkpoints, review notes, validation evidence and close summaries are recorded in the Task file.
 
-In the real Nerv MVP, runs will generate files under:
-
-```txt
-.nerv/agent/runs/RUN-001/run.md
-```
+Do not add new files here unless you are intentionally preserving historical context.

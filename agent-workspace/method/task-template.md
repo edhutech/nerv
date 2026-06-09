@@ -84,6 +84,12 @@ Do not expand into other tasks from the parent Build.
 
 If you find that the task is too broad, blocked or unsafe, stop and explain the issue before making unrelated changes.
 
+## Active work instructions
+
+Use this Task file as the active execution record.
+
+Do not create a manual Run file. Record progress in the checkpoint log below, then record review and close evidence in this same Task file.
+
 ## Expected evidence
 
 At the end, provide:
@@ -93,6 +99,18 @@ At the end, provide:
 - Validation results
 - Remaining risks
 - Suggested commit message
+
+## Commit checklist
+
+Before committing:
+
+- Review `git status --short`.
+- Review `git diff`.
+- Review recent commits with `git log --oneline -5`.
+- Run required validation or explain why it could not run.
+- Stage only files related to this Task.
+- Use the commit message format from `agent-workspace/method/commit-system.md`.
+- Record the implementation commit hash in a separate metadata commit if needed.
 
 ## Checkpoint log
 

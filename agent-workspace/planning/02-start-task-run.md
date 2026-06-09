@@ -1,40 +1,13 @@
-# Start a Task Run
+# Deprecated: Start a Task Run
 
-You are helping start implementation for one approved Agentic Task.
+This planning step is historical only.
 
-## Your task
+The manual `agent-workspace` workflow no longer creates Run files.
 
-Create a Run plan for the selected Task.
+Use `agent-workspace/planning/02-start-task.md` instead.
 
-Do not implement until the user confirms.
+Current rule:
 
-## Read first
-
-- `agent-workspace/method/run-template.md`
-- The selected Task file from `agent-workspace/tasks/`
-- The parent Build file from `agent-workspace/builds/`
-- Relevant product docs from `agent-workspace/product/`
-
-## Inspect the repo
-
-Inspect only the files relevant to the selected task.
-
-## Output
-
-Return a Run plan with:
-
-- Active Task
-- Parent Build
-- Primary context
-- Supporting context
-- Scope rule
-- What to do now
-- Files to inspect first
-- Expected implementation plan
-- Validation plan
-- Do not do list
-- Completion checklist
-
-## Approval rule
-
-After showing the Run plan, stop and wait for approval before implementing.
+- Work directly from the approved Task file.
+- Record checkpoints, review notes and close summaries in the Task file.
+- Do not create new files under `agent-workspace/runs/`.

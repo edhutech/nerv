@@ -18,6 +18,11 @@ Commit hash:
 pending
 ```
 
+Hash recording rule:
+
+- Do not amend a commit only to record that same commit's hash.
+- Use a separate metadata or evolution commit when recording a prior commit hash.
+
 ## Final summary
 
 Describe what was completed.

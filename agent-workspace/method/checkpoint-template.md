@@ -1,14 +1,10 @@
 # Checkpoint Template
 
-Use this structure when saving progress for a Run.
+Use this structure when saving progress for a Task.
 
 ## Checkpoint ID
 
 CHECKPOINT-001
-
-## Related Run
-
-RUN-ID
 
 ## Related Task
 

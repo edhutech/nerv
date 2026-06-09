@@ -1,3 +1,11 @@
+# Deprecated Run Template
+
+This template is historical only.
+
+The manual `agent-workspace` workflow no longer creates Run files. Use `agent-workspace/method/task-template.md` and record active work directly in the Task file.
+
+The old template is kept below only to preserve historical context.
+
 # RUN-ID
 
 ## Active Task

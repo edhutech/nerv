@@ -70,6 +70,8 @@ Do not complete this section until the Build is approved.
 - TASK-002:
 - TASK-003:
 
+Tasks are the only manual execution records for this workspace. Do not create manual Run files for Build work.
+
 ## Acceptance criteria
 
 The Build is complete when:

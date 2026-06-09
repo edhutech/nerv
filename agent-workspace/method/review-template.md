@@ -67,3 +67,13 @@ Choose one:
 ```txt
 TASK-ID concise message
 ```
+
+## Commit checklist
+
+Before committing, follow `agent-workspace/method/commit-system.md`.
+
+- [ ] `git status --short` reviewed
+- [ ] `git diff` reviewed
+- [ ] `git log --oneline -5` reviewed
+- [ ] Validation passed or exception documented
+- [ ] Only intended files will be staged

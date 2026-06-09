@@ -9,6 +9,7 @@ Review whether the selected Task is ready to commit and close.
 ## Read first
 
 - `agent-workspace/method/review-template.md`
+- `agent-workspace/method/commit-system.md`
 - The selected Task file
 - The parent Build file
 - Relevant product docs
@@ -32,8 +33,8 @@ The ideal flow is:
 
 1. Checkpoint
 2. Review
-3. Git commit
-4. Close
+3. Git commit using the commit system
+4. Close the Task
 
 Do not close the task before the user commits, unless the user explicitly decides to close without commit.
 
@@ -46,6 +47,7 @@ Return:
 - What failed or is missing
 - Required fixes if any
 - Suggested commit message
+- Whether the commit checklist is ready
 
 ## Approval rule
 
