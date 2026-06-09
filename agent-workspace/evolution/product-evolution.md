@@ -185,3 +185,15 @@ Impact:
 - Checkpoints are persisted in SQLite and written as Markdown files under each Run's `checkpoints/` directory.
 - Related Build: BUILD-006 Checkpoint And Review Lifecycle
 - Commit hash: 7bffdf5
+
+## 2026-06-09
+
+Closed TASK-018: Add Review Persistence And nerv review
+
+Impact:
+
+- Implemented review persistence and the `nerv review` command.
+- Developers can record review outcomes with structured evidence fields.
+- Reviews are persisted in SQLite and written as Markdown files under each Run's `reviews/` directory.
+- Related Build: BUILD-006 Checkpoint And Review Lifecycle
+- Commit hash: pending

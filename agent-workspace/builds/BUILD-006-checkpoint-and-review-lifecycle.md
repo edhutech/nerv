@@ -62,7 +62,7 @@ By the end of this Build, the repo should have:
 ## Progress
 
 - TASK-017: Closed. Checkpoint persistence and `nerv checkpoint` command are implemented.
-- TASK-018: Proposed.
+- TASK-018: Closed. Review persistence and `nerv review` command are implemented.
 - TASK-019: Proposed.
 
 ## Acceptance criteria

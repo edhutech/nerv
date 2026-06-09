@@ -67,6 +67,14 @@ export type CheckpointRecord = {
   created_at: string;
 };
 
+export type ReviewRecord = {
+  id: number;
+  run_id: string;
+  outcome: string;
+  summary: string;
+  created_at: string;
+};
+
 export type CreateBuildInput = {
   id: string;
   title: string;
@@ -107,6 +115,12 @@ export type CreateCheckpointInput = {
   summary: string;
 };
 
+export type CreateReviewInput = {
+  run_id: string;
+  outcome: string;
+  summary: string;
+};
+
 export type Repository = {
   close(): void;
   getNextId(type: IdType): string;
@@ -130,6 +144,8 @@ export type Repository = {
   listRuns(): RunRecord[];
   createCheckpoint(input: CreateCheckpointInput): CheckpointRecord;
   listCheckpoints(runId: string): CheckpointRecord[];
+  createReview(input: CreateReviewInput): ReviewRecord;
+  listReviews(runId: string): ReviewRecord[];
   getCurrentRunId(): string | null;
   setCurrentRunId(runId: string): void;
 };
@@ -250,6 +266,19 @@ export function openRepository(databasePath: string): Repository {
 
   const listCheckpointsStmt = database.prepare(
     `SELECT * FROM checkpoints WHERE run_id = ? ORDER BY id ASC`,
+  );
+
+  const createReviewStmt = database.prepare(
+    `INSERT INTO reviews (run_id, outcome, summary, created_at)
+     VALUES (@runId, @outcome, @summary, @createdAt)`,
+  );
+
+  const getReviewStmt = database.prepare(
+    `SELECT * FROM reviews WHERE id = ?`,
+  );
+
+  const listReviewsStmt = database.prepare(
+    `SELECT * FROM reviews WHERE run_id = ? ORDER BY id ASC`,
   );
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
@@ -541,6 +570,22 @@ export function openRepository(databasePath: string): Repository {
     return listCheckpointsStmt.all(runId) as CheckpointRecord[];
   };
 
+  const createReview = database.transaction((input: CreateReviewInput): ReviewRecord => {
+    const now = new Date().toISOString();
+    const result = createReviewStmt.run({
+      runId: input.run_id,
+      outcome: input.outcome,
+      summary: input.summary,
+      createdAt: now,
+    });
+
+    return getReviewStmt.get(result.lastInsertRowid) as ReviewRecord;
+  });
+
+  const listReviews = (runId: string): ReviewRecord[] => {
+    return listReviewsStmt.all(runId) as ReviewRecord[];
+  };
+
   return {
     close() {
       database.close();
@@ -574,6 +619,8 @@ export function openRepository(databasePath: string): Repository {
     listRuns,
     createCheckpoint,
     listCheckpoints,
+    createReview,
+    listReviews,
     getCurrentRunId(): string | null {
       return this.getMetadata("current_run_id");
     },

@@ -604,8 +604,132 @@ program
 program
   .command("review")
   .option("--run <runId>", "Run ID to review.")
+  .requiredOption("--outcome <outcome>", "Review outcome: passed or failed.")
+  .requiredOption("--summary <summary>", "Review summary.")
+  .option("--validation <validation>", "Validation status: passed, failed, or not_run.")
+  .option("--evidence <evidence>", "Evidence summary.")
   .description("Review a Run against acceptance criteria and evidence.")
-  .action(() => notImplemented("review"));
+  .action((options: {
+    run?: string;
+    outcome: string;
+    summary: string;
+    validation?: string;
+    evidence?: string;
+  }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv review must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const outcome = options.outcome.trim().toLowerCase();
+    if (outcome !== "passed" && outcome !== "failed") {
+      program.error("Review outcome must be 'passed' or 'failed'.", {
+        code: "NERV_REVIEW_OUTCOME_INVALID",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    const summary = options.summary.trim();
+    if (!summary) {
+      program.error("Review summary is required.", {
+        code: "NERV_REVIEW_SUMMARY_REQUIRED",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const runId = options.run?.trim().toUpperCase() || repository.getCurrentRunId();
+
+      if (!runId) {
+        program.error("No current run. Use `nerv review --run RUN-### --outcome ... --summary \"...\"`.", {
+          code: "NERV_CURRENT_RUN_NOT_FOUND",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      const run = repository.getRun(runId);
+
+      if (!run) {
+        program.error(`Run ${runId} not found.`, {
+          code: "NERV_RUN_NOT_FOUND",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      const task = repository.getTask(run.task_id);
+      const build = task?.build_id ? repository.getBuild(task.build_id) : null;
+
+      const validation = options.validation?.trim().toLowerCase() || "not_run";
+      if (validation !== "passed" && validation !== "failed" && validation !== "not_run") {
+        program.error("Validation status must be 'passed', 'failed', or 'not_run'.", {
+          code: "NERV_REVIEW_VALIDATION_INVALID",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      const review = repository.createReview({
+        run_id: run.id,
+        outcome,
+        summary,
+      });
+
+      const reviewPath = writeReviewMarkdown(status.workspaceRoot!, review.id, run.id, {
+        outcome,
+        summary,
+        validation,
+        evidence: options.evidence,
+        task,
+        build,
+      });
+
+      console.log(`Saved review ${review.id} for ${run.id}.`);
+      console.log(`  Outcome: ${outcome}`);
+      console.log(`  Validation: ${validation}`);
+      console.log(`  Review file: ${reviewPath}`);
+
+      if (validation === "not_run") {
+        console.log("");
+        console.log("Warning: Validation was not run. Review evidence is incomplete.");
+      }
+
+      if (!options.evidence?.trim()) {
+        console.log("");
+        console.log("Warning: No evidence provided. Review evidence is incomplete.");
+      }
+    } finally {
+      repository.close();
+    }
+  });
 
 function writeCheckpointMarkdown(
   workspaceRoot: string,
@@ -673,6 +797,67 @@ function formatOptionalList(value: string | undefined): string {
 function formatOptionalText(value: string | undefined): string {
   const trimmed = value?.trim();
   return trimmed || "None provided.";
+}
+
+function writeReviewMarkdown(
+  workspaceRoot: string,
+  reviewId: number,
+  runId: string,
+  details: {
+    outcome: string;
+    summary: string;
+    validation: string;
+    evidence?: string;
+    task: { id: string; title: string; acceptance_criteria: string | null; validation: string | null } | null;
+    build: { id: string; title: string } | null;
+  },
+): string {
+  const reviewDir = join(workspaceRoot, "agent", "runs", runId, "reviews");
+  mkdirSync(reviewDir, { recursive: true });
+
+  const reviewPath = join(reviewDir, `review-${String(reviewId).padStart(3, "0")}.md`);
+  const content = `# Review ${reviewId}
+
+## Run
+
+${runId}
+
+## Task
+
+${details.task ? `${details.task.id}: ${details.task.title}` : "Unknown task"}
+
+## Build
+
+${details.build ? `${details.build.id}: ${details.build.title}` : "None"}
+
+## Outcome
+
+${details.outcome}
+
+## Summary
+
+${details.summary}
+
+## Validation
+
+${details.validation}
+
+## Evidence
+
+${formatOptionalText(details.evidence)}
+
+## Acceptance Criteria
+
+${details.task?.acceptance_criteria || "Not specified."}
+
+## Expected Validation
+
+${details.task?.validation || "Not specified."}
+`;
+
+  writeFileSync(reviewPath, content, "utf8");
+
+  return reviewPath;
 }
 
 program

@@ -78,6 +78,7 @@ runQueryChecks();
 runStartChecks();
 runCurrentAndRunsChecks();
 runCheckpointChecks();
+runReviewChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1096,6 +1097,36 @@ function runWorkItemPersistenceChecks() {
 
       console.log("ok - work item checkpoint listing");
 
+      const review = repository.createReview({
+        run_id: "RUN-001",
+        outcome: "passed",
+        summary: "Implementation complete",
+      });
+      if (review.id !== 1) {
+        fail("work item review creation", `expected review id 1, got ${review.id}`, "");
+      }
+      if (review.run_id !== "RUN-001") {
+        fail("work item review creation", "run_id not set", "");
+      }
+      if (review.outcome !== "passed") {
+        fail("work item review creation", "outcome not stored", "");
+      }
+      if (review.summary !== "Implementation complete") {
+        fail("work item review creation", "summary not stored", "");
+      }
+
+      console.log("ok - work item review creation");
+
+      const reviews = repository.listReviews("RUN-001");
+      if (reviews.length !== 1) {
+        fail("work item review listing", `expected 1 review, got ${reviews.length}`, "");
+      }
+      if (reviews[0].summary !== "Implementation complete") {
+        fail("work item review listing", "wrong review returned", "");
+      }
+
+      console.log("ok - work item review listing");
+
       repository.setCurrentRunId("RUN-001");
       const currentRunId = repository.getCurrentRunId();
       if (currentRunId !== "RUN-001") {
@@ -1720,6 +1751,116 @@ function runCheckpointChecks() {
       cwd: repoRoot,
       exitCode: 1,
       includes: ["Checkpoint summary is required"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runReviewChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-review-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before review check", ["init"], repoRoot);
+
+    runCheck({
+      name: "review fails without current run",
+      args: ["review", "--outcome", "passed", "--summary", "Nothing active"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["No current run"],
+    });
+
+    spawnOrFail("create task for review check", ["new", "task", "Add reviewable feature"], repoRoot);
+    spawnOrFail("start run for review check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "review saves for explicit run",
+      args: [
+        "review",
+        "--run",
+        "RUN-001",
+        "--outcome",
+        "passed",
+        "--summary",
+        "Implementation complete and validated",
+        "--validation",
+        "passed",
+        "--evidence",
+        "All tests pass, build succeeds",
+      ],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved review 1 for RUN-001", "passed", ".nerv/agent/runs/RUN-001/reviews/review-001.md"],
+      verify: () => {
+        const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-001.md");
+        verifyPath("review saves for explicit run", reviewFile, "file");
+
+        const reviewContent = readFileSync(reviewFile, "utf8");
+        if (!reviewContent.includes("Implementation complete and validated")) {
+          fail("review saves for explicit run", "missing summary in review file", reviewContent);
+        }
+        if (!reviewContent.includes("passed")) {
+          fail("review saves for explicit run", "missing outcome in review file", reviewContent);
+        }
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const reviews = repository.listReviews("RUN-001");
+          if (reviews.length !== 1) {
+            fail("review saves for explicit run", `expected 1 review, got ${reviews.length}`, "");
+          }
+          if (reviews[0].outcome !== "passed") {
+            fail("review saves for explicit run", `outcome mismatch: ${reviews[0].outcome}`, "");
+          }
+          if (reviews[0].summary !== "Implementation complete and validated") {
+            fail("review saves for explicit run", `summary mismatch: ${reviews[0].summary}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "review uses current run",
+      args: ["review", "--outcome", "failed", "--summary", "Missing evidence"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved review 2 for RUN-001", "failed", "Warning: Validation was not run"],
+      verify: () => {
+        const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-002.md");
+        verifyPath("review uses current run", reviewFile, "file");
+      },
+    });
+
+    runCheck({
+      name: "review fails for missing run",
+      args: ["review", "--run", "RUN-999", "--outcome", "passed", "--summary", "Missing run"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Run RUN-999 not found"],
+    });
+
+    runCheck({
+      name: "review fails for empty summary",
+      args: ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "   "],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Review summary is required"],
+    });
+
+    runCheck({
+      name: "review fails for invalid outcome",
+      args: ["review", "--run", "RUN-001", "--outcome", "maybe", "--summary", "Invalid outcome"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Review outcome must be 'passed' or 'failed'"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
