@@ -199,6 +199,8 @@ Closed on 2026-06-09.
 
 Committed as 5374da9.
 
+Review fixes committed as 2f60c38.
+
 **Final summary:**
 
 TASK-024 hardened the BUILD-007 integration by updating generated run.md close instructions, adding comprehensive end-to-end smoke coverage, and updating build evidence. The MVP lifecycle is now complete with all BUILD-007 tasks closed.
@@ -219,4 +221,4 @@ Developers now have accurate close instructions in generated run.md and comprehe
 
 - `pnpm build` passed.
 - `pnpm typecheck` passed.
-- `pnpm smoke` passed (122 tests).
+- `pnpm smoke` passed (125 tests).
