@@ -65,3 +65,13 @@ Before finishing this Run, provide:
 - Pending work
 - Suggested next step
 - Suggested commit message
+
+## Close summary
+
+Closed on 2026-06-09.
+
+**Commit status:** Committed as 5f7d347.
+
+**Final summary:** RUN-018 implemented review persistence and the `nerv review` command. The task was reviewed and approved, with all acceptance criteria met and comprehensive smoke test coverage.
+
+**Build update:** BUILD-006 progress updated to mark TASK-018 as closed.

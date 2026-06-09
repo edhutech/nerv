@@ -196,4 +196,4 @@ Impact:
 - Developers can record review outcomes with structured evidence fields.
 - Reviews are persisted in SQLite and written as Markdown files under each Run's `reviews/` directory.
 - Related Build: BUILD-006 Checkpoint And Review Lifecycle
-- Commit hash: pending
+- Commit hash: 5f7d347

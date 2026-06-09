@@ -200,7 +200,7 @@ Closed on 2026-06-09.
 
 **Commit status:**
 
-Committed.
+Committed as 5f7d347.
 
 **Final summary:**
 
