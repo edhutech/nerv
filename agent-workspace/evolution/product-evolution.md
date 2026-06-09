@@ -219,3 +219,4 @@ Impact:
 - Generated `run.md` now includes correct checkpoint and review commands.
 - All planned BUILD-006 tasks are closed and the repo is ready for BUILD-007.
 - Related tasks: TASK-017, TASK-018, TASK-019
+- Commit hash: 4807ecc
