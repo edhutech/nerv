@@ -6,6 +6,7 @@ const REQUIRED_TABLES = [
   "runs",
   "checkpoints",
   "reviews",
+  "close_records",
   "decisions",
   "status_history",
   "metadata",
@@ -48,6 +49,7 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   runs: ["id", "task_id", "status", "created_at", "updated_at", "closed_at"],
   checkpoints: ["id", "run_id", "summary", "created_at"],
   reviews: ["id", "run_id", "outcome", "summary", "created_at"],
+  close_records: ["run_id", "commit_hash", "closed_at"],
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
   metadata: ["key", "value", "updated_at"],
@@ -115,6 +117,12 @@ const SCHEMA_STATEMENTS = [
     outcome TEXT NOT NULL,
     summary TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS close_records (
+    run_id TEXT PRIMARY KEY,
+    commit_hash TEXT,
+    closed_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
   )`,
   `CREATE TABLE IF NOT EXISTS decisions (
@@ -240,6 +248,15 @@ function hasRequiredColumns(database: Database.Database, tableName: (typeof REQU
 }
 
 function migrateSchema(database: Database.Database): void {
+  if (!hasTable(database, "close_records")) {
+    database.exec(`CREATE TABLE IF NOT EXISTS close_records (
+      run_id TEXT PRIMARY KEY,
+      commit_hash TEXT,
+      closed_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES runs(id)
+    )`);
+  }
+
   for (const [tableName, columnNames] of Object.entries(MIGRATED_COLUMNS)) {
     if (!hasTable(database, tableName)) {
       continue;

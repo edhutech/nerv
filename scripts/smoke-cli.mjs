@@ -79,6 +79,7 @@ runStartChecks();
 runCurrentAndRunsChecks();
 runCheckpointChecks();
 runReviewChecks();
+runCloseChecks();
 runEndToEndLifecycleChecks();
 runGitUnavailableChecks();
 
@@ -718,6 +719,7 @@ function verifySchema(name, databasePath) {
       "runs",
       "checkpoints",
       "reviews",
+      "close_records",
       "decisions",
       "status_history",
       "metadata",
@@ -1875,6 +1877,128 @@ function runReviewChecks() {
       cwd: repoRoot,
       exitCode: 1,
       includes: ["Review outcome must be 'passed' or 'failed'"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runCloseChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-close-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before close check", ["init"], repoRoot);
+
+    runCheck({
+      name: "close fails without current run",
+      args: ["close"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["No current run"],
+    });
+
+    spawnOrFail("create task for close check", ["new", "task", "Add closeable feature"], repoRoot);
+    spawnOrFail("start run for close check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "close fails without passed review",
+      args: ["close", "--run", "RUN-001"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["cannot be closed without a passed review"],
+    });
+
+    spawnOrFail(
+      "add passed review for close check",
+      [
+        "review",
+        "--run",
+        "RUN-001",
+        "--outcome",
+        "passed",
+        "--summary",
+        "Ready to close",
+        "--validation",
+        "passed",
+        "--evidence",
+        "All checks pass",
+      ],
+      repoRoot,
+    );
+
+    spawnSync("git", ["add", "."], { cwd: repoRoot, encoding: "utf8" });
+    spawnSync(
+      "git",
+      ["commit", "-m", "TASK-001 Add closeable feature", "--allow-empty"],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+
+    runCheck({
+      name: "close succeeds with passed review and git",
+      args: ["close", "--run", "RUN-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Closed RUN-001", "Status: closed", "Commit:"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const run = repository.getRun("RUN-001");
+          if (!run) {
+            fail("close succeeds with passed review and git", "run not found", "");
+          }
+          if (run.status !== "closed") {
+            fail("close succeeds with passed review and git", `run status: ${run.status}`, "");
+          }
+          if (!run.closed_at) {
+            fail("close succeeds with passed review and git", "run closed_at not set", "");
+          }
+
+          const task = repository.getTask("TASK-001");
+          if (!task) {
+            fail("close succeeds with passed review and git", "task not found", "");
+          }
+          if (task.status !== "closed") {
+            fail("close succeeds with passed review and git", `task status: ${task.status}`, "");
+          }
+          if (!task.closed_at) {
+            fail("close succeeds with passed review and git", "task closed_at not set", "");
+          }
+
+          const closeRecord = repository.getCloseRecord("RUN-001");
+          if (!closeRecord) {
+            fail("close succeeds with passed review and git", "close record not found", "");
+          }
+          if (!closeRecord.commit_hash) {
+            fail("close succeeds with passed review and git", "commit hash not captured", "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "close fails for already closed run",
+      args: ["close", "--run", "RUN-001"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["already closed"],
+    });
+
+    spawnOrFail("create second task for close check", ["new", "task", "Add another feature"], repoRoot);
+    spawnOrFail("start second run for close check", ["start", "TASK-002"], repoRoot);
+
+    runCheck({
+      name: "close uses current run",
+      args: ["close"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["cannot be closed without a passed review"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

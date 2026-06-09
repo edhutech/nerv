@@ -900,7 +900,131 @@ program
   .command("close")
   .option("--run <runId>", "Run ID to close.")
   .description("Close reviewed work and link commit metadata when available.")
-  .action(() => notImplemented("close"));
+  .action((options: { run?: string }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv close must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const runId = options.run?.trim().toUpperCase() || repository.getCurrentRunId();
+
+      if (!runId) {
+        program.error("No current run. Use `nerv close --run RUN-###`.", {
+          code: "NERV_CURRENT_RUN_NOT_FOUND",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      const run = repository.getRun(runId);
+
+      if (!run) {
+        program.error(`Run ${runId} not found.`, {
+          code: "NERV_RUN_NOT_FOUND",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      if (run.status === "closed") {
+        program.error(`Run ${runId} is already closed.`, {
+          code: "NERV_RUN_ALREADY_CLOSED",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      if (!repository.hasPassedReview(runId)) {
+        program.error(
+          `Run ${runId} cannot be closed without a passed review.\n` +
+            `Run \`nerv review --run ${runId} --outcome passed --summary "..." \` first.`,
+          {
+            code: "NERV_RUN_NOT_REVIEWED",
+            exitCode: 1,
+          },
+        );
+
+        return;
+      }
+
+      const gitContext = captureGitContext(status.repoRoot!);
+      let commitHash: string | null = null;
+      let gitWarning: string | null = null;
+
+      if (gitContext.status === "Git metadata unavailable.") {
+        gitWarning = "Git metadata unavailable. Close recorded without commit hash.";
+      } else {
+        try {
+          commitHash = execFileSync("git", ["rev-parse", "HEAD"], {
+            cwd: status.repoRoot!,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+          }).trim();
+        } catch {
+          gitWarning = "Git available but no commit found. Close recorded without commit hash.";
+        }
+      }
+
+      const closeRecord = repository.createCloseRecord({
+        run_id: runId,
+        commit_hash: commitHash,
+      });
+
+      const now = new Date().toISOString();
+      repository.updateRun(runId, { status: "closed", closed_at: now });
+
+      const task = repository.getTask(run.task_id);
+      if (task && task.status !== "closed") {
+        repository.updateTask(task.id, { status: "closed", closed_at: now });
+      }
+
+      repository.setMetadata("current_run_id", "");
+
+      console.log(`Closed ${runId}.`);
+      console.log(`  Status: closed`);
+      console.log(`  Closed at: ${closeRecord.closed_at}`);
+
+      if (commitHash) {
+        console.log(`  Commit: ${commitHash}`);
+      }
+
+      if (gitWarning) {
+        console.log("");
+        console.log(`Warning: ${gitWarning}`);
+      }
+
+      if (task) {
+        console.log("");
+        console.log(`Task ${task.id} also marked closed.`);
+      }
+    } finally {
+      repository.close();
+    }
+  });
 
 program
   .command("tasks")

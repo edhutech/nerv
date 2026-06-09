@@ -75,6 +75,12 @@ export type ReviewRecord = {
   created_at: string;
 };
 
+export type CloseRecord = {
+  run_id: string;
+  commit_hash: string | null;
+  closed_at: string;
+};
+
 export type CreateBuildInput = {
   id: string;
   title: string;
@@ -121,6 +127,11 @@ export type CreateReviewInput = {
   summary: string;
 };
 
+export type CreateCloseInput = {
+  run_id: string;
+  commit_hash?: string | null;
+};
+
 export type Repository = {
   close(): void;
   getNextId(type: IdType): string;
@@ -142,10 +153,14 @@ export type Repository = {
   createRun(input: CreateRunInput): RunRecord;
   getRun(id: string): RunRecord | null;
   listRuns(): RunRecord[];
+  updateRun(id: string, updates: Partial<Omit<RunRecord, "id" | "created_at">>): void;
   createCheckpoint(input: CreateCheckpointInput): CheckpointRecord;
   listCheckpoints(runId: string): CheckpointRecord[];
   createReview(input: CreateReviewInput): ReviewRecord;
   listReviews(runId: string): ReviewRecord[];
+  hasPassedReview(runId: string): boolean;
+  createCloseRecord(input: CreateCloseInput): CloseRecord;
+  getCloseRecord(runId: string): CloseRecord | null;
   getCurrentRunId(): string | null;
   setCurrentRunId(runId: string): void;
 };
@@ -555,6 +570,34 @@ export function openRepository(databasePath: string): Repository {
     return listRunsStmt.all() as RunRecord[];
   };
 
+  const updateRunStmt = database.prepare(
+    `UPDATE runs SET task_id = @taskId, status = @status, updated_at = @updatedAt, closed_at = @closedAt WHERE id = @id`,
+  );
+
+  const updateRun = database.transaction((id: string, updates: Partial<Omit<RunRecord, "id" | "created_at">>): void => {
+    const existing = getRun(id);
+    if (!existing) {
+      throw new Error(`Run ${id} not found`);
+    }
+
+    const now = new Date().toISOString();
+    const updated: RunRecord = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      created_at: existing.created_at,
+      updated_at: now,
+    };
+
+    updateRunStmt.run({
+      id: updated.id,
+      taskId: updated.task_id,
+      status: updated.status,
+      updatedAt: updated.updated_at,
+      closedAt: updated.closed_at,
+    });
+  });
+
   const createCheckpoint = database.transaction((input: CreateCheckpointInput): CheckpointRecord => {
     const now = new Date().toISOString();
     const result = createCheckpointStmt.run({
@@ -584,6 +627,42 @@ export function openRepository(databasePath: string): Repository {
 
   const listReviews = (runId: string): ReviewRecord[] => {
     return listReviewsStmt.all(runId) as ReviewRecord[];
+  };
+
+  const hasPassedReview = (runId: string): boolean => {
+    const reviews = listReviews(runId);
+    return reviews.some((review) => review.outcome === "passed");
+  };
+
+  const createCloseRecordStmt = database.prepare(
+    `INSERT OR REPLACE INTO close_records (run_id, commit_hash, closed_at)
+     VALUES (@runId, @commitHash, @closedAt)`,
+  );
+
+  const getCloseRecordStmt = database.prepare(
+    `SELECT * FROM close_records WHERE run_id = ?`,
+  );
+
+  const createCloseRecord = database.transaction((input: CreateCloseInput): CloseRecord => {
+    const now = new Date().toISOString();
+    const record: CloseRecord = {
+      run_id: input.run_id,
+      commit_hash: input.commit_hash ?? null,
+      closed_at: now,
+    };
+
+    createCloseRecordStmt.run({
+      runId: record.run_id,
+      commitHash: record.commit_hash,
+      closedAt: record.closed_at,
+    });
+
+    return record;
+  });
+
+  const getCloseRecord = (runId: string): CloseRecord | null => {
+    const row = getCloseRecordStmt.get(runId) as CloseRecord | undefined;
+    return row ?? null;
   };
 
   return {
@@ -617,10 +696,14 @@ export function openRepository(databasePath: string): Repository {
     createRun,
     getRun,
     listRuns,
+    updateRun,
     createCheckpoint,
     listCheckpoints,
     createReview,
     listReviews,
+    hasPassedReview,
+    createCloseRecord,
+    getCloseRecord,
     getCurrentRunId(): string | null {
       return this.getMetadata("current_run_id");
     },
