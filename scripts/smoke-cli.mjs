@@ -649,6 +649,25 @@ function runContextMetadataChecks() {
       exitCode: 0,
       includes: ["Context availability:", "Product context: available", "Repo context: available"],
     });
+
+    spawnOrFail("create task for status check", ["new", "task", "Add status test feature"], repoRoot);
+    spawnOrFail("start run for status check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "status shows current run and lifecycle counts",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: [
+        "Current run:",
+        "RUN-001: TASK-001",
+        "Status: active",
+        "Lifecycle counts:",
+        "Builds: 0 open, 0 closed",
+        "Tasks: 1 open, 0 closed",
+        "Runs: 1 open, 0 closed",
+      ],
+    });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -1431,7 +1450,7 @@ function runQueryChecks() {
       args: ["builds"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Found 1 build(s)", "BUILD-001", "Tasks: 3"],
+      includes: ["Found 1 build(s)", "BUILD-001", "Tasks: 0/3 closed"],
     });
 
     runCheck({

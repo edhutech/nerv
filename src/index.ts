@@ -1117,6 +1117,9 @@ program
         const buildInfo = task.build_id ? ` [${task.build_id}]` : "";
         console.log(`${task.id}: ${task.title}${buildInfo}`);
         console.log(`  Status: ${task.status}`);
+        if (task.closed_at) {
+          console.log(`  Closed: ${task.closed_at}`);
+        }
         if (task.intent) {
           console.log(`  Intent: ${task.intent}`);
         }
@@ -1180,9 +1183,13 @@ program
 
       for (const build of builds) {
         const taskCount = repository.getBuildTaskCount(build.id);
+        const closedTaskCount = repository.getBuildClosedTaskCount(build.id);
         console.log(`${build.id}: ${build.title}`);
         console.log(`  Status: ${build.status}`);
-        console.log(`  Tasks: ${taskCount}`);
+        console.log(`  Tasks: ${closedTaskCount}/${taskCount} closed`);
+        if (build.closed_at) {
+          console.log(`  Closed: ${build.closed_at}`);
+        }
         if (build.intent) {
           console.log(`  Intent: ${build.intent}`);
         }
@@ -1240,6 +1247,9 @@ program
 
         console.log(`${run.id}: ${taskLabel} - ${taskTitle}`);
         console.log(`  Status: ${run.status}`);
+        if (run.closed_at) {
+          console.log(`  Closed: ${run.closed_at}`);
+        }
         console.log("");
       }
     } finally {
@@ -1265,16 +1275,52 @@ program
 
     if (status.initialized) {
       const context = discoverContext(status.workspaceRoot!, status.databasePath!);
+      const repository = openRepository(status.databasePath!);
 
-      console.log("");
-      console.log("Context availability:");
-      console.log(`  Product context: ${context.productContext.available ? "available" : "not available"}`);
-      if (context.productContext.updatedAt) {
-        console.log(`    Updated: ${context.productContext.updatedAt}`);
-      }
-      console.log(`  Repo context: ${context.repoContext.available ? "available" : "not available"}`);
-      if (context.repoContext.updatedAt) {
-        console.log(`    Updated: ${context.repoContext.updatedAt}`);
+      try {
+        const currentRunId = repository.getCurrentRunId();
+        const currentRun = currentRunId ? repository.getRun(currentRunId) : null;
+        const currentTask = currentRun ? repository.getTask(currentRun.task_id) : null;
+
+        const allTasks = repository.listTasks();
+        const closedTasks = allTasks.filter((t) => t.status === "closed").length;
+        const openTasks = allTasks.length - closedTasks;
+
+        const allBuilds = repository.listBuilds();
+        const closedBuilds = allBuilds.filter((b) => b.status === "closed").length;
+        const openBuilds = allBuilds.length - closedBuilds;
+
+        const allRuns = repository.listRuns();
+        const closedRuns = allRuns.filter((r) => r.status === "closed").length;
+        const openRuns = allRuns.length - closedRuns;
+
+        console.log("");
+        console.log("Context availability:");
+        console.log(`  Product context: ${context.productContext.available ? "available" : "not available"}`);
+        if (context.productContext.updatedAt) {
+          console.log(`    Updated: ${context.productContext.updatedAt}`);
+        }
+        console.log(`  Repo context: ${context.repoContext.available ? "available" : "not available"}`);
+        if (context.repoContext.updatedAt) {
+          console.log(`    Updated: ${context.repoContext.updatedAt}`);
+        }
+
+        console.log("");
+        console.log("Current run:");
+        if (currentRun && currentTask) {
+          console.log(`  ${currentRun.id}: ${currentTask.id} - ${currentTask.title}`);
+          console.log(`  Status: ${currentRun.status}`);
+        } else {
+          console.log("  No active run.");
+        }
+
+        console.log("");
+        console.log("Lifecycle counts:");
+        console.log(`  Builds: ${openBuilds} open, ${closedBuilds} closed`);
+        console.log(`  Tasks: ${openTasks} open, ${closedTasks} closed`);
+        console.log(`  Runs: ${openRuns} open, ${closedRuns} closed`);
+      } finally {
+        repository.close();
       }
     }
   });
