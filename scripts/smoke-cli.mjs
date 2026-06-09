@@ -75,6 +75,7 @@ runWorkItemPersistenceChecks();
 runTaskCreationChecks();
 runBuildCreationChecks();
 runQueryChecks();
+runStartChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1400,6 +1401,131 @@ function runQueryChecks() {
       cwd: repoRoot,
       exitCode: 0,
       includes: ["No builds found matching \"nonexistent\""],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runStartChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-start-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before start check", ["init"], repoRoot);
+    spawnOrFail("create task 1 for start check", ["new", "task", "Add sample feature"], repoRoot);
+    spawnOrFail("create task 2 for start check", ["new", "task", "Add another feature"], repoRoot);
+
+    runCheck({
+      name: "start creates run and generates run.md",
+      args: ["start", "TASK-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Started RUN-001 for TASK-001", "Parent Build: None", ".nerv/agent/runs/RUN-001/run.md"],
+      verify: () => {
+        const runDir = join(repoRoot, ".nerv/agent/runs/RUN-001");
+        const runFile = join(runDir, "run.md");
+        const taskFile = join(runDir, "task.md");
+
+        verifyPath("start creates run.md", runFile, "file");
+        verifyPath("start creates task.md", taskFile, "file");
+
+        const runContent = readFileSync(runFile, "utf8");
+        if (!runContent.includes("## Active Task")) {
+          fail("start creates run.md", "missing Active Task section", "");
+        }
+        if (!runContent.includes("`./task.md`")) {
+          fail("start creates run.md", "missing local task.md primary context link", "");
+        }
+        if (!runContent.includes("`../../tasks/TASK-001.md`")) {
+          fail("start creates run.md", "missing source task supporting context link", "");
+        }
+        if (!runContent.includes("`../../../product/product.md`")) {
+          fail("start creates run.md", "missing product supporting context link", "");
+        }
+        if (!runContent.includes("## Scope rule")) {
+          fail("start creates run.md", "missing Scope rule section", "");
+        }
+        if (!runContent.includes("## Acceptance criteria")) {
+          fail("start creates run.md", "missing Acceptance criteria section", "");
+        }
+        if (!runContent.includes("## Validation")) {
+          fail("start creates run.md", "missing Validation section", "");
+        }
+        if (!runContent.includes("## Checkpoint instructions")) {
+          fail("start creates run.md", "missing Checkpoint instructions section", "");
+        }
+        if (!runContent.includes("## Review instructions")) {
+          fail("start creates run.md", "missing Review instructions section", "");
+        }
+        if (!runContent.includes("## Close instructions")) {
+          fail("start creates run.md", "missing Close instructions section", "");
+        }
+        if (!runContent.includes("## Git awareness")) {
+          fail("start creates run.md", "missing Git awareness section", "");
+        }
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const run = repository.getRun("RUN-001");
+          if (!run) {
+            fail("start creates run in database", "run not found", "");
+          }
+          if (run.task_id !== "TASK-001") {
+            fail("start creates run in database", `expected task_id TASK-001, got ${run.task_id}`, "");
+          }
+          if (run.status !== "active") {
+            fail("start creates run in database", `expected active status, got ${run.status}`, "");
+          }
+
+          const currentRunId = repository.getCurrentRunId();
+          if (currentRunId !== "RUN-001") {
+            fail("start sets current run", `expected RUN-001, got ${currentRunId}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "start fails for non-existent task",
+      args: ["start", "TASK-999"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["No task found"],
+    });
+
+    runCheck({
+      name: "start fails for ambiguous query",
+      args: ["start", "feature"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["ambiguous"],
+    });
+
+    runCheck({
+      name: "start sets current run in database",
+      args: ["start", "TASK-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Started RUN-002"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const currentRunId = repository.getCurrentRunId();
+          if (currentRunId !== "RUN-002") {
+            fail("start sets current run in database", `expected RUN-002, got ${currentRunId}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

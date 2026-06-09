@@ -10,6 +10,7 @@ import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
 import { createTaskFromIntent, detectLargeIntent } from "./task.js";
 import { createBuildFromIntent, planBuildTasks } from "./build.js";
+import { startRun } from "./run.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -393,7 +394,52 @@ program
   .command("start")
   .argument("<query>", "Task query or ID to start.")
   .description("Start a Run for a selected Agentic Task.")
-  .action(() => notImplemented("start"));
+  .action((query: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv start must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    try {
+      const result = startRun(status.databasePath!, status.workspaceRoot!, query);
+
+      console.log(`Started ${result.run.id} for ${result.task.id}: ${result.task.title}`);
+      console.log(`Parent Build: ${result.build ? result.build.id : "None"}`);
+      console.log("");
+      console.log("Generated files:");
+      console.log(`  - ${result.runMarkdownPath}`);
+      console.log(`  - ${result.taskMarkdownPath}`);
+      console.log("");
+      console.log("Next steps:");
+      console.log(`  Give your coding agent this file: ${result.runMarkdownPath}`);
+      console.log(`  Track active run: nerv current`);
+      console.log(`  Save progress: nerv checkpoint --run ${result.run.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      program.error(message, {
+        code: "NERV_START_FAILED",
+        exitCode: 1,
+      });
+    }
+  });
 
 program
   .command("current")
