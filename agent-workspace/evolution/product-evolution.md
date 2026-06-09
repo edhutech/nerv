@@ -12,6 +12,7 @@ In the real MVP, Nerv will update `.nerv/product/evolution.md` when tasks and bu
 Closed TASK-ID: Task title
 
 Impact:
+
 - What changed
 - What this enables
 - Related Build
@@ -23,6 +24,7 @@ Impact:
 Closed TASK-001: Initialize TypeScript Package Foundation
 
 Impact:
+
 - Created the first real Nerv software foundation with Node.js, TypeScript and pnpm.
 - Added a buildable minimal CLI entrypoint for future command work.
 - Related Build: BUILD-001 Project And CLI Foundation
@@ -31,6 +33,7 @@ Impact:
 Closed TASK-002: Add Commander CLI Entrypoint And Command Skeleton
 
 Impact:
+
 - Added the Commander-based `nerv` CLI command surface for the MVP scope.
 - Added explicit placeholder behavior so commands are discoverable without pretending to perform real work.
 - Related Build: BUILD-001 Project And CLI Foundation
@@ -39,6 +42,7 @@ Impact:
 Closed TASK-003: Add Minimal Quality Gates And CLI Smoke Validation
 
 Impact:
+
 - Added repeatable CLI smoke validation and an aggregate `pnpm validate` command for the CLI foundation.
 - Documented current validation scripts and the intentional absence of `test` and `lint` scripts.
 - Related Build: BUILD-001 Project And CLI Foundation
@@ -47,6 +51,7 @@ Impact:
 Closed BUILD-001: Project And CLI Foundation
 
 Impact:
+
 - Established Nerv as a buildable Node.js, TypeScript and pnpm CLI project.
 - Added the Commander-based MVP command skeleton and repeatable CLI validation.
 - All planned BUILD-001 tasks are closed and the repo is ready for BUILD-002.
@@ -57,6 +62,7 @@ Impact:
 Closed TASK-004: Add Workspace Detection, `nerv init`, And `nerv status`
 
 Impact:
+
 - Added repo-local workspace detection using the current Git repository root.
 - Implemented idempotent `nerv init` and minimal `nerv status` behavior.
 - Related Build: BUILD-002 Local Workspace And SQLite State
@@ -65,6 +71,7 @@ Impact:
 Closed TASK-005: Add SQLite Bootstrap Schema And Database Initialization
 
 Impact:
+
 - Added the initial SQLite schema for builds, tasks, runs, checkpoints, reviews, decisions, status history and metadata.
 - Made database initialization safe to rerun and hardened malformed schema handling.
 - Related Build: BUILD-002 Local Workspace And SQLite State
@@ -73,6 +80,7 @@ Impact:
 Closed TASK-006: Add Repository Helpers And Stable ID Generation
 
 Impact:
+
 - Added a thin SQLite repository helper layer.
 - Added stable sequential IDs for builds, tasks and runs with malformed/stale counter protection.
 - Related Build: BUILD-002 Local Workspace And SQLite State
@@ -81,6 +89,7 @@ Impact:
 Closed BUILD-002: Local Workspace And SQLite State
 
 Impact:
+
 - Established `.nerv/` and `.nerv/nerv.db` as the local-first Nerv state foundation.
 - Added repo-scoped initialization, status reporting, durable schema and stable ID generation.
 - Unblocked future lifecycle commands that need persistent local state.
@@ -89,6 +98,7 @@ Impact:
 Closed TASK-007: Implement Product Context Scaffold Command
 
 Impact:
+
 - Implemented `nerv product` to scaffold stable human-editable product docs under `.nerv/product/`.
 - Added non-overwrite behavior with smoke coverage that verifies edited content is preserved.
 - Related Build: BUILD-003 Product And Repo Context Flow
@@ -97,6 +107,7 @@ Impact:
 Closed TASK-008: Add Lightweight Repo Development Context
 
 Impact:
+
 - Implemented `nerv repo` to generate `.nerv/repo/development.md` with lightweight package, script, folder and Git context.
 - Added graceful behavior when Git metadata is unavailable in an initialized workspace.
 - Related Build: BUILD-003 Product And Repo Context Flow
@@ -105,6 +116,7 @@ Impact:
 Closed TASK-009: Persist Context Metadata And Status Integration
 
 Impact:
+
 - Persisted product/repo context freshness metadata and product decision headings in SQLite.
 - Added context discovery and concise context availability output in `nerv status`.
 - Related Build: BUILD-003 Product And Repo Context Flow
@@ -113,6 +125,7 @@ Impact:
 Closed BUILD-003: Product And Repo Context Flow
 
 Impact:
+
 - Added usable product context creation and lightweight repo awareness to the Nerv CLI.
 - Made context availability visible and durable for future `run.md` generation.
 - Preserved the local-first, human-editable Markdown model while storing useful structured metadata in SQLite.

@@ -33,6 +33,7 @@ The Agentic Task is the execution scope. The Agentic Build provides shared conte
 ## What to do now
 
 Implement `nerv tasks [query]` and `nerv builds [query]` commands with:
+
 - List all tasks/builds when no query provided
 - Search by exact ID (e.g., TASK-001)
 - Search by case-insensitive text match on title or intent
