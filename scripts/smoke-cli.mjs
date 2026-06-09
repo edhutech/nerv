@@ -35,7 +35,7 @@ const checks = [
     name: "new command exposes task and build",
     args: ["new", "--help"],
     exitCode: 0,
-    includes: ["task <intent>", "build <intent>"],
+    includes: ["task [options] <intent>", "build <intent>"],
   },
   {
     name: "build command exposes plan",
@@ -72,6 +72,7 @@ runProductContextChecks();
 runRepoContextChecks();
 runContextMetadataChecks();
 runWorkItemPersistenceChecks();
+runTaskCreationChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1000,6 +1001,87 @@ function runWorkItemPersistenceChecks() {
     } finally {
       repository.close();
     }
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runTaskCreationChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-task-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+  const nonGitDir = join(tempRoot, "non-git");
+
+  mkdirSync(repoRoot, { recursive: true });
+  mkdirSync(nonGitDir, { recursive: true });
+
+  try {
+    runCheck({
+      name: "new task creates task in initialized repo",
+      args: ["new", "task", "Add Google login without breaking email auth"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created TASK-001", "Add Google login without breaking email auth", "Next steps:"],
+      setup: () => {
+        spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+        spawnOrFail("init workspace before task check", ["init"], repoRoot);
+      },
+      verify: () => {
+        const taskFile = join(repoRoot, ".nerv/agent/tasks/TASK-001.md");
+        verifyPath("new task creates task in initialized repo", taskFile, "file");
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const task = repository.getTask("TASK-001");
+          if (!task) {
+            fail("new task creates task in initialized repo", "task not found in database", "");
+          }
+          if (task.title !== "Add Google login without breaking email auth") {
+            fail("new task creates task in initialized repo", `title mismatch: ${task.title}`, "");
+          }
+          if (task.intent !== "Add Google login without breaking email auth") {
+            fail("new task creates task in initialized repo", `intent mismatch: ${task.intent}`, "");
+          }
+          if (task.status !== "proposed") {
+            fail("new task creates task in initialized repo", `status mismatch: ${task.status}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "new task fails when not in git repo",
+      args: ["new", "task", "Test task"],
+      cwd: nonGitDir,
+      exitCode: 1,
+      includes: ["must be run inside a Git repository"],
+    });
+
+    runCheck({
+      name: "new task detects large intent",
+      args: ["new", "task", "Build a complete authentication system with OAuth and SAML"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["appears to be large", "nerv new build"],
+    });
+
+    runCheck({
+      name: "new task --force bypasses large intent detection",
+      args: ["new", "task", "--force", "Build a complete authentication system with OAuth and SAML"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created TASK-002", "Large intent was detected"],
+    });
+
+    runCheck({
+      name: "new task generates sequential IDs",
+      args: ["new", "task", "Another simple task"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created TASK-003"],
+    });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }

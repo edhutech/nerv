@@ -68,7 +68,7 @@ By the end of this Build, the repo should have:
 ## Progress
 
 - TASK-010: Closed on 2026-06-08. Commit `9220b6a`.
-- TASK-011: Proposed.
+- TASK-011: Complete on 2026-06-08.
 - TASK-012: Proposed.
 - TASK-013: Proposed.
 

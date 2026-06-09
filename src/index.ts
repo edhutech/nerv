@@ -7,6 +7,7 @@ import { scaffoldProductContext, persistProductMetadata, persistDecisions } from
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
+import { createTaskFromIntent } from "./task.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -177,7 +178,57 @@ newCommand
   .command("task")
   .argument("<intent>", "Task intent to turn into scoped agentic work.")
   .description("Create an Agentic Task from intent.")
-  .action(() => notImplemented("new task"));
+  .option("--force", "Force task creation even if large intent is detected.")
+  .action((intent: string, options: { force?: boolean }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv new task must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    try {
+      const result = createTaskFromIntent(status.databasePath!, status.workspaceRoot!, intent, {
+        force: options.force,
+      });
+
+      console.log(`Created ${result.task.id}: ${result.task.title}`);
+      console.log(`Intent: ${intent}`);
+      console.log(`Status: ${result.task.status}`);
+      console.log(`Markdown: ${result.markdownPath}`);
+
+      if (result.largeIntentDetected) {
+        console.log("");
+        console.log("Note: Large intent was detected. Consider using `nerv new build` for complex work.");
+      }
+
+      console.log("");
+      console.log("Next steps:");
+      console.log(`  nerv start ${result.task.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      program.error(message, {
+        code: "NERV_TASK_CREATION_FAILED",
+        exitCode: 1,
+      });
+    }
+  });
 
 newCommand
   .command("build")
