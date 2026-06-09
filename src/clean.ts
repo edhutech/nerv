@@ -9,21 +9,26 @@ export type CleanResult = {
 export function cleanWorkspace(workspaceRoot: string): CleanResult {
   const cleanedPaths: string[] = [];
   const preservedPaths: string[] = [];
+  const agentRoot = join(workspaceRoot, "agent");
+  const preservedGeneratedDirs = new Set(["runs", "builds", "tasks"]);
 
-  for (const generatedDir of [
-    join(workspaceRoot, "agent", "runs"),
-    join(workspaceRoot, "agent", "builds"),
-    join(workspaceRoot, "agent", "tasks"),
-  ]) {
-    if (existsSync(generatedDir)) {
-      for (const entry of readdirSync(generatedDir)) {
-        const entryPath = join(generatedDir, entry);
+  if (existsSync(agentRoot)) {
+    for (const entry of readdirSync(agentRoot)) {
+      const entryPath = join(agentRoot, entry);
+
+      if (preservedGeneratedDirs.has(entry)) {
+        for (const childEntry of readdirSync(entryPath)) {
+          const childPath = join(entryPath, childEntry);
+          rmSync(childPath, { recursive: true, force: true });
+          cleanedPaths.push(childPath);
+        }
+      } else {
         rmSync(entryPath, { recursive: true, force: true });
         cleanedPaths.push(entryPath);
       }
-    } else {
-      preservedPaths.push(generatedDir);
     }
+  } else {
+    preservedPaths.push(agentRoot);
   }
 
   const productDir = join(workspaceRoot, "product");

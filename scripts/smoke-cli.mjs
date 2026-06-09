@@ -2243,6 +2243,28 @@ function runCleanChecks() {
       includes: ["Nothing to clean."],
     });
 
+    const futureGeneratedDir = join(repoRoot, ".nerv/agent/future-cache");
+    const futureGeneratedFile = join(repoRoot, ".nerv/agent/future-artifact.md");
+    mkdirSync(futureGeneratedDir, { recursive: true });
+    writeFileSync(join(futureGeneratedDir, "generated.txt"), "generated\n", "utf8");
+    writeFileSync(futureGeneratedFile, "generated\n", "utf8");
+
+    runCheck({
+      name: "clean removes future generated agent artifacts",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Cleaned 2 generated artifact(s):", "future-cache", "future-artifact.md"],
+      verify: () => {
+        if (existsSync(futureGeneratedDir)) {
+          fail("clean removes future generated agent artifacts", "future generated directory still exists", "");
+        }
+        if (existsSync(futureGeneratedFile)) {
+          fail("clean removes future generated agent artifacts", "future generated file still exists", "");
+        }
+      },
+    });
+
     spawnOrFail("create build for clean check", ["new", "build", "Clean generated build artifacts"], repoRoot);
     spawnOrFail("plan build for clean check", ["build", "plan", "BUILD-001"], repoRoot);
 
