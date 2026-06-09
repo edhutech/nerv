@@ -151,4 +151,4 @@ Impact:
 - Implemented `nerv start <query>` so it creates a Run in SQLite, marks it active, and generates focused `run.md` plus local `task.md`.
 - The generated `run.md` is the single agent entrypoint with scope, context, acceptance criteria, validation, checkpoint, review, close and Git awareness sections.
 - Related Build: BUILD-005 Run Generation And Agent Entrypoint
-- Commit hash: not committed
+- Commit hash: 78a6ea6
