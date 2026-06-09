@@ -195,7 +195,7 @@ Closed on 2026-06-09.
 
 **Commit status:**
 
-Pending commit.
+Committed as 7998e61.
 
 **Final summary:**
 
