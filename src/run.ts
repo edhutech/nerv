@@ -140,20 +140,20 @@ nerv review --outcome failed --summary "What failed"
 After review passes:
 
 1. Commit changes with a descriptive message:
-   ```
+   \`\`\`
    git add .
    git commit -m "TASK-XXX: Your commit message"
-   ```
+   \`\`\`
 
 2. Close the run:
-   ```
+   \`\`\`
    nerv close --run ${run.id}
-   ```
+   \`\`\`
    
    Or use the current run:
-   ```
+   \`\`\`
    nerv close
-   ```
+   \`\`\`
 
 The close command will:
 - Verify a passed review exists
