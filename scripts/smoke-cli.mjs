@@ -74,6 +74,7 @@ runContextMetadataChecks();
 runWorkItemPersistenceChecks();
 runTaskCreationChecks();
 runBuildCreationChecks();
+runQueryChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1183,6 +1184,121 @@ function runBuildCreationChecks() {
       cwd: repoRoot,
       exitCode: 1,
       includes: ["not found"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runQueryChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-query-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before query check", ["init"], repoRoot);
+
+    runCheck({
+      name: "tasks shows empty list message",
+      args: ["tasks"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["No tasks found."],
+    });
+
+    runCheck({
+      name: "builds shows empty list message",
+      args: ["builds"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["No builds found."],
+    });
+
+    // Create some test data
+    spawnOrFail("create build for query check", ["new", "build", "Implement user authentication"], repoRoot);
+    spawnOrFail("create task for query check", ["new", "task", "Add login form"], repoRoot);
+    spawnOrFail("plan build for query check", ["build", "plan", "BUILD-001"], repoRoot);
+
+    runCheck({
+      name: "tasks lists all tasks",
+      args: ["tasks"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 4 task(s)", "[BUILD-001]"],
+    });
+
+    runCheck({
+      name: "tasks treats whitespace query as list",
+      args: ["tasks", "   "],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 4 task(s):"],
+    });
+
+    runCheck({
+      name: "tasks searches by ID",
+      args: ["tasks", "TASK-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 task(s) matching \"TASK-001\"", "TASK-001"],
+    });
+
+    runCheck({
+      name: "tasks searches by text",
+      args: ["tasks", "login"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 task(s) matching \"login\"", "Add login form"],
+    });
+
+    runCheck({
+      name: "tasks shows no results message",
+      args: ["tasks", "nonexistent"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["No tasks found matching \"nonexistent\""],
+    });
+
+    runCheck({
+      name: "builds lists all builds",
+      args: ["builds"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 build(s)", "BUILD-001", "Tasks: 3"],
+    });
+
+    runCheck({
+      name: "builds treats whitespace query as list",
+      args: ["builds", "   "],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 build(s):", "BUILD-001"],
+    });
+
+    runCheck({
+      name: "builds searches by ID",
+      args: ["builds", "BUILD-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 build(s) matching \"BUILD-001\"", "BUILD-001"],
+    });
+
+    runCheck({
+      name: "builds searches by text",
+      args: ["builds", "authentication"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 build(s) matching \"authentication\"", "Implement user authentication"],
+    });
+
+    runCheck({
+      name: "builds shows no results message",
+      args: ["builds", "nonexistent"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["No builds found matching \"nonexistent\""],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

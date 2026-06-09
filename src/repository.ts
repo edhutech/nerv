@@ -88,10 +88,13 @@ export type Repository = {
   createBuild(input: CreateBuildInput): BuildRecord;
   getBuild(id: string): BuildRecord | null;
   listBuilds(): BuildRecord[];
+  searchBuilds(query: string): BuildRecord[];
+  getBuildTaskCount(buildId: string): number;
   updateBuild(id: string, updates: Partial<Omit<BuildRecord, "id" | "created_at">>): void;
   createTask(input: CreateTaskInput): TaskRecord;
   getTask(id: string): TaskRecord | null;
   listTasks(): TaskRecord[];
+  searchTasks(query: string): TaskRecord[];
   listTasksByBuild(buildId: string): TaskRecord[];
   updateTask(id: string, updates: Partial<Omit<TaskRecord, "id" | "created_at">>): void;
 };
@@ -143,6 +146,18 @@ export function openRepository(databasePath: string): Repository {
     `SELECT * FROM builds ORDER BY id DESC`,
   );
 
+  const searchBuildsByIdStmt = database.prepare(
+    `SELECT * FROM builds WHERE id = ?`,
+  );
+
+  const searchBuildsByTextStmt = database.prepare(
+    `SELECT * FROM builds WHERE title LIKE ? OR intent LIKE ? ORDER BY id DESC`,
+  );
+
+  const getBuildTaskCountStmt = database.prepare(
+    `SELECT COUNT(*) as count FROM tasks WHERE build_id = ?`,
+  );
+
   const updateBuildStmt = database.prepare(
     `UPDATE builds SET title = @title, status = @status, updated_at = @updatedAt, closed_at = @closedAt, intent = @intent, goal = @goal, user_value = @userValue, scope = @scope, out_of_scope = @outOfScope, acceptance_criteria = @acceptanceCriteria, validation = @validation, risks = @risks, generated_markdown_path = @generatedMarkdownPath WHERE id = @id`,
   );
@@ -158,6 +173,14 @@ export function openRepository(databasePath: string): Repository {
 
   const listTasksStmt = database.prepare(
     `SELECT * FROM tasks ORDER BY id DESC`,
+  );
+
+  const searchTasksByIdStmt = database.prepare(
+    `SELECT * FROM tasks WHERE id = ?`,
+  );
+
+  const searchTasksByTextStmt = database.prepare(
+    `SELECT * FROM tasks WHERE title LIKE ? OR intent LIKE ? ORDER BY id DESC`,
   );
 
   const listTasksByBuildStmt = database.prepare(
@@ -216,6 +239,31 @@ export function openRepository(databasePath: string): Repository {
 
   const listBuilds = (): BuildRecord[] => {
     return listBuildsStmt.all() as BuildRecord[];
+  };
+
+  const searchBuilds = (query: string): BuildRecord[] => {
+    const trimmed = query.trim();
+
+    if (!trimmed) {
+      return listBuilds();
+    }
+
+    // Check if it's an exact ID match
+    if (trimmed.startsWith("BUILD-")) {
+      const exact = searchBuildsByIdStmt.get(trimmed) as BuildRecord | undefined;
+      if (exact) {
+        return [exact];
+      }
+    }
+
+    // Search by text in title or intent
+    const pattern = `%${trimmed}%`;
+    return searchBuildsByTextStmt.all(pattern, pattern) as BuildRecord[];
+  };
+
+  const getBuildTaskCount = (buildId: string): number => {
+    const row = getBuildTaskCountStmt.get(buildId) as { count: number } | undefined;
+    return row?.count ?? 0;
   };
 
   const updateBuild = database.transaction((id: string, updates: Partial<Omit<BuildRecord, "id" | "created_at">>): void => {
@@ -299,6 +347,26 @@ export function openRepository(databasePath: string): Repository {
     return listTasksStmt.all() as TaskRecord[];
   };
 
+  const searchTasks = (query: string): TaskRecord[] => {
+    const trimmed = query.trim();
+
+    if (!trimmed) {
+      return listTasks();
+    }
+
+    // Check if it's an exact ID match
+    if (trimmed.startsWith("TASK-")) {
+      const exact = searchTasksByIdStmt.get(trimmed) as TaskRecord | undefined;
+      if (exact) {
+        return [exact];
+      }
+    }
+
+    // Search by text in title or intent
+    const pattern = `%${trimmed}%`;
+    return searchTasksByTextStmt.all(pattern, pattern) as TaskRecord[];
+  };
+
   const listTasksByBuild = (buildId: string): TaskRecord[] => {
     return listTasksByBuildStmt.all(buildId) as TaskRecord[];
   };
@@ -353,10 +421,13 @@ export function openRepository(databasePath: string): Repository {
     createBuild,
     getBuild,
     listBuilds,
+    searchBuilds,
+    getBuildTaskCount,
     updateBuild,
     createTask,
     getTask,
     listTasks,
+    searchTasks,
     listTasksByBuild,
     updateTask,
   };

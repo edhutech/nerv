@@ -70,7 +70,7 @@ By the end of this Build, the repo should have:
 - TASK-010: Closed on 2026-06-08. Commit `9220b6a`.
 - TASK-011: Closed on 2026-06-08. Commit `d8b26da`.
 - TASK-012: Closed on 2026-06-08. Commit `1f5e476`.
-- TASK-013: Proposed.
+- TASK-013: Closed on 2026-06-08. Commit `<pending>`.
 
 ## Acceptance criteria
 

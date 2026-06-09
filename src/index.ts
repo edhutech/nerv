@@ -375,13 +375,132 @@ program
   .command("tasks")
   .argument("[query]", "Optional task query.")
   .description("List or search Agentic Tasks.")
-  .action(() => notImplemented("tasks"));
+  .action((query?: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv tasks must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const normalizedQuery = query?.trim() || "";
+      const tasks = normalizedQuery ? repository.searchTasks(normalizedQuery) : repository.listTasks();
+
+      if (tasks.length === 0) {
+        if (normalizedQuery) {
+          console.log(`No tasks found matching "${normalizedQuery}".`);
+        } else {
+          console.log("No tasks found.");
+        }
+        return;
+      }
+
+      if (normalizedQuery) {
+        console.log(`Found ${tasks.length} task(s) matching "${normalizedQuery}":`);
+      } else {
+        console.log(`Found ${tasks.length} task(s):`);
+      }
+
+      console.log("");
+
+      for (const task of tasks) {
+        const buildInfo = task.build_id ? ` [${task.build_id}]` : "";
+        console.log(`${task.id}: ${task.title}${buildInfo}`);
+        console.log(`  Status: ${task.status}`);
+        if (task.intent) {
+          console.log(`  Intent: ${task.intent}`);
+        }
+        console.log("");
+      }
+    } finally {
+      repository.close();
+    }
+  });
 
 program
   .command("builds")
   .argument("[query]", "Optional build query.")
   .description("List or search Agentic Builds.")
-  .action(() => notImplemented("builds"));
+  .action((query?: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv builds must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const normalizedQuery = query?.trim() || "";
+      const builds = normalizedQuery ? repository.searchBuilds(normalizedQuery) : repository.listBuilds();
+
+      if (builds.length === 0) {
+        if (normalizedQuery) {
+          console.log(`No builds found matching "${normalizedQuery}".`);
+        } else {
+          console.log("No builds found.");
+        }
+        return;
+      }
+
+      if (normalizedQuery) {
+        console.log(`Found ${builds.length} build(s) matching "${normalizedQuery}":`);
+      } else {
+        console.log(`Found ${builds.length} build(s):`);
+      }
+
+      console.log("");
+
+      for (const build of builds) {
+        const taskCount = repository.getBuildTaskCount(build.id);
+        console.log(`${build.id}: ${build.title}`);
+        console.log(`  Status: ${build.status}`);
+        console.log(`  Tasks: ${taskCount}`);
+        if (build.intent) {
+          console.log(`  Intent: ${build.intent}`);
+        }
+        console.log("");
+      }
+    } finally {
+      repository.close();
+    }
+  });
 
 program
   .command("runs")
