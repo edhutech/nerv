@@ -1519,8 +1519,14 @@ function runStartChecks() {
         if (!runContent.includes("## Checkpoint instructions")) {
           fail("start creates run.md", "missing Checkpoint instructions section", "");
         }
+        if (!runContent.includes("nerv checkpoint --summary")) {
+          fail("start creates run.md", "missing checkpoint command guidance", "");
+        }
         if (!runContent.includes("## Review instructions")) {
           fail("start creates run.md", "missing Review instructions section", "");
+        }
+        if (!runContent.includes("nerv review --outcome passed")) {
+          fail("start creates run.md", "missing review command guidance", "");
         }
         if (!runContent.includes("## Close instructions")) {
           fail("start creates run.md", "missing Close instructions section", "");
@@ -1809,6 +1815,12 @@ function runReviewChecks() {
         if (!reviewContent.includes("passed")) {
           fail("review saves for explicit run", "missing outcome in review file", reviewContent);
         }
+        if (!reviewContent.includes("## Git Status")) {
+          fail("review saves for explicit run", "missing Git Status section", reviewContent);
+        }
+        if (!reviewContent.includes("## Git Diff Summary")) {
+          fail("review saves for explicit run", "missing Git Diff Summary section", reviewContent);
+        }
 
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         const repository = openRepository(dbPath);
@@ -1938,6 +1950,9 @@ function runEndToEndLifecycleChecks() {
         if (!reviewContent.includes("passed")) {
           fail("review after checkpoint", "missing outcome in review file", reviewContent);
         }
+        if (!reviewContent.includes("## Git Status")) {
+          fail("review after checkpoint", "missing Git Status section", reviewContent);
+        }
 
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         const repository = openRepository(dbPath);
@@ -2013,6 +2028,14 @@ function runGitUnavailableChecks() {
       verify: () => {
         const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-001.md");
         verifyPath("review saves without git", reviewFile, "file");
+
+        const reviewContent = readFileSync(reviewFile, "utf8");
+        if (!reviewContent.includes("Git metadata unavailable.")) {
+          fail("review saves without git", "missing unavailable Git status", reviewContent);
+        }
+        if (!reviewContent.includes("Git diff unavailable.")) {
+          fail("review saves without git", "missing unavailable Git diff", reviewContent);
+        }
       },
     });
   } finally {

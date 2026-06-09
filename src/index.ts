@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { createInterface } from "node:readline/promises";
+import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
 import { scaffoldProductContext, persistProductMetadata, persistDecisions } from "./product.js";
@@ -710,6 +711,7 @@ program
         evidence: options.evidence,
         task,
         build,
+        git: captureGitContext(status.repoRoot!),
       });
 
       console.log(`Saved review ${review.id} for ${run.id}.`);
@@ -810,6 +812,7 @@ function writeReviewMarkdown(
     evidence?: string;
     task: { id: string; title: string; acceptance_criteria: string | null; validation: string | null } | null;
     build: { id: string; title: string } | null;
+    git: { status: string; diff: string };
   },
 ): string {
   const reviewDir = join(workspaceRoot, "agent", "runs", runId, "reviews");
@@ -853,11 +856,44 @@ ${details.task?.acceptance_criteria || "Not specified."}
 ## Expected Validation
 
 ${details.task?.validation || "Not specified."}
+
+## Git Status
+
+${details.git.status}
+
+## Git Diff Summary
+
+${details.git.diff}
 `;
 
   writeFileSync(reviewPath, content, "utf8");
 
   return reviewPath;
+}
+
+function captureGitContext(repoRoot: string): { status: string; diff: string } {
+  try {
+    const status = execFileSync("git", ["status", "--short"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    const diff = execFileSync("git", ["diff", "--stat"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+
+    return {
+      status: status || "Clean working tree.",
+      diff: diff || "No unstaged diff.",
+    };
+  } catch {
+    return {
+      status: "Git metadata unavailable.",
+      diff: "Git diff unavailable.",
+    };
+  }
 }
 
 program
