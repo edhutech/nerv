@@ -2022,6 +2022,34 @@ function runCloseChecks() {
       includes: ["cannot be closed without a passed review"],
     });
 
+    spawnOrFail(
+      "add passed review for second close check",
+      ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second run ready", "--validation", "passed"],
+      repoRoot,
+    );
+    spawnOrFail("create third task for current preservation check", ["new", "task", "Keep current run active"], repoRoot);
+    spawnOrFail("start third run for current preservation check", ["start", "TASK-003"], repoRoot);
+
+    runCheck({
+      name: "explicit close preserves different current run",
+      args: ["close", "--run", "RUN-002"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Closed RUN-002"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const currentRunId = repository.getCurrentRunId();
+          if (currentRunId !== "RUN-003") {
+            fail("explicit close preserves different current run", `expected RUN-003 current run, got ${currentRunId}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
     const buildTempRoot = mkdtempSync(join(tmpdir(), "nerv-close-build-smoke-"));
     const buildRepoRoot = join(buildTempRoot, "repo");
     mkdirSync(buildRepoRoot, { recursive: true });
@@ -2184,7 +2212,7 @@ function runCleanChecks() {
       args: ["clean"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Cleaned 1 generated artifact(s):", "RUN-001"],
+      includes: ["Cleaned 2 generated artifact(s):", "RUN-001", "TASK-001.md"],
       verify: () => {
         if (existsSync(runDir)) {
           fail("clean removes generated run artifacts", "run directory still exists", "");
@@ -2215,6 +2243,30 @@ function runCleanChecks() {
       includes: ["Nothing to clean."],
     });
 
+    spawnOrFail("create build for clean check", ["new", "build", "Clean generated build artifacts"], repoRoot);
+    spawnOrFail("plan build for clean check", ["build", "plan", "BUILD-001"], repoRoot);
+
+    const generatedBuildFile = join(repoRoot, ".nerv/agent/builds/BUILD-001.md");
+    const generatedTaskFile = join(repoRoot, ".nerv/agent/tasks/TASK-002.md");
+    verifyPath("plan build for clean check", generatedBuildFile, "file");
+    verifyPath("plan build for clean check", generatedTaskFile, "file");
+
+    runCheck({
+      name: "clean removes generated build and task artifacts",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Cleaned 4 generated artifact(s):", "BUILD-001.md", "TASK-002.md"],
+      verify: () => {
+        if (existsSync(generatedBuildFile)) {
+          fail("clean removes generated build and task artifacts", "generated build file still exists", "");
+        }
+        if (existsSync(generatedTaskFile)) {
+          fail("clean removes generated build and task artifacts", "generated task file still exists", "");
+        }
+      },
+    });
+
     spawnOrFail("start another run for clean check", ["start", "TASK-001"], repoRoot);
     const run2Dir = join(repoRoot, ".nerv/agent/runs/RUN-002");
 
@@ -2238,8 +2290,8 @@ function runCleanChecks() {
           }
 
           const tasks = repository.listTasks();
-          if (tasks.length !== 1) {
-            fail("clean preserves database and product context", `expected 1 task in database, got ${tasks.length}`, "");
+          if (tasks.length !== 4) {
+            fail("clean preserves database and product context", `expected 4 tasks in database, got ${tasks.length}`, "");
           }
         } finally {
           repository.close();
@@ -2414,6 +2466,34 @@ function runGitUnavailableChecks() {
         }
       },
     });
+
+    runCheck({
+      name: "close saves without git",
+      args: ["close"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Closed RUN-001", "Warning: Git metadata unavailable. Close recorded without commit hash."],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const run = repository.getRun("RUN-001");
+          if (!run || run.status !== "closed") {
+            fail("close saves without git", "run was not closed", "");
+          }
+
+          const closeRecord = repository.getCloseRecord("RUN-001");
+          if (!closeRecord) {
+            fail("close saves without git", "close record not found", "");
+          }
+          if (closeRecord.commit_hash !== null) {
+            fail("close saves without git", `expected null commit hash, got ${closeRecord.commit_hash}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -2521,7 +2601,7 @@ function runBuild007LifecycleChecks() {
       args: ["clean"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Cleaned 1 generated artifact(s):", "RUN-001"],
+      includes: ["Cleaned 2 generated artifact(s):", "RUN-001", "TASK-001.md"],
       verify: () => {
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         if (!existsSync(dbPath)) {

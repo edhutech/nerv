@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 export type CleanResult = {
@@ -10,33 +10,20 @@ export function cleanWorkspace(workspaceRoot: string): CleanResult {
   const cleanedPaths: string[] = [];
   const preservedPaths: string[] = [];
 
-  const agentRunsDir = join(workspaceRoot, "agent", "runs");
-  const agentBuildsDir = join(workspaceRoot, "agent", "builds");
-
-  if (existsSync(agentRunsDir)) {
-    const runEntries = readdirSync(agentRunsDir);
-    for (const entry of runEntries) {
-      const entryPath = join(agentRunsDir, entry);
-      if (statSync(entryPath).isDirectory()) {
+  for (const generatedDir of [
+    join(workspaceRoot, "agent", "runs"),
+    join(workspaceRoot, "agent", "builds"),
+    join(workspaceRoot, "agent", "tasks"),
+  ]) {
+    if (existsSync(generatedDir)) {
+      for (const entry of readdirSync(generatedDir)) {
+        const entryPath = join(generatedDir, entry);
         rmSync(entryPath, { recursive: true, force: true });
         cleanedPaths.push(entryPath);
       }
+    } else {
+      preservedPaths.push(generatedDir);
     }
-  } else {
-    preservedPaths.push(agentRunsDir);
-  }
-
-  if (existsSync(agentBuildsDir)) {
-    const buildEntries = readdirSync(agentBuildsDir);
-    for (const entry of buildEntries) {
-      const entryPath = join(agentBuildsDir, entry);
-      if (statSync(entryPath).isDirectory()) {
-        rmSync(entryPath, { recursive: true, force: true });
-        cleanedPaths.push(entryPath);
-      }
-    }
-  } else {
-    preservedPaths.push(agentBuildsDir);
   }
 
   const productDir = join(workspaceRoot, "product");

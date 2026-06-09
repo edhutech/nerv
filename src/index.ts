@@ -928,7 +928,8 @@ program
     const repository = openRepository(status.databasePath!);
 
     try {
-      const runId = options.run?.trim().toUpperCase() || repository.getCurrentRunId();
+      const currentRunId = repository.getCurrentRunId();
+      const runId = options.run?.trim().toUpperCase() || currentRunId;
 
       if (!runId) {
         program.error("No current run. Use `nerv close --run RUN-###`.", {
@@ -1003,7 +1004,9 @@ program
         repository.updateTask(task.id, { status: "closed", closed_at: now });
       }
 
-      repository.setMetadata("current_run_id", "");
+      if (currentRunId === runId) {
+        repository.setMetadata("current_run_id", "");
+      }
 
       let buildUpdateMessage: string | null = null;
       if (task?.build_id) {
