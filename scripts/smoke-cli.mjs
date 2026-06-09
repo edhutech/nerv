@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -80,6 +80,7 @@ runCurrentAndRunsChecks();
 runCheckpointChecks();
 runReviewChecks();
 runCloseChecks();
+runCleanChecks();
 runEndToEndLifecycleChecks();
 runGitUnavailableChecks();
 
@@ -2124,6 +2125,132 @@ function runCloseChecks() {
     } finally {
       rmSync(buildTempRoot, { recursive: true, force: true });
     }
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runCleanChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-clean-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before clean check", ["init"], repoRoot);
+
+    runCheck({
+      name: "clean fails when not in git repo",
+      args: ["clean"],
+      cwd: tempRoot,
+      exitCode: 1,
+      includes: ["nerv clean must be run inside a Git repository."],
+    });
+
+    runCheck({
+      name: "clean fails when workspace not initialized",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Nerv is not initialized in this repo. Run `nerv init` first."],
+      setup: () => {
+        rmSync(join(repoRoot, ".nerv"), { recursive: true, force: true });
+      },
+    });
+
+    spawnOrFail("reinit workspace for clean check", ["init"], repoRoot);
+    spawnOrFail("scaffold product for clean check", ["product"], repoRoot);
+
+    runCheck({
+      name: "clean reports nothing to clean when empty",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Nothing to clean."],
+    });
+
+    spawnOrFail("create task for clean check", ["new", "task", "Add clean test feature"], repoRoot);
+    spawnOrFail("start run for clean check", ["start", "TASK-001"], repoRoot);
+
+    const runDir = join(repoRoot, ".nerv/agent/runs/RUN-001");
+    if (!existsSync(runDir)) {
+      fail("start run for clean check", "run directory not created", "");
+    }
+
+    runCheck({
+      name: "clean removes generated run artifacts",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Cleaned 1 generated artifact(s):", "RUN-001"],
+      verify: () => {
+        if (existsSync(runDir)) {
+          fail("clean removes generated run artifacts", "run directory still exists", "");
+        }
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        if (!existsSync(dbPath)) {
+          fail("clean removes generated run artifacts", "database was deleted", "");
+        }
+
+        const productDir = join(repoRoot, ".nerv/product");
+        if (!existsSync(productDir)) {
+          fail("clean removes generated run artifacts", "product directory was deleted", "");
+        }
+
+        const repoDir = join(repoRoot, ".nerv/repo");
+        if (!existsSync(repoDir)) {
+          fail("clean removes generated run artifacts", "repo directory was deleted", "");
+        }
+      },
+    });
+
+    runCheck({
+      name: "clean is idempotent",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Nothing to clean."],
+    });
+
+    spawnOrFail("start another run for clean check", ["start", "TASK-001"], repoRoot);
+    const run2Dir = join(repoRoot, ".nerv/agent/runs/RUN-002");
+
+    runCheck({
+      name: "clean preserves database and product context",
+      args: ["clean"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Cleaned 1 generated artifact(s):", "RUN-002"],
+      verify: () => {
+        if (existsSync(run2Dir)) {
+          fail("clean preserves database and product context", "run directory still exists", "");
+        }
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const runs = repository.listRuns();
+          if (runs.length !== 2) {
+            fail("clean preserves database and product context", `expected 2 runs in database, got ${runs.length}`, "");
+          }
+
+          const tasks = repository.listTasks();
+          if (tasks.length !== 1) {
+            fail("clean preserves database and product context", `expected 1 task in database, got ${tasks.length}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+
+        const productDir = join(repoRoot, ".nerv/product");
+        const productFiles = readdirSync(productDir);
+        if (productFiles.length === 0) {
+          fail("clean preserves database and product context", "product directory is empty", "");
+        }
+      },
+    });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }

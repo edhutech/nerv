@@ -12,6 +12,7 @@ import { openRepository } from "./repository.js";
 import { createTaskFromIntent, detectLargeIntent } from "./task.js";
 import { createBuildFromIntent, planBuildTasks } from "./build.js";
 import { startRun } from "./run.js";
+import { cleanWorkspace } from "./clean.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -1328,6 +1329,41 @@ program
 program
   .command("clean")
   .description("Clean safe generated Nerv artifacts.")
-  .action(() => notImplemented("clean"));
+  .action(() => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv clean must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const result = cleanWorkspace(status.workspaceRoot!);
+
+    if (result.cleanedPaths.length === 0) {
+      console.log("Nothing to clean.");
+      return;
+    }
+
+    console.log(`Cleaned ${result.cleanedPaths.length} generated artifact(s):`);
+    for (const path of result.cleanedPaths) {
+      console.log(`  - ${path}`);
+    }
+  });
 
 await program.parseAsync();
