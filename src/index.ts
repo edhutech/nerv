@@ -11,7 +11,7 @@ import { openRepository } from "./repository.js";
 import { createTaskFromIntent, detectLargeIntent } from "./task.js";
 import { createBuildFromIntent, planBuildTasks } from "./build.js";
 import { startRun } from "./run.js";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const program = new Command();
@@ -505,14 +505,175 @@ program
 program
   .command("checkpoint")
   .option("--run <runId>", "Run ID to checkpoint.")
+  .requiredOption("--summary <summary>", "Checkpoint summary.")
+  .option("--files <files>", "Files touched, separated by commas or semicolons.")
+  .option("--decisions <decisions>", "Decisions made since the last checkpoint.")
+  .option("--problems <problems>", "Problems or blockers encountered.")
+  .option("--pending <pending>", "Pending work.")
+  .option("--next <nextSteps>", "Suggested next steps.")
   .description("Save checkpoint memory for a Run.")
-  .action(() => notImplemented("checkpoint"));
+  .action((options: {
+    run?: string;
+    summary: string;
+    files?: string;
+    decisions?: string;
+    problems?: string;
+    pending?: string;
+    next?: string;
+  }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+
+    if (status.repoRoot === null) {
+      program.error("nerv checkpoint must be run inside a Git repository.", {
+        code: "NERV_REPO_NOT_FOUND",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    if (!status.initialized) {
+      program.error(
+        "Nerv is not initialized in this repo. Run `nerv init` first.",
+        {
+          code: "NERV_WORKSPACE_NOT_INITIALIZED",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
+    const summary = options.summary.trim();
+
+    if (!summary) {
+      program.error("Checkpoint summary is required.", {
+        code: "NERV_CHECKPOINT_SUMMARY_REQUIRED",
+        exitCode: 1,
+      });
+
+      return;
+    }
+
+    const repository = openRepository(status.databasePath!);
+
+    try {
+      const runId = options.run?.trim().toUpperCase() || repository.getCurrentRunId();
+
+      if (!runId) {
+        program.error("No current run. Use `nerv checkpoint --run RUN-### --summary \"...\"`.", {
+          code: "NERV_CURRENT_RUN_NOT_FOUND",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      const run = repository.getRun(runId);
+
+      if (!run) {
+        program.error(`Run ${runId} not found.`, {
+          code: "NERV_RUN_NOT_FOUND",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      const checkpoint = repository.createCheckpoint({
+        run_id: run.id,
+        summary,
+      });
+      const checkpointPath = writeCheckpointMarkdown(status.workspaceRoot!, checkpoint.id, run.id, {
+        summary,
+        files: options.files,
+        decisions: options.decisions,
+        problems: options.problems,
+        pending: options.pending,
+        next: options.next,
+      });
+
+      console.log(`Saved checkpoint ${checkpoint.id} for ${run.id}.`);
+      console.log(`  Summary: ${summary}`);
+      console.log(`  Checkpoint file: ${checkpointPath}`);
+    } finally {
+      repository.close();
+    }
+  });
 
 program
   .command("review")
   .option("--run <runId>", "Run ID to review.")
   .description("Review a Run against acceptance criteria and evidence.")
   .action(() => notImplemented("review"));
+
+function writeCheckpointMarkdown(
+  workspaceRoot: string,
+  checkpointId: number,
+  runId: string,
+  details: {
+    summary: string;
+    files?: string;
+    decisions?: string;
+    problems?: string;
+    pending?: string;
+    next?: string;
+  },
+): string {
+  const checkpointDir = join(workspaceRoot, "agent", "runs", runId, "checkpoints");
+  mkdirSync(checkpointDir, { recursive: true });
+
+  const checkpointPath = join(checkpointDir, `checkpoint-${String(checkpointId).padStart(3, "0")}.md`);
+  const content = `# Checkpoint ${checkpointId}
+
+## Run
+
+${runId}
+
+## Summary
+
+${details.summary}
+
+## Files touched
+
+${formatOptionalList(details.files)}
+
+## Decisions
+
+${formatOptionalText(details.decisions)}
+
+## Problems
+
+${formatOptionalText(details.problems)}
+
+## Pending work
+
+${formatOptionalText(details.pending)}
+
+## Next steps
+
+${formatOptionalText(details.next)}
+`;
+
+  writeFileSync(checkpointPath, content, "utf8");
+
+  return checkpointPath;
+}
+
+function formatOptionalList(value: string | undefined): string {
+  const items = value?.split(/[;,]/).map((item) => item.trim()).filter(Boolean) || [];
+
+  if (items.length === 0) {
+    return "- None provided.";
+  }
+
+  return items.map((item) => `- ${item}`).join("\n");
+}
+
+function formatOptionalText(value: string | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed || "None provided.";
+}
 
 program
   .command("close")

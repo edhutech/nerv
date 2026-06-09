@@ -60,6 +60,13 @@ export type RunRecord = {
   closed_at: string | null;
 };
 
+export type CheckpointRecord = {
+  id: number;
+  run_id: string;
+  summary: string;
+  created_at: string;
+};
+
 export type CreateBuildInput = {
   id: string;
   title: string;
@@ -95,6 +102,11 @@ export type CreateRunInput = {
   status?: string;
 };
 
+export type CreateCheckpointInput = {
+  run_id: string;
+  summary: string;
+};
+
 export type Repository = {
   close(): void;
   getNextId(type: IdType): string;
@@ -116,6 +128,8 @@ export type Repository = {
   createRun(input: CreateRunInput): RunRecord;
   getRun(id: string): RunRecord | null;
   listRuns(): RunRecord[];
+  createCheckpoint(input: CreateCheckpointInput): CheckpointRecord;
+  listCheckpoints(runId: string): CheckpointRecord[];
   getCurrentRunId(): string | null;
   setCurrentRunId(runId: string): void;
 };
@@ -223,6 +237,19 @@ export function openRepository(databasePath: string): Repository {
 
   const listRunsStmt = database.prepare(
     `SELECT * FROM runs ORDER BY id DESC`,
+  );
+
+  const createCheckpointStmt = database.prepare(
+    `INSERT INTO checkpoints (run_id, summary, created_at)
+     VALUES (@runId, @summary, @createdAt)`,
+  );
+
+  const getCheckpointStmt = database.prepare(
+    `SELECT * FROM checkpoints WHERE id = ?`,
+  );
+
+  const listCheckpointsStmt = database.prepare(
+    `SELECT * FROM checkpoints WHERE run_id = ? ORDER BY id ASC`,
   );
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
@@ -499,6 +526,21 @@ export function openRepository(databasePath: string): Repository {
     return listRunsStmt.all() as RunRecord[];
   };
 
+  const createCheckpoint = database.transaction((input: CreateCheckpointInput): CheckpointRecord => {
+    const now = new Date().toISOString();
+    const result = createCheckpointStmt.run({
+      runId: input.run_id,
+      summary: input.summary,
+      createdAt: now,
+    });
+
+    return getCheckpointStmt.get(result.lastInsertRowid) as CheckpointRecord;
+  });
+
+  const listCheckpoints = (runId: string): CheckpointRecord[] => {
+    return listCheckpointsStmt.all(runId) as CheckpointRecord[];
+  };
+
   return {
     close() {
       database.close();
@@ -530,6 +572,8 @@ export function openRepository(databasePath: string): Repository {
     createRun,
     getRun,
     listRuns,
+    createCheckpoint,
+    listCheckpoints,
     getCurrentRunId(): string | null {
       return this.getMetadata("current_run_id");
     },

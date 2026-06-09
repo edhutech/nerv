@@ -173,3 +173,15 @@ Impact:
 - Implemented `nerv current` and `nerv runs` for active Run discovery and Run listing.
 - All planned BUILD-005 tasks are closed and the repo is ready for BUILD-006.
 - Related tasks: TASK-014, TASK-015, TASK-016
+
+## 2026-06-09
+
+Closed TASK-017: Add Checkpoint Persistence And nerv checkpoint
+
+Impact:
+
+- Implemented checkpoint persistence and the `nerv checkpoint` command.
+- Developers can save progress checkpoints for active Runs with structured evidence fields.
+- Checkpoints are persisted in SQLite and written as Markdown files under each Run's `checkpoints/` directory.
+- Related Build: BUILD-006 Checkpoint And Review Lifecycle
+- Commit hash: fd74ba9

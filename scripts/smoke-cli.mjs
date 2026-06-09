@@ -77,6 +77,7 @@ runBuildCreationChecks();
 runQueryChecks();
 runStartChecks();
 runCurrentAndRunsChecks();
+runCheckpointChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1069,6 +1070,32 @@ function runWorkItemPersistenceChecks() {
 
       console.log("ok - work item run listing");
 
+      const checkpoint = repository.createCheckpoint({
+        run_id: "RUN-001",
+        summary: "Implemented first checkpoint",
+      });
+      if (checkpoint.id !== 1) {
+        fail("work item checkpoint creation", `expected checkpoint id 1, got ${checkpoint.id}`, "");
+      }
+      if (checkpoint.run_id !== "RUN-001") {
+        fail("work item checkpoint creation", "run_id not set", "");
+      }
+      if (checkpoint.summary !== "Implemented first checkpoint") {
+        fail("work item checkpoint creation", "summary not stored", "");
+      }
+
+      console.log("ok - work item checkpoint creation");
+
+      const checkpoints = repository.listCheckpoints("RUN-001");
+      if (checkpoints.length !== 1) {
+        fail("work item checkpoint listing", `expected 1 checkpoint, got ${checkpoints.length}`, "");
+      }
+      if (checkpoints[0].summary !== "Implemented first checkpoint") {
+        fail("work item checkpoint listing", "wrong checkpoint returned", "");
+      }
+
+      console.log("ok - work item checkpoint listing");
+
       repository.setCurrentRunId("RUN-001");
       const currentRunId = repository.getCurrentRunId();
       if (currentRunId !== "RUN-001") {
@@ -1594,6 +1621,105 @@ function runCurrentAndRunsChecks() {
       cwd: repoRoot,
       exitCode: 0,
       includes: ["RUN-002:", "TASK-001"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runCheckpointChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-checkpoint-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before checkpoint check", ["init"], repoRoot);
+
+    runCheck({
+      name: "checkpoint fails without current run",
+      args: ["checkpoint", "--summary", "Nothing active"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["No current run"],
+    });
+
+    spawnOrFail("create task for checkpoint check", ["new", "task", "Add checkpointable feature"], repoRoot);
+    spawnOrFail("start run for checkpoint check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "checkpoint saves for explicit run",
+      args: [
+        "checkpoint",
+        "--run",
+        "RUN-001",
+        "--summary",
+        "Implemented checkpoint flow",
+        "--files",
+        "src/index.ts;scripts/smoke-cli.mjs",
+        "--decisions",
+        "Store summary in SQLite",
+        "--pending",
+        "Review remains next",
+      ],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved checkpoint 1 for RUN-001", "Implemented checkpoint flow", ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md"],
+      verify: () => {
+        const checkpointFile = join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md");
+        verifyPath("checkpoint saves for explicit run", checkpointFile, "file");
+
+        const checkpointContent = readFileSync(checkpointFile, "utf8");
+        if (!checkpointContent.includes("Implemented checkpoint flow")) {
+          fail("checkpoint saves for explicit run", "missing summary in checkpoint file", checkpointContent);
+        }
+        if (!checkpointContent.includes("- src/index.ts")) {
+          fail("checkpoint saves for explicit run", "missing files list in checkpoint file", checkpointContent);
+        }
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const checkpoints = repository.listCheckpoints("RUN-001");
+          if (checkpoints.length !== 1) {
+            fail("checkpoint saves for explicit run", `expected 1 checkpoint, got ${checkpoints.length}`, "");
+          }
+          if (checkpoints[0].summary !== "Implemented checkpoint flow") {
+            fail("checkpoint saves for explicit run", `summary mismatch: ${checkpoints[0].summary}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "checkpoint uses current run",
+      args: ["checkpoint", "--summary", "Saved current run checkpoint"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved checkpoint 2 for RUN-001", "Saved current run checkpoint"],
+      verify: () => {
+        const checkpointFile = join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-002.md");
+        verifyPath("checkpoint uses current run", checkpointFile, "file");
+      },
+    });
+
+    runCheck({
+      name: "checkpoint fails for missing run",
+      args: ["checkpoint", "--run", "RUN-999", "--summary", "Missing run"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Run RUN-999 not found"],
+    });
+
+    runCheck({
+      name: "checkpoint fails for empty summary",
+      args: ["checkpoint", "--run", "RUN-001", "--summary", "   "],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Checkpoint summary is required"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

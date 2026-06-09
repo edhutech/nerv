@@ -55,11 +55,15 @@ By the end of this Build, the repo should have:
 
 ## Suggested Agentic Tasks
 
-Do not complete this section until the Build is approved.
+- TASK-017: Add Checkpoint Persistence And `nerv checkpoint`
+- TASK-018: Add Review Persistence And `nerv review`
+- TASK-019: Harden Checkpoint/Review Integration And Evidence
 
-- TASK-001:
-- TASK-002:
-- TASK-003:
+## Progress
+
+- TASK-017: Closed. Checkpoint persistence and `nerv checkpoint` command are implemented.
+- TASK-018: Proposed.
+- TASK-019: Proposed.
 
 ## Acceptance criteria
 
