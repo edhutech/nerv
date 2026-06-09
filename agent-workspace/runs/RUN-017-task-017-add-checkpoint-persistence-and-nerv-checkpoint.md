@@ -104,7 +104,7 @@ TASK-017 Add checkpoint persistence and command
 
 Closed on 2026-06-09.
 
-**Commit status:** Committed as fd74ba9.
+**Commit status:** Committed as 7bffdf5.
 
 **Final summary:** RUN-017 implemented checkpoint persistence and the `nerv checkpoint` command. The task was reviewed and approved, with all acceptance criteria met and comprehensive smoke test coverage.
 

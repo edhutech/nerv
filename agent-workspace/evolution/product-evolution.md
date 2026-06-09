@@ -184,4 +184,4 @@ Impact:
 - Developers can save progress checkpoints for active Runs with structured evidence fields.
 - Checkpoints are persisted in SQLite and written as Markdown files under each Run's `checkpoints/` directory.
 - Related Build: BUILD-006 Checkpoint And Review Lifecycle
-- Commit hash: fd74ba9
+- Commit hash: 7bffdf5
