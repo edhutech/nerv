@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Closed
 
 ## Parent Build
 
@@ -102,12 +102,91 @@ At the end, provide:
 
 ## Checkpoint log
 
-Pending.
+### Checkpoint 001
+
+Implemented on 2026-06-09.
+
+**What changed:**
+
+- Updated generated `run.md` checkpoint and review instructions to match actual CLI options (`nerv checkpoint --summary ... --files ...` and `nerv review --outcome ... --summary ... --validation ... --evidence ...`).
+- Added end-to-end smoke coverage: checkpoint then review flow for a single Run.
+- Added Git-unavailable smoke coverage: checkpoint and review work after `.git` is removed.
+
+**Files touched:**
+
+- `src/run.ts`
+- `scripts/smoke-cli.mjs`
+
+**Validation performed:**
+
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `pnpm smoke` passed (98 tests).
+
+**Pending work:**
+
+- Review and close TASK-019.
+
+**Suggested commit message:**
+
+```txt
+TASK-019 Harden checkpoint/review integration and evidence
+
+- Update generated run.md with actual checkpoint and review CLI options
+- Add end-to-end smoke test for checkpoint then review flow
+- Add Git-unavailable smoke tests for checkpoint and review
+```
 
 ## Review
 
-Pending.
+Reviewed on 2026-06-09.
+
+**Status:** Approved
+
+**Acceptance criteria verification:**
+
+- ✓ Run guidance matches implemented checkpoint and review commands
+- ✓ End-to-end smoke coverage exercises checkpoint then review for a Run
+- ✓ Git unavailable behavior remains graceful
+- ✓ BUILD-006 evidence is ready for close
+
+**Implementation quality:**
+
+- `run.md` now shows actual CLI commands with correct options instead of generic instructions
+- Smoke tests verify the full checkpoint → review lifecycle in a single Run
+- Git-unavailable tests confirm both commands work without `.git`
+
+**Residual risks:**
+
+- Git diff/status capture from TASK-018 scope was deferred; not blocking BUILD-006 close.
 
 ## Close summary
 
+Closed on 2026-06-09.
+
+**Commit status:**
+
 Pending.
+
+**Final summary:**
+
+TASK-019 hardened checkpoint/review integration by updating generated `run.md` to match actual CLI options and adding end-to-end and Git-unavailable smoke coverage. BUILD-006 is now ready for close.
+
+**User or developer value delivered:**
+
+Generated `run.md` now gives agents correct checkpoint and review commands, and the lifecycle is verified end-to-end.
+
+**Files changed:**
+
+- `src/run.ts`
+- `scripts/smoke-cli.mjs`
+- `agent-workspace/tasks/TASK-019-harden-checkpoint-review-integration-and-evidence.md`
+- `agent-workspace/runs/RUN-019-task-019-harden-checkpoint-review-integration-and-evidence.md`
+- `agent-workspace/builds/BUILD-006-checkpoint-and-review-lifecycle.md`
+- `agent-workspace/evolution/product-evolution.md`
+
+**Validation evidence:**
+
+- `pnpm build` passed.
+- `pnpm typecheck` passed.
+- `pnpm smoke` passed (98 tests).

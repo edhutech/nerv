@@ -79,6 +79,8 @@ runStartChecks();
 runCurrentAndRunsChecks();
 runCheckpointChecks();
 runReviewChecks();
+runEndToEndLifecycleChecks();
+runGitUnavailableChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -1861,6 +1863,157 @@ function runReviewChecks() {
       cwd: repoRoot,
       exitCode: 1,
       includes: ["Review outcome must be 'passed' or 'failed'"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runEndToEndLifecycleChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-e2e-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before e2e check", ["init"], repoRoot);
+
+    spawnOrFail("create task for e2e check", ["new", "task", "Add end-to-end flow"], repoRoot);
+    spawnOrFail("start run for e2e check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "checkpoint then review flow",
+      args: [
+        "checkpoint",
+        "--summary",
+        "Implemented feature",
+        "--files",
+        "src/index.ts,src/run.ts",
+        "--decisions",
+        "Used existing schema",
+        "--pending",
+        "Review and close",
+        "--next",
+        "Request review",
+      ],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved checkpoint 1 for RUN-001"],
+      verify: () => {
+        const checkpointFile = join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md");
+        verifyPath("checkpoint then review flow", checkpointFile, "file");
+
+        const checkpointContent = readFileSync(checkpointFile, "utf8");
+        if (!checkpointContent.includes("Implemented feature")) {
+          fail("checkpoint then review flow", "missing summary in checkpoint file", checkpointContent);
+        }
+      },
+    });
+
+    runCheck({
+      name: "review after checkpoint",
+      args: [
+        "review",
+        "--outcome",
+        "passed",
+        "--summary",
+        "All criteria met",
+        "--validation",
+        "passed",
+        "--evidence",
+        "Build, typecheck, smoke all pass",
+      ],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved review 1 for RUN-001"],
+      verify: () => {
+        const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-001.md");
+        verifyPath("review after checkpoint", reviewFile, "file");
+
+        const reviewContent = readFileSync(reviewFile, "utf8");
+        if (!reviewContent.includes("All criteria met")) {
+          fail("review after checkpoint", "missing summary in review file", reviewContent);
+        }
+        if (!reviewContent.includes("passed")) {
+          fail("review after checkpoint", "missing outcome in review file", reviewContent);
+        }
+
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const checkpoints = repository.listCheckpoints("RUN-001");
+          if (checkpoints.length !== 1) {
+            fail("review after checkpoint", `expected 1 checkpoint, got ${checkpoints.length}`, "");
+          }
+
+          const reviews = repository.listReviews("RUN-001");
+          if (reviews.length !== 1) {
+            fail("review after checkpoint", `expected 1 review, got ${reviews.length}`, "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runGitUnavailableChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-no-git-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before no-git check", ["init"], repoRoot);
+
+    rmSync(join(repoRoot, ".git"), { recursive: true, force: true });
+
+    runCheck({
+      name: "checkpoint works without git",
+      args: ["checkpoint", "--run", "RUN-001", "--summary", "No git available"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Run RUN-001 not found"],
+    });
+
+    spawnOrFail("create task for no-git check", ["new", "task", "Test without git"], repoRoot);
+    spawnOrFail("start run for no-git check", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "checkpoint saves without git",
+      args: ["checkpoint", "--summary", "Saved without git"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved checkpoint 1 for RUN-001"],
+      verify: () => {
+        const checkpointFile = join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md");
+        verifyPath("checkpoint saves without git", checkpointFile, "file");
+      },
+    });
+
+    runCheck({
+      name: "review saves without git",
+      args: [
+        "review",
+        "--outcome",
+        "passed",
+        "--summary",
+        "Reviewed without git",
+        "--validation",
+        "passed",
+      ],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved review 1 for RUN-001"],
+      verify: () => {
+        const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-001.md");
+        verifyPath("review saves without git", reviewFile, "file");
+      },
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

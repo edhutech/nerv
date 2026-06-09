@@ -197,3 +197,25 @@ Impact:
 - Reviews are persisted in SQLite and written as Markdown files under each Run's `reviews/` directory.
 - Related Build: BUILD-006 Checkpoint And Review Lifecycle
 - Commit hash: 5f7d347
+
+## 2026-06-09
+
+Closed TASK-019: Harden Checkpoint/Review Integration And Evidence
+
+Impact:
+
+- Updated generated `run.md` with actual checkpoint and review CLI options.
+- Added end-to-end smoke coverage for checkpoint then review flow.
+- Added Git-unavailable smoke coverage for checkpoint and review.
+- Related Build: BUILD-006 Checkpoint And Review Lifecycle
+- Commit hash: pending
+
+Closed BUILD-006: Checkpoint And Review Lifecycle
+
+Impact:
+
+- Implemented `nerv checkpoint` with structured evidence fields and persistent checkpoint records.
+- Implemented `nerv review` with outcome, validation, and evidence capture.
+- Generated `run.md` now includes correct checkpoint and review commands.
+- All planned BUILD-006 tasks are closed and the repo is ready for BUILD-007.
+- Related tasks: TASK-017, TASK-018, TASK-019

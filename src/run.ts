@@ -109,22 +109,31 @@ ${validation}
 
 ## Checkpoint instructions
 
-Before checkpointing:
+Save progress with:
 
-- Summarize what changed
-- List files touched
-- Note any decisions made
-- Run validation commands
-- Save checkpoint summary
+\`\`\`
+nerv checkpoint --summary "What changed" --files "file1,file2" --decisions "Key decisions" --pending "What remains" --next "Next steps"
+\`\`\`
+
+Or use the current run:
+
+\`\`\`
+nerv checkpoint --summary "What changed"
+\`\`\`
 
 ## Review instructions
 
-Before requesting review:
+After validation passes, request review with:
 
-- Verify all acceptance criteria are met
-- Ensure validation commands pass
-- Confirm no unrelated changes were made
-- Provide evidence of completion
+\`\`\`
+nerv review --outcome passed --summary "Review summary" --validation passed --evidence "Evidence details"
+\`\`\`
+
+Or mark as failed:
+
+\`\`\`
+nerv review --outcome failed --summary "What failed"
+\`\`\`
 
 ## Close instructions
 

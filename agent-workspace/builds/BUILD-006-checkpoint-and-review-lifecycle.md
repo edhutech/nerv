@@ -63,7 +63,9 @@ By the end of this Build, the repo should have:
 
 - TASK-017: Closed. Checkpoint persistence and `nerv checkpoint` command are implemented.
 - TASK-018: Closed. Review persistence and `nerv review` command are implemented.
-- TASK-019: Proposed.
+- TASK-019: Closed. Checkpoint/review integration hardened with end-to-end and Git-unavailable smoke coverage.
+
+**BUILD-006 is complete.**
 
 ## Acceptance criteria
 
