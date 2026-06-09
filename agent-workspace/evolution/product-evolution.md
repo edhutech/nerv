@@ -284,6 +284,7 @@ Impact:
 - Related Build: BUILD-007 Git-Aware Close, Evolution, Lists And Clean
 - Commit hash: 5374da9
 - Review fix hash: 2f60c38
+- Residual clean-risk fix hash: 1f00885
 
 Closed BUILD-007: Git-Aware Close, Evolution, Lists And Clean
 
@@ -296,4 +297,4 @@ Impact:
 - Clean safely removes generated artifacts while preserving durable state.
 - All planned BUILD-007 tasks are closed and the MVP lifecycle is complete.
 - Related tasks: TASK-020, TASK-021, TASK-022, TASK-023, TASK-024
-- Commit hash: 2f60c38
+- Commit hash: 1f00885
