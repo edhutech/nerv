@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete
+Closed
 
 ## Parent Build
 
@@ -165,7 +165,7 @@ No blocking or behavioral findings found.
 - `nerv runs` lists created Runs in stable order.
 - Empty states are clear and non-error.
 - Output includes enough information to resume agent work.
-- Smoke coverage exercises empty states, active run, multiple runs, and stale metadata handling.
+- Smoke coverage exercises empty states, active run, run listing, and multiple runs. Stale metadata handling was reviewed in code.
 
 **Validation evidence:**
 
@@ -183,7 +183,7 @@ Closed on 2026-06-09.
 
 **Commit status:**
 
-Not committed. The task passed review and validation, but the current workspace changes have not been committed yet.
+Closed and committed as 077cd83.
 
 **Final summary:**
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete
+Closed
 
 ## Active Task
 
@@ -108,7 +108,7 @@ Reviewed on 2026-06-09. No blocking or behavioral findings found.
 
 Closed on 2026-06-09.
 
-**Commit status:** Not committed.
+**Commit status:** Closed and committed as 077cd83.
 
 **Final summary:** TASK-016 implemented `nerv current` and `nerv runs` commands with graceful handling of edge cases and smoke coverage.
 

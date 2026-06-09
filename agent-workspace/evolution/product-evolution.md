@@ -163,7 +163,7 @@ Impact:
 - Implemented `nerv runs` to list all Runs with task details.
 - Added graceful handling for stale metadata and missing task references.
 - Related Build: BUILD-005 Run Generation And Agent Entrypoint
-- Commit hash: c53e972
+- Commit hash: 077cd83
 
 Closed BUILD-005: Run Generation And Agent Entrypoint
 
