@@ -71,7 +71,7 @@ Before finishing this Run, provide:
 
 Closed on 2026-06-09.
 
-**Commit status:** Pending.
+**Commit status:** Committed as 3cdb6db.
 
 **Final summary:** RUN-019 hardened checkpoint/review integration by updating generated `run.md` with actual CLI options and adding end-to-end and Git-unavailable smoke coverage. BUILD-006 is ready for close.
 

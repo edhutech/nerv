@@ -208,7 +208,7 @@ Impact:
 - Added end-to-end smoke coverage for checkpoint then review flow.
 - Added Git-unavailable smoke coverage for checkpoint and review.
 - Related Build: BUILD-006 Checkpoint And Review Lifecycle
-- Commit hash: pending
+- Commit hash: 3cdb6db
 
 Closed BUILD-006: Checkpoint And Review Lifecycle
 

@@ -166,7 +166,7 @@ Closed on 2026-06-09.
 
 **Commit status:**
 
-Pending.
+Committed as 3cdb6db.
 
 **Final summary:**
 
