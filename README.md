@@ -23,7 +23,7 @@ Nerv does not replace coding agents. It works **with** agents (Codex, Claude Cod
 ## Installation
 
 ```bash
-git clone https://github.com/<your-username>/nerv.git
+git clone https://github.com/edhutech/nerv.git
 cd nerv
 pnpm install
 pnpm build
