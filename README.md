@@ -22,21 +22,57 @@ Nerv does not replace coding agents. It works **with** agents (Codex, Claude Cod
 
 ## Installation
 
+Nerv is installed once in a local tools folder, but you run it from the project repository where you want Nerv to create and manage `.nerv/`.
+
 ```bash
-git clone https://github.com/edhutech/nerv.git
-cd nerv
+mkdir -p ~/tools
+git clone https://github.com/edhutech/nerv.git ~/tools/nerv
+cd ~/tools/nerv
 pnpm install
 pnpm build
-pnpm link --global
 ```
 
-Verify installation:
+## Running Nerv
+
+Nerv commands are executed from your project repository, not from the installation folder.
+
+**Direct execution:**
+
+```bash
+cd your-project
+node ~/tools/nerv/dist/index.js init
+node ~/tools/nerv/dist/index.js product
+```
+
+Verify:
+
+```bash
+node ~/tools/nerv/dist/index.js --help
+```
+
+**Optional convenience alias:**
+
+Add to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+alias nerv='node ~/tools/nerv/dist/index.js'
+```
+
+Reload your shell:
+
+```bash
+source ~/.bashrc   # or source ~/.zshrc
+```
+
+Verify:
 
 ```bash
 nerv --help
 ```
 
 ## Quick Start
+
+The following examples use `nerv` for readability. If you did not configure the optional alias, replace `nerv` with `node ~/tools/nerv/dist/index.js`.
 
 ```bash
 # 1. Initialize Nerv in your project
@@ -103,6 +139,15 @@ Give your coding agent the `run.md` file. It contains:
 - Checkpoint/review/close instructions
 
 The agent reads `run.md` and works with focused context instead of guessing from the whole repo.
+
+## Update Nerv
+
+```bash
+cd ~/tools/nerv
+git pull
+pnpm install
+pnpm build
+```
 
 ## Development
 
