@@ -16,6 +16,7 @@ The MVP includes:
 
 - `nerv init`
 - `nerv product`
+- `nerv repo`
 - `nerv new task "..."`
 - `nerv new build "..."`
 - `nerv build plan BUILD-001`
@@ -35,11 +36,12 @@ The MVP includes:
 ```bash
 nerv init
 nerv product
+nerv repo
 nerv new task "Add Google login without breaking email auth"
 nerv start login
 # agent works with @.nerv/agent/runs/RUN-001/run.md
-nerv checkpoint --run RUN-001
-nerv review --run RUN-001
+nerv checkpoint --run RUN-001 --summary "Implemented Google login"
+nerv review --run RUN-001 --outcome passed --summary "All criteria met" --validation passed --evidence "Validation passed"
 git add .
 git commit -m "TASK-001 Add Google login without breaking email auth"
 nerv close --run RUN-001
@@ -50,7 +52,7 @@ nerv close --run RUN-001
 The MVP must prove that Nerv can:
 
 1. Create local project structure.
-2. Create product context.
+2. Create product context and repository-development context.
 3. Convert intent into an Agentic Task or suggest an Agentic Build.
 4. Create a Run for a task.
 5. Generate a focused `run.md` for the agent.
@@ -59,6 +61,12 @@ The MVP must prove that Nerv can:
 8. Close tasks and update related Builds.
 9. Preserve product evolution.
 10. Reduce repeated explanations between sessions.
+
+## Product Context status
+
+The current `nerv product` behavior is non-destructive scaffolding: it creates missing product-context files and preserves existing files. It does not populate or revise their content.
+
+The target behavior is a guided creation and evolution workflow that reads initial material, asks for missing decisions, checks completeness and contradictions, and proposes changes before replacing relevant content. This behavior is not implemented yet.
 
 ## Out of scope for MVP
 
