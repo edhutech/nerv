@@ -79,8 +79,11 @@ The following examples use `nerv` for readability. If you did not configure the 
 cd your-project
 nerv init
 
-# 2. Create product context
+# 2. Prepare a portable Product Context session
 nerv product
+# Give the printed .nerv/agent/product/run.md file to any coding agent.
+# Optional temporary source material stays in your repository:
+nerv product --input product-brief.md notes/
 
 # 3. Create an Agentic Task from intent
 nerv new task "Add Google login without breaking email auth"
@@ -108,7 +111,10 @@ nerv close
 | Command | Description |
 |---------|-------------|
 | `nerv init` | Initialize Nerv in the current repo |
-| `nerv product` | Create or update product context |
+| `nerv product [--input <paths...>]` | Prepare an agent-neutral Product Context session |
+| `nerv product status` | Show session state and Product Context checks |
+| `nerv product review` | Check required documents and placeholders before close |
+| `nerv product close` | Close a reviewed Product Session |
 | `nerv repo` | Generate repo development context |
 | `nerv new task "<intent>"` | Create Agentic Task from intent |
 | `nerv new build "<intent>"` | Create Agentic Build from intent |
@@ -125,6 +131,8 @@ nerv close
 | `nerv clean` | Clean generated artifacts |
 
 ## Using with Coding Agents
+
+Product Context is independent of agents and providers. Nerv never opens an agent or calls an AI API. `nerv product` writes `.nerv/agent/product/run.md`; give that file to the agent you choose. It may update only `.nerv/product/`, asks only necessary questions, and requires you to review the diff before Git. A later `nerv product` resumes an active session; use `nerv product status`, then `nerv product review` and `nerv product close` when it is complete. Builds and checkpoints remain optional.
 
 When you start a Run with `nerv start <query>`, Nerv generates:
 
