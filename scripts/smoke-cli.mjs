@@ -805,6 +805,33 @@ function runProductSessionChecks() {
       exitCode: 0,
       includes: ["Resumed Product Session PRODUCT-001 (creation)."],
     });
+
+    const inputDirectory = join(repoRoot, "product-notes");
+    mkdirSync(inputDirectory);
+    writeFileSync(join(inputDirectory, "brief.md"), "A temporary brief\n", "utf8");
+    runCheck({
+      name: "product accepts input and generates a portable entrypoint",
+      args: ["product", "--input", "product-notes"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Give your agent this file:", ".nerv/agent/product/run.md"],
+      verify: () => {
+        const entrypoint = join(repoRoot, ".nerv/agent/product/run.md");
+        verifyPath("product accepts input and generates a portable entrypoint", entrypoint, "file");
+        const content = readFileSync(entrypoint, "utf8");
+        if (!content.includes("product-notes/brief.md") || !content.includes("Do not modify application code")) {
+          fail("product accepts input and generates a portable entrypoint", "entrypoint is missing input or scope rules", content);
+        }
+      },
+    });
+
+    runCheck({
+      name: "product rejects missing input",
+      args: ["product", "--input", "missing.md"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Input path does not exist"],
+    });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -2448,11 +2475,11 @@ function runCleanChecks() {
     spawnOrFail("scaffold product for clean check", ["product"], repoRoot);
 
     runCheck({
-      name: "clean reports nothing to clean when empty",
+      name: "clean removes generated product entrypoint",
       args: ["clean"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Nothing to clean."],
+      includes: ["Cleaned 1 generated artifact(s):", "agent/product"],
     });
 
     spawnOrFail("create task for clean check", ["new", "task", "Add clean test feature"], repoRoot);
@@ -2872,7 +2899,7 @@ function runBuild007LifecycleChecks() {
       args: ["clean"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Cleaned 2 generated artifact(s):", "RUN-001", "TASK-001.md"],
+      includes: ["Cleaned 3 generated artifact(s):", "agent/product", "RUN-001", "TASK-001.md"],
       verify: () => {
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         if (!existsSync(dbPath)) {

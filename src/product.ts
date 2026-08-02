@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
 import Database from "better-sqlite3";
 
@@ -189,6 +189,86 @@ export function startProductSession(databasePath: string, hasExistingContext: bo
   } finally {
     repository.close();
   }
+}
+
+const INPUT_EXTENSIONS = new Set([".md", ".txt", ".json", ".yaml", ".yml", ".csv"]);
+
+export function discoverProductInputs(repoRoot: string, inputs: string[]): string[] {
+  const discovered: string[] = [];
+  for (const input of inputs) {
+    const path = resolve(process.cwd(), input);
+    const relativePath = relative(repoRoot, path);
+    if (!relativePath || relativePath.startsWith("..") || relativePath.split(sep).includes(".nerv")) {
+      throw new Error(`Input path is not allowed: ${input}. Inputs must be files or folders inside the repository and outside .nerv/.`);
+    }
+    if (!existsSync(path)) {
+      throw new Error(`Input path does not exist: ${input}.`);
+    }
+    collectInputFiles(path, repoRoot, discovered);
+  }
+  const unique = [...new Set(discovered)].sort();
+  if (inputs.length > 0 && unique.length === 0) {
+    throw new Error("No compatible input files were found.");
+  }
+  return unique;
+}
+
+function collectInputFiles(path: string, repoRoot: string, discovered: string[]): void {
+  const stat = statSync(path);
+  if (stat.isDirectory()) {
+    for (const entry of readdirSync(path)) {
+      collectInputFiles(join(path, entry), repoRoot, discovered);
+    }
+    return;
+  }
+  const extension = path.slice(path.lastIndexOf(".")).toLowerCase();
+  if (!INPUT_EXTENSIONS.has(extension)) {
+    throw new Error(`Input file is not compatible: ${relative(repoRoot, path)}. Allowed extensions: ${[...INPUT_EXTENSIONS].join(", ")}.`);
+  }
+  discovered.push(relative(repoRoot, path));
+}
+
+export function generateProductEntrypoint(workspaceRoot: string, session: ProductSessionRecord, inputs: string[]): string {
+  const productDir = join(workspaceRoot, "product");
+  const entrypointDir = join(workspaceRoot, "agent", "product");
+  mkdirSync(entrypointDir, { recursive: true });
+  const repoContext = existsSync(join(workspaceRoot, "repo", "development.md")) ? "- `../../repo/development.md`" : "- No Repo Context is available yet.";
+  const inputList = inputs.length > 0 ? inputs.map((input) => `- \`${join("..", "..", "..", input)}\``).join("\n") : "- No input files were supplied. Interview the user only for information needed to complete the Product Context.";
+  const content = `# Product Session ${session.id}
+
+## Purpose
+
+Prepare Product Context only. Nerv does not invoke models or APIs. Give this file to any external coding agent that can read repository files.
+
+## Session
+
+- Mode: ${session.mode}
+- State: ${session.status}
+
+## Read
+
+- \`../../product/product.md\`
+- \`../../product/problem.md\`
+- \`../../product/users.md\`
+- \`../../product/prd.md\`
+- \`../../product/roadmap.md\`
+- \`../../product/scope.md\`
+- \`../../product/decisions.md\`
+- \`../../product/architecture.md\`
+- \`../../product/evolution.md\`
+${repoContext}
+
+## Temporary input material
+
+${inputList}
+
+## Allowed changes
+
+Modify only the nine Markdown documents in \`.nerv/product/\`. Do not modify application code, dependencies, configuration, Git state, or files outside \`.nerv/product/\`.
+`;
+  const path = join(entrypointDir, "run.md");
+  writeFileSync(path, content, "utf8");
+  return path;
 }
 
 export function scaffoldProductContext(workspaceRoot: string): ProductScaffoldResult {

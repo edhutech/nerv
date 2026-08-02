@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, generateProductEntrypoint } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -82,8 +82,9 @@ program
 
 program
   .command("product")
-  .description("Create or update local product context.")
-  .action(() => {
+  .description("Prepare an agent-neutral Product Context session.")
+  .option("--input <paths...>", "Temporary product material: compatible files or folders inside the repository.")
+  .action((options: { input?: string[] }) => {
     const status = getWorkspaceStatus(process.cwd());
 
     if (status.repoRoot === null) {
@@ -109,8 +110,17 @@ program
 
     const productDirectory = join(status.workspaceRoot!, "product");
     const hadExistingContext = PRODUCT_CONTEXT_FILES.some((file) => existsSync(join(productDirectory, file)));
-    const result = scaffoldProductContext(status.workspaceRoot!);
-    const productSession = startProductSession(status.databasePath!, hadExistingContext);
+    try {
+      const inputs = discoverProductInputs(status.repoRoot!, options.input ?? []);
+      const result = scaffoldProductContext(status.workspaceRoot!);
+      const productSession = startProductSession(status.databasePath!, hadExistingContext);
+      const repository = openRepository(status.databasePath!);
+      try {
+        repository.updateProductSession(productSession.session.id, { input_manifest: JSON.stringify(inputs) });
+      } finally {
+        repository.close();
+      }
+      const entrypoint = generateProductEntrypoint(status.workspaceRoot!, productSession.session, inputs);
 
     if (result.created.length > 0 || result.preserved.length > 0) {
       persistProductMetadata(status.databasePath!, result.created, result.preserved);
@@ -142,7 +152,12 @@ program
       }
     }
 
-    console.log(`${productSession.resumed ? "Resumed" : "Started"} Product Session ${productSession.session.id} (${productSession.session.mode}).`);
+      console.log(`${productSession.resumed ? "Resumed" : "Started"} Product Session ${productSession.session.id} (${productSession.session.mode}).`);
+      console.log(`Give your agent this file: ${entrypoint}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      program.error(message, { code: "NERV_PRODUCT_SESSION_FAILED", exitCode: 1 });
+    }
   });
 
 program

@@ -179,6 +179,7 @@ export type Repository = {
   setCurrentRunId(runId: string): void;
   createProductSession(input: { id: string; mode: string; input_manifest?: string | null }): ProductSessionRecord;
   getProductSession(id: string): ProductSessionRecord | null;
+  updateProductSession(id: string, updates: Partial<Pick<ProductSessionRecord, "status" | "input_manifest" | "closed_at">>): void;
   getCurrentProductSessionId(): string | null;
   setCurrentProductSessionId(sessionId: string): void;
 };
@@ -680,6 +681,9 @@ export function openRepository(databasePath: string): Repository {
      VALUES (@id, @status, @mode, @createdAt, @updatedAt, @closedAt, @inputManifest)`,
   );
   const getProductSessionStmt = database.prepare("SELECT * FROM product_sessions WHERE id = ?");
+  const updateProductSessionStmt = database.prepare(
+    `UPDATE product_sessions SET status = @status, updated_at = @updatedAt, closed_at = @closedAt, input_manifest = @inputManifest WHERE id = @id`,
+  );
 
   const getCloseRecordStmt = database.prepare(
     `SELECT * FROM close_records WHERE run_id = ?`,
@@ -778,6 +782,19 @@ export function openRepository(databasePath: string): Repository {
     },
     getProductSession(id: string): ProductSessionRecord | null {
       return (getProductSessionStmt.get(id) as ProductSessionRecord | undefined) ?? null;
+    },
+    updateProductSession(id: string, updates: Partial<Pick<ProductSessionRecord, "status" | "input_manifest" | "closed_at">>): void {
+      const existing = this.getProductSession(id);
+      if (!existing) {
+        throw new Error(`Product Session ${id} not found.`);
+      }
+      updateProductSessionStmt.run({
+        id,
+        status: updates.status ?? existing.status,
+        updatedAt: new Date().toISOString(),
+        closedAt: updates.closed_at ?? existing.closed_at,
+        inputManifest: updates.input_manifest ?? existing.input_manifest,
+      });
     },
     getCurrentProductSessionId(): string | null {
       return this.getMetadata("current_product_session_id");
