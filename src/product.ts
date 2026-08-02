@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import Database from "better-sqlite3";
 
-import { openRepository } from "./repository.js";
+import { openRepository, type ProductSessionRecord } from "./repository.js";
 
 const PRODUCT_FILES = [
   {
@@ -164,6 +164,32 @@ export type ProductScaffoldResult = {
   created: string[];
   preserved: string[];
 };
+
+export type ProductSessionStartResult = {
+  session: ProductSessionRecord;
+  resumed: boolean;
+};
+
+export function startProductSession(databasePath: string, hasExistingContext: boolean): ProductSessionStartResult {
+  const repository = openRepository(databasePath);
+
+  try {
+    const currentId = repository.getCurrentProductSessionId();
+    const current = currentId ? repository.getProductSession(currentId) : null;
+    if (current?.status === "active") {
+      return { session: current, resumed: true };
+    }
+
+    const session = repository.createProductSession({
+      id: repository.getNextId("PRODUCT"),
+      mode: hasExistingContext ? "evolution" : "creation",
+    });
+    repository.setCurrentProductSessionId(session.id);
+    return { session, resumed: false };
+  } finally {
+    repository.close();
+  }
+}
 
 export function scaffoldProductContext(workspaceRoot: string): ProductScaffoldResult {
   const productDir = join(workspaceRoot, "product");

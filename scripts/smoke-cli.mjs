@@ -75,6 +75,7 @@ for (const check of checks) {
 runTemporaryRepoChecks();
 runRepositoryChecks();
 runProductContextChecks();
+runProductSessionChecks();
 runRepoContextChecks();
 runContextMetadataChecks();
 runWorkItemPersistenceChecks();
@@ -757,6 +758,7 @@ function verifySchema(name, databasePath) {
       "decisions",
       "status_history",
       "metadata",
+      "product_sessions",
     ]) {
       if (!tableNames.has(tableName)) {
         fail(name, `missing required table: ${tableName}`, "");
@@ -764,6 +766,47 @@ function verifySchema(name, databasePath) {
     }
   } finally {
     database.close();
+  }
+}
+
+function runProductSessionChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-product-session-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace for product sessions", ["init"], repoRoot);
+
+    runCheck({
+      name: "product starts a creation session and resumes it",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Started Product Session PRODUCT-001 (creation)."],
+      verify: () => {
+        const database = new Database(join(repoRoot, ".nerv/nerv.db"), { readonly: true });
+        try {
+          const session = database.prepare("SELECT id, status, mode FROM product_sessions WHERE id = ?").get("PRODUCT-001");
+          const current = database.prepare("SELECT value FROM metadata WHERE key = ?").get("current_product_session_id");
+          if (!session || session.status !== "active" || session.mode !== "creation" || current?.value !== "PRODUCT-001") {
+            fail("product starts a creation session and resumes it", "Product Session state was not persisted", JSON.stringify({ session, current }));
+          }
+        } finally {
+          database.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "product resumes the active session",
+      args: ["product"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Resumed Product Session PRODUCT-001 (creation)."],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 
@@ -1805,18 +1848,18 @@ function runStartChecks() {
     });
 
     runCheck({
-      name: "start sets current run in database",
+      name: "start rejects a second active run",
       args: ["start", "TASK-001"],
       cwd: repoRoot,
-      exitCode: 0,
-      includes: ["Started RUN-002"],
+      exitCode: 1,
+      includes: ["RUN-001 is already active"],
       verify: () => {
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         const repository = openRepository(dbPath);
         try {
           const currentRunId = repository.getCurrentRunId();
-          if (currentRunId !== "RUN-002") {
-            fail("start sets current run in database", `expected RUN-002, got ${currentRunId}`, "");
+          if (currentRunId !== "RUN-001") {
+            fail("start rejects a second active run", `expected RUN-001, got ${currentRunId}`, "");
           }
         } finally {
           repository.close();
@@ -1873,22 +1916,28 @@ function runCurrentAndRunsChecks() {
       includes: ["Found 1 run(s):", "RUN-001:", "TASK-001", "Add sample feature", "Status: active"],
     });
 
-    spawnOrFail("start second run for current check", ["start", "TASK-001"], repoRoot);
-
     runCheck({
-      name: "runs lists multiple runs",
-      args: ["runs"],
+      name: "start rejects a second active run for current check",
+      args: ["start", "TASK-001"],
       cwd: repoRoot,
-      exitCode: 0,
-      includes: ["Found 2 run(s):", "RUN-001:", "RUN-002:"],
+      exitCode: 1,
+      includes: ["RUN-001 is already active"],
     });
 
     runCheck({
-      name: "current shows most recent run",
+      name: "runs keeps one active run",
+      args: ["runs"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Found 1 run(s):", "RUN-001:"],
+    });
+
+    runCheck({
+      name: "current retains active run",
       args: ["current"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["RUN-002:", "TASK-001"],
+      includes: ["RUN-001:", "TASK-001"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
@@ -2233,22 +2282,23 @@ function runCloseChecks() {
       ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second run ready", "--validation", "passed"],
       repoRoot,
     );
+    spawnOrFail("close second run before starting another", ["close", "--run", "RUN-002"], repoRoot);
     spawnOrFail("create third task for current preservation check", ["new", "task", "Keep current run active"], repoRoot);
     spawnOrFail("start third run for current preservation check", ["start", "TASK-003"], repoRoot);
 
     runCheck({
-      name: "explicit close preserves different current run",
-      args: ["close", "--run", "RUN-002"],
+      name: "current shows the newly started run after closing the previous run",
+      args: ["current"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Closed RUN-002"],
+      includes: ["RUN-003:", "TASK-003"],
       verify: () => {
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         const repository = openRepository(dbPath);
         try {
           const currentRunId = repository.getCurrentRunId();
           if (currentRunId !== "RUN-003") {
-            fail("explicit close preserves different current run", `expected RUN-003 current run, got ${currentRunId}`, "");
+            fail("current shows the newly started run after closing the previous run", `expected RUN-003 current run, got ${currentRunId}`, "");
           }
         } finally {
           repository.close();
@@ -2495,26 +2545,19 @@ function runCleanChecks() {
       },
     });
 
-    spawnOrFail("start another run for clean check", ["start", "TASK-001"], repoRoot);
-    const run2Dir = join(repoRoot, ".nerv/agent/runs/RUN-002");
-
     runCheck({
-      name: "clean preserves database and product context",
-      args: ["clean"],
+      name: "start rejects another run while clean check remains active",
+      args: ["start", "TASK-001"],
       cwd: repoRoot,
-      exitCode: 0,
-      includes: ["Cleaned 1 generated artifact(s):", "RUN-002"],
+      exitCode: 1,
+      includes: ["RUN-001 is already active"],
       verify: () => {
-        if (existsSync(run2Dir)) {
-          fail("clean preserves database and product context", "run directory still exists", "");
-        }
-
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         const repository = openRepository(dbPath);
         try {
           const runs = repository.listRuns();
-          if (runs.length !== 2) {
-            fail("clean preserves database and product context", `expected 2 runs in database, got ${runs.length}`, "");
+          if (runs.length !== 1) {
+            fail("start rejects another run while clean check remains active", `expected 1 run in database, got ${runs.length}`, "");
           }
 
           const tasks = repository.listTasks();

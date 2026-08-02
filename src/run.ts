@@ -20,6 +20,18 @@ export function startRun(
 
   try {
     const task = repository.selectTaskForRun(query);
+    if (task.status === "closed") {
+      throw new Error(`Task ${task.id} is already closed.`);
+    }
+
+    const currentRunId = repository.getCurrentRunId();
+    if (currentRunId) {
+      const currentRun = repository.getRun(currentRunId);
+      if (currentRun?.status === "active") {
+        throw new Error(`Run ${currentRun.id} is already active. Close it before starting another Task.`);
+      }
+      repository.setCurrentRunId("");
+    }
 
     const build = task.build_id ? repository.getBuild(task.build_id) : null;
 

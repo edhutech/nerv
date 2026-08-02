@@ -1,17 +1,19 @@
 import Database from "better-sqlite3";
 
-export type IdType = "BUILD" | "TASK" | "RUN";
+export type IdType = "BUILD" | "TASK" | "RUN" | "PRODUCT";
 
 const COUNTER_KEYS: Record<IdType, string> = {
   BUILD: "next_build_number",
   TASK: "next_task_number",
   RUN: "next_run_number",
+  PRODUCT: "next_product_session_number",
 };
 
 const ID_TABLES: Record<IdType, string> = {
   BUILD: "builds",
   TASK: "tasks",
   RUN: "runs",
+  PRODUCT: "product_sessions",
 };
 
 const ID_WIDTH = 3;
@@ -79,6 +81,16 @@ export type CloseRecord = {
   run_id: string;
   commit_hash: string | null;
   closed_at: string;
+};
+
+export type ProductSessionRecord = {
+  id: string;
+  status: string;
+  mode: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  input_manifest: string | null;
 };
 
 export type CreateBuildInput = {
@@ -165,6 +177,10 @@ export type Repository = {
   getCloseRecord(runId: string): CloseRecord | null;
   getCurrentRunId(): string | null;
   setCurrentRunId(runId: string): void;
+  createProductSession(input: { id: string; mode: string; input_manifest?: string | null }): ProductSessionRecord;
+  getProductSession(id: string): ProductSessionRecord | null;
+  getCurrentProductSessionId(): string | null;
+  setCurrentProductSessionId(sessionId: string): void;
 };
 
 export function openRepository(databasePath: string): Repository {
@@ -659,6 +675,12 @@ export function openRepository(databasePath: string): Repository {
      VALUES (@runId, @commitHash, @closedAt)`,
   );
 
+  const createProductSessionStmt = database.prepare(
+    `INSERT INTO product_sessions (id, status, mode, created_at, updated_at, closed_at, input_manifest)
+     VALUES (@id, @status, @mode, @createdAt, @updatedAt, @closedAt, @inputManifest)`,
+  );
+  const getProductSessionStmt = database.prepare("SELECT * FROM product_sessions WHERE id = ?");
+
   const getCloseRecordStmt = database.prepare(
     `SELECT * FROM close_records WHERE run_id = ?`,
   );
@@ -732,11 +754,43 @@ export function openRepository(databasePath: string): Repository {
     setCurrentRunId(runId: string): void {
       this.setMetadata("current_run_id", runId);
     },
+    createProductSession(input: { id: string; mode: string; input_manifest?: string | null }): ProductSessionRecord {
+      const now = new Date().toISOString();
+      const record: ProductSessionRecord = {
+        id: input.id,
+        status: "active",
+        mode: input.mode,
+        created_at: now,
+        updated_at: now,
+        closed_at: null,
+        input_manifest: input.input_manifest ?? null,
+      };
+      createProductSessionStmt.run({
+        id: record.id,
+        status: record.status,
+        mode: record.mode,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+        closedAt: record.closed_at,
+        inputManifest: record.input_manifest,
+      });
+      return record;
+    },
+    getProductSession(id: string): ProductSessionRecord | null {
+      return (getProductSessionStmt.get(id) as ProductSessionRecord | undefined) ?? null;
+    },
+    getCurrentProductSessionId(): string | null {
+      return this.getMetadata("current_product_session_id");
+    },
+    setCurrentProductSessionId(sessionId: string): void {
+      this.setMetadata("current_product_session_id", sessionId);
+    },
   };
 }
 
 function formatId(type: IdType, sequence: number): string {
-  return `${type}-${String(sequence).padStart(ID_WIDTH, "0")}`;
+  const prefix = type === "PRODUCT" ? "PRODUCT" : type;
+  return `${prefix}-${String(sequence).padStart(ID_WIDTH, "0")}`;
 }
 
 function parseCounter(value: string): number {

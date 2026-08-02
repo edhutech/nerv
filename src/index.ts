@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -13,10 +13,22 @@ import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./ta
 import { createBuildFromIntent, planBuildTasks } from "./build.js";
 import { startRun } from "./run.js";
 import { cleanWorkspace } from "./clean.js";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const program = new Command();
+
+const PRODUCT_CONTEXT_FILES = [
+  "product.md",
+  "problem.md",
+  "users.md",
+  "prd.md",
+  "roadmap.md",
+  "scope.md",
+  "decisions.md",
+  "architecture.md",
+  "evolution.md",
+] as const;
 
 function notImplemented(commandName: string): void {
   program.error(
@@ -95,7 +107,10 @@ program
       return;
     }
 
+    const productDirectory = join(status.workspaceRoot!, "product");
+    const hadExistingContext = PRODUCT_CONTEXT_FILES.some((file) => existsSync(join(productDirectory, file)));
     const result = scaffoldProductContext(status.workspaceRoot!);
+    const productSession = startProductSession(status.databasePath!, hadExistingContext);
 
     if (result.created.length > 0 || result.preserved.length > 0) {
       persistProductMetadata(status.databasePath!, result.created, result.preserved);
@@ -126,6 +141,8 @@ program
         console.log(`  - ${file}`);
       }
     }
+
+    console.log(`${productSession.resumed ? "Resumed" : "Started"} Product Session ${productSession.session.id} (${productSession.session.mode}).`);
   });
 
 program

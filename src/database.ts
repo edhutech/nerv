@@ -10,6 +10,7 @@ const REQUIRED_TABLES = [
   "decisions",
   "status_history",
   "metadata",
+  "product_sessions",
 ] as const;
 
 const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string[]> = {
@@ -53,6 +54,7 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
   metadata: ["key", "value", "updated_at"],
+  product_sessions: ["id", "status", "mode", "created_at", "updated_at", "closed_at", "input_manifest"],
 };
 
 const SCHEMA_STATEMENTS = [
@@ -139,9 +141,18 @@ const SCHEMA_STATEMENTS = [
     status TEXT NOT NULL,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS product_sessions (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    closed_at TEXT,
+    input_manifest TEXT
+  )`,
 ] as const;
 
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -254,6 +265,18 @@ function migrateSchema(database: Database.Database): void {
       commit_hash TEXT,
       closed_at TEXT NOT NULL,
       FOREIGN KEY (run_id) REFERENCES runs(id)
+    )`);
+  }
+
+  if (!hasTable(database, "product_sessions")) {
+    database.exec(`CREATE TABLE product_sessions (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      closed_at TEXT,
+      input_manifest TEXT
     )`);
   }
 
