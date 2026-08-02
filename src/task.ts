@@ -42,7 +42,27 @@ export type CreateTaskResult = {
 
 export type CreateTaskOptions = {
   force?: boolean;
+  buildId?: string;
 };
+
+export function validateTaskBuild(databasePath: string, requestedBuildId: string | undefined): string | undefined {
+  const buildId = requestedBuildId?.trim().toUpperCase();
+  if (!buildId) {
+    return undefined;
+  }
+
+  const repository = openRepository(databasePath);
+
+  try {
+    if (!repository.getBuild(buildId)) {
+      throw new Error(`Build ${buildId} not found.`);
+    }
+
+    return buildId;
+  } finally {
+    repository.close();
+  }
+}
 
 export function createTaskFromIntent(
   databasePath: string,
@@ -65,10 +85,11 @@ export function createTaskFromIntent(
   try {
     const taskId = repository.getNextId("TASK");
     const title = deriveTitle(intent);
-    const markdownPath = generateTaskMarkdown(workspaceRoot, taskId, title, intent);
+    const markdownPath = generateTaskMarkdown(workspaceRoot, taskId, title, intent, options.buildId);
 
     const task = repository.createTask({
       id: taskId,
+      build_id: options.buildId,
       title,
       intent,
       scope: `Implement ${title.toLowerCase()}.`,
@@ -149,6 +170,7 @@ function generateTaskMarkdown(
   taskId: string,
   title: string,
   intent: string,
+  buildId: string | undefined,
 ): string {
   const tasksDir = join(workspaceRoot, "agent", "tasks");
   const markdownPath = join(tasksDir, `${taskId}.md`);
@@ -166,6 +188,10 @@ function generateTaskMarkdown(
 ## Status
 
 Proposed
+
+## Parent Build
+
+${buildId ?? "None (standalone)"}
 
 ## Task Goal
 

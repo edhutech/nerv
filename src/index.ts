@@ -9,7 +9,7 @@ import { scaffoldProductContext, persistProductMetadata, persistDecisions, appen
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
-import { createTaskFromIntent, detectLargeIntent } from "./task.js";
+import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./task.js";
 import { createBuildFromIntent, planBuildTasks } from "./build.js";
 import { startRun } from "./run.js";
 import { cleanWorkspace } from "./clean.js";
@@ -185,7 +185,8 @@ newCommand
   .description("Create an Agentic Task from intent.")
   .option("--force", "Force task creation even if large intent is detected.")
   .option("--yes", "Create a Build instead when large intent is detected.")
-  .action(async (intent: string, options: { force?: boolean; yes?: boolean }) => {
+  .option("--build <buildId>", "Associate the Task with an existing Build.")
+  .action(async (intent: string, options: { force?: boolean; yes?: boolean; build?: string }) => {
     const status = getInitializedWorkspaceStatus(process.cwd());
 
     if (status.repoRoot === null) {
@@ -209,7 +210,20 @@ newCommand
       return;
     }
 
+    if (options.build && options.yes) {
+      program.error(
+        "`--build` cannot be used with `--yes`: `--yes` may create a new Build, while `--build` creates a Task in an existing Build.",
+        {
+          code: "NERV_TASK_BUILD_YES_CONFLICT",
+          exitCode: 1,
+        },
+      );
+
+      return;
+    }
+
     try {
+      const buildId = validateTaskBuild(status.databasePath!, options.build);
       if (!options.force && detectLargeIntent(intent)) {
         if (options.yes || await shouldCreateBuildFromLargeIntent()) {
           const result = createBuildFromIntent(status.databasePath!, status.workspaceRoot!, intent);
@@ -239,6 +253,7 @@ newCommand
 
       const result = createTaskFromIntent(status.databasePath!, status.workspaceRoot!, intent, {
         force: options.force,
+        buildId,
       });
 
       console.log(`Created ${result.task.id}: ${result.task.title}`);

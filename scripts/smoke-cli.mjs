@@ -38,6 +38,12 @@ const checks = [
     includes: ["task [options] <intent>", "build <intent>"],
   },
   {
+    name: "new task help exposes build association",
+    args: ["new", "task", "--help"],
+    exitCode: 0,
+    includes: ["--build <buildId>", "Associate the Task with an existing Build."],
+  },
+  {
     name: "build command exposes plan",
     args: ["build", "--help"],
     exitCode: 0,
@@ -73,6 +79,7 @@ runRepoContextChecks();
 runContextMetadataChecks();
 runWorkItemPersistenceChecks();
 runTaskCreationChecks();
+runTaskBuildAssociationChecks();
 runBuildCreationChecks();
 runQueryChecks();
 runStartChecks();
@@ -695,6 +702,12 @@ function runCheck(check) {
     }
   }
 
+  for (const unexpected of check.excludes || []) {
+    if (output.includes(unexpected)) {
+      fail(check.name, `unexpected output: ${unexpected}`, output);
+    }
+  }
+
   check.verify?.();
   console.log(`ok - ${check.name}`);
 }
@@ -1269,6 +1282,199 @@ function runTaskCreationChecks() {
       cwd: repoRoot,
       exitCode: 0,
       includes: ["Created TASK-003"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runTaskBuildAssociationChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-task-build-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace for task-build association", ["init"], repoRoot);
+    spawnOrFail("scaffold product for task-build association", ["product"], repoRoot);
+    spawnOrFail("create count build for task-build association", ["new", "build", "Association count build"], repoRoot);
+
+    runCheck({
+      name: "new task creates task linked to build",
+      args: ["new", "task", "--build", "BUILD-001", "Add associated task"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created TASK-001", "Add associated task"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const task = repository.getTask("TASK-001");
+          if (!task || task.build_id !== "BUILD-001") {
+            fail("new task creates task linked to build", "task is not linked to BUILD-001", "");
+          }
+          if (repository.getBuildTaskCount("BUILD-001") !== 1) {
+            fail("new task creates task linked to build", "build count did not include TASK-001", "");
+          }
+        } finally {
+          repository.close();
+        }
+
+        const taskContent = readFileSync(join(repoRoot, ".nerv/agent/tasks/TASK-001.md"), "utf8");
+        if (!taskContent.includes("## Parent Build\n\nBUILD-001")) {
+          fail("new task creates task linked to build", "task Markdown is missing the parent Build", taskContent);
+        }
+      },
+    });
+
+    runCheck({
+      name: "new task remains standalone without build",
+      args: ["new", "task", "Add standalone task"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created TASK-002", "Add standalone task"],
+      verify: () => {
+        const dbPath = join(repoRoot, ".nerv/nerv.db");
+        const repository = openRepository(dbPath);
+        try {
+          const task = repository.getTask("TASK-002");
+          if (!task || task.build_id !== null) {
+            fail("new task remains standalone without build", "task should not have a parent Build", "");
+          }
+        } finally {
+          repository.close();
+        }
+
+        const taskContent = readFileSync(join(repoRoot, ".nerv/agent/tasks/TASK-002.md"), "utf8");
+        if (!taskContent.includes("## Parent Build\n\nNone (standalone)")) {
+          fail("new task remains standalone without build", "task Markdown is missing standalone status", taskContent);
+        }
+      },
+    });
+
+    const associationDbPath = join(repoRoot, ".nerv/nerv.db");
+    const database = new Database(associationDbPath, { readonly: true });
+    const nextTaskNumberBeforeFailure = database.prepare("SELECT value FROM metadata WHERE key = ?").get("next_task_number").value;
+    database.close();
+
+    runCheck({
+      name: "new task rejects missing build without partial state",
+      args: ["new", "task", "--build", "BUILD-999", "Add invalid build task"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Build BUILD-999 not found."],
+      verify: () => {
+        const databaseAfterFailure = new Database(associationDbPath, { readonly: true });
+        try {
+          const taskCount = databaseAfterFailure.prepare("SELECT COUNT(*) AS count FROM tasks").get().count;
+          const nextTaskNumber = databaseAfterFailure.prepare("SELECT value FROM metadata WHERE key = ?").get("next_task_number").value;
+          if (taskCount !== 2 || nextTaskNumber !== nextTaskNumberBeforeFailure) {
+            fail("new task rejects missing build without partial state", "task state changed after missing Build", "");
+          }
+        } finally {
+          databaseAfterFailure.close();
+        }
+
+        if (existsSync(join(repoRoot, ".nerv/agent/tasks/TASK-003.md"))) {
+          fail("new task rejects missing build without partial state", "Task Markdown was created after missing Build", "");
+        }
+      },
+    });
+
+    runCheck({
+      name: "new task rejects missing build before large intent detection",
+      args: ["new", "task", "--build", "BUILD-999", "Build a complete authentication system with OAuth and SAML"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["Build BUILD-999 not found."],
+      excludes: ["This intent appears to be large enough", "nerv new build"],
+      verify: () => {
+        const databaseAfterFailure = new Database(associationDbPath, { readonly: true });
+        try {
+          const taskCount = databaseAfterFailure.prepare("SELECT COUNT(*) AS count FROM tasks").get().count;
+          const nextTaskNumber = databaseAfterFailure.prepare("SELECT value FROM metadata WHERE key = ?").get("next_task_number").value;
+          if (taskCount !== 2 || nextTaskNumber !== nextTaskNumberBeforeFailure) {
+            fail("new task rejects missing build before large intent detection", "task state changed after missing Build", "");
+          }
+        } finally {
+          databaseAfterFailure.close();
+        }
+
+        if (existsSync(join(repoRoot, ".nerv/agent/tasks/TASK-003.md"))) {
+          fail("new task rejects missing build before large intent detection", "Task Markdown was created after missing Build", "");
+        }
+      },
+    });
+
+    runCheck({
+      name: "new task rejects build with yes",
+      args: ["new", "task", "--build", "BUILD-001", "--yes", "Build a complete authentication system with OAuth and SAML"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["`--build` cannot be used with `--yes`"],
+      verify: () => {
+        const databaseAfterConflict = new Database(associationDbPath, { readonly: true });
+        try {
+          const buildCount = databaseAfterConflict.prepare("SELECT COUNT(*) AS count FROM builds").get().count;
+          const taskCount = databaseAfterConflict.prepare("SELECT COUNT(*) AS count FROM tasks").get().count;
+          const nextTaskNumber = databaseAfterConflict.prepare("SELECT value FROM metadata WHERE key = ?").get("next_task_number").value;
+          if (buildCount !== 1 || taskCount !== 2 || nextTaskNumber !== nextTaskNumberBeforeFailure) {
+            fail("new task rejects build with yes", "state changed after incompatible options", "");
+          }
+        } finally {
+          databaseAfterConflict.close();
+        }
+      },
+    });
+
+    spawnOrFail("create close build for task-build association", ["new", "build", "Association close build"], repoRoot);
+
+    runCheck({
+      name: "new task force creates task linked to build",
+      args: ["new", "task", "--build", "BUILD-002", "--force", "Build a complete authentication system with OAuth and SAML"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Created TASK-003", "Large intent was detected"],
+      verify: () => {
+        const repository = openRepository(associationDbPath);
+        try {
+          const task = repository.getTask("TASK-003");
+          if (!task || task.build_id !== "BUILD-002") {
+            fail("new task force creates task linked to build", "forced task is not linked to BUILD-002", "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
+    });
+
+    spawnOrFail("start associated task for close check", ["start", "TASK-003"], repoRoot);
+    spawnOrFail(
+      "review associated task for close check",
+      ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "Associated task complete", "--validation", "passed"],
+      repoRoot,
+    );
+    spawnSync("git", ["add", "."], { cwd: repoRoot, encoding: "utf8" });
+    spawnSync("git", ["commit", "-m", "TASK-003 associated task", "--allow-empty"], { cwd: repoRoot, encoding: "utf8" });
+
+    runCheck({
+      name: "close linked task closes its build",
+      args: ["close", "--run", "RUN-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Build BUILD-002 also marked closed"],
+      verify: () => {
+        const repository = openRepository(associationDbPath);
+        try {
+          const build = repository.getBuild("BUILD-002");
+          if (!build || build.status !== "closed") {
+            fail("close linked task closes its build", "linked Build was not closed", "");
+          }
+        } finally {
+          repository.close();
+        }
+      },
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
