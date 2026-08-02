@@ -265,6 +265,16 @@ ${inputList}
 ## Allowed changes
 
 Modify only the nine Markdown documents in \`.nerv/product/\`. Do not modify application code, dependencies, configuration, Git state, or files outside \`.nerv/product/\`.
+
+## Interview and safe evolution
+
+First inspect the existing Product Context and identify only missing information, conflicts, and assumptions that block a useful update. Ask focused follow-up questions only when they are necessary; do not use a rigid questionnaire.
+
+Treat existing confirmed content as authoritative. Do not overwrite it silently. Before replacing a confirmed decision, show the proposed replacement and obtain explicit user confirmation. Record new decisions and replacements in \`decisions.md\`, preserve historical or obsolete material in \`evolution.md\`, and keep pending questions and assumptions visibly distinguished from confirmed facts in the document where they matter.
+
+Adapt temporary input material into the appropriate templates. Do not copy it literally and do not treat input paths as permanent sources. Keep the nine documents coherent: product, problem, users, scope, requirements, architecture, roadmap, decisions, and evolution must agree.
+
+Before Git is used, show the Product Context diff to the user for review.
 `;
   const path = join(entrypointDir, "run.md");
   writeFileSync(path, content, "utf8");

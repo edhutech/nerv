@@ -819,7 +819,7 @@ function runProductSessionChecks() {
         const entrypoint = join(repoRoot, ".nerv/agent/product/run.md");
         verifyPath("product accepts input and generates a portable entrypoint", entrypoint, "file");
         const content = readFileSync(entrypoint, "utf8");
-        if (!content.includes("product-notes/brief.md") || !content.includes("Do not modify application code")) {
+        if (!content.includes("product-notes/brief.md") || !content.includes("Do not modify application code") || !content.includes("do not use a rigid questionnaire") || !content.includes("Do not overwrite it silently")) {
           fail("product accepts input and generates a portable entrypoint", "entrypoint is missing input or scope rules", content);
         }
       },
