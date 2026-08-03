@@ -188,6 +188,8 @@ export type ProposalObservation = { id: string; statement: string; sources: stri
 export type ProductContextChange = { document: string; action: "create" | "update"; summary: string; rationale: string; proposedContent: string };
 export type ProductContextProposalReview = { id: number; session_id: string; proposal_id: string; decision: "changes_requested" | "rejected" | "approved"; superseding_proposal_id: string | null; created_at: string };
 type ProductContextMaterialization = { id: string; session_id: string; proposal_id: string; status: "pending_markdown" | "complete"; plan_json: string; decision_replacement_confirmed_at: string | null; created_at: string; updated_at: string };
+export type ProductSessionCheck = { name: string; status: "passed" | "failed"; detail: string };
+export type ProductSessionState = { session: ProductSessionRecord; proposals: ProductContextProposalRecord[]; reviews: ProductContextProposalReview[]; materializations: ProductContextMaterialization[]; checks: ProductSessionCheck[] };
 type ProductContextMaterializationPlan = {
   proposal: string;
   session: string;
@@ -428,6 +430,82 @@ export function productContextProposalStatus(databasePath: string, sessionId: st
       materializations: database.prepare("SELECT * FROM product_context_materializations WHERE session_id = ? ORDER BY created_at").all(normalized) as ProductContextMaterialization[],
     };
   } finally { database.close(); }
+}
+
+function productSessionState(database: Database.Database, workspaceRoot: string, session: ProductSessionRecord): ProductSessionState {
+  const proposals = database.prepare("SELECT * FROM product_context_proposals WHERE session_id = ? ORDER BY version").all(session.id) as ProductContextProposalRecord[];
+  const reviews = database.prepare("SELECT * FROM product_context_proposal_reviews WHERE session_id = ? ORDER BY id").all(session.id) as ProductContextProposalReview[];
+  const materializations = database.prepare("SELECT * FROM product_context_materializations WHERE session_id = ? ORDER BY created_at").all(session.id) as ProductContextMaterialization[];
+  const checks: ProductSessionCheck[] = [];
+  const productDir = join(workspaceRoot, "product");
+  const missing = PRODUCT_FILES.map((file) => file.name).filter((file) => !existsSync(join(productDir, file)));
+  const placeholders = PRODUCT_FILES.map((file) => file.name).filter((file) => existsSync(join(productDir, file)) && /describe the|list the minimum|record important/i.test(readFileSync(join(productDir, file), "utf8")));
+  checks.push({ name: "Canonical documents", status: missing.length === 0 ? "passed" : "failed", detail: missing.length === 0 ? "9/9 present" : `missing ${missing.join(", ")}` });
+  checks.push({ name: "Placeholder content", status: placeholders.length === 0 ? "passed" : "failed", detail: placeholders.length === 0 ? "none" : placeholders.join(", ") });
+
+  const pending = proposals.filter((proposal) => ["proposed", "changes_requested", "approved", "applying"].includes(proposal.status));
+  checks.push({ name: "Proposal decisions", status: pending.length === 0 ? "passed" : "failed", detail: pending.length === 0 ? "no pending decisions" : `pending ${pending.map((proposal) => proposal.id).join(", ")}` });
+  const applied = proposals.filter((proposal) => proposal.status === "applied");
+  checks.push({ name: "Applied proposal", status: applied.length > 0 ? "passed" : "failed", detail: applied.length > 0 ? applied.map((proposal) => proposal.id).join(", ") : "no applied proposal; historical sessions must be resumed with an approved proposal" });
+
+  const proposalArtifacts = proposals.filter((proposal) => !existsSync(proposal.markdown_path) || readFileSync(proposal.markdown_path, "utf8") !== renderProductContextProposalWithReviews(proposal, reviews.filter((review) => review.proposal_id === proposal.id)));
+  checks.push({ name: "Proposal Markdown", status: proposalArtifacts.length === 0 ? "passed" : "failed", detail: proposalArtifacts.length === 0 ? "SQLite and proposal artifacts agree" : `missing or stale ${proposalArtifacts.map((proposal) => proposal.id).join(", ")}` });
+
+  const materializationErrors: string[] = [];
+  for (const proposal of applied) {
+    const materialization = materializations.find((item) => item.proposal_id === proposal.id);
+    if (!materialization || materialization.status !== "complete") { materializationErrors.push(`${proposal.id} is not completely applied`); continue; }
+    try {
+      const plan = JSON.parse(materialization.plan_json) as ProductContextMaterializationPlan;
+      for (const document of plan.documents) {
+        const path = join(productDir, document.document);
+        if (!existsSync(path) || readFileSync(path, "utf8") !== document.proposedContent) materializationErrors.push(`${proposal.id} does not match ${document.document}`);
+      }
+    } catch { materializationErrors.push(`${proposal.id} has an invalid materialization plan`); }
+  }
+  for (const materialization of materializations.filter((item) => item.status !== "complete")) materializationErrors.push(`${materialization.proposal_id} apply is ${materialization.status}`);
+  checks.push({ name: "Applied Markdown", status: materializationErrors.length === 0 ? "passed" : "failed", detail: materializationErrors.length === 0 ? "SQLite materializations match canonical documents" : materializationErrors.join("; ") });
+
+  const decisionsPath = join(productDir, "decisions.md");
+  const markdownDecisions = existsSync(decisionsPath) ? parseDecisions(readFileSync(decisionsPath, "utf8")).map((decision) => decision.summary) : [];
+  const sqliteDecisions = (database.prepare("SELECT summary FROM decisions WHERE scope_type = 'product' AND scope_id = 'decisions.md' ORDER BY id").all() as ParsedDecision[]).map((decision) => decision.summary);
+  checks.push({ name: "Decision index", status: JSON.stringify(markdownDecisions) === JSON.stringify(sqliteDecisions) ? "passed" : "failed", detail: JSON.stringify(markdownDecisions) === JSON.stringify(sqliteDecisions) ? "SQLite matches decisions.md" : "SQLite decisions do not match decisions.md" });
+  return { session, proposals, reviews, materializations, checks };
+}
+
+export function getCurrentProductSessionState(databasePath: string, workspaceRoot: string): ProductSessionState | null {
+  const database = new Database(databasePath, { readonly: true });
+  try {
+    const id = database.prepare("SELECT value FROM metadata WHERE key = 'current_product_session_id'").get() as { value: string } | undefined;
+    if (!id?.value) return null;
+    const session = database.prepare("SELECT * FROM product_sessions WHERE id = ?").get(id.value) as ProductSessionRecord | undefined;
+    if (!session) throw new Error(`Current Product Session ${id.value} not found.`);
+    return productSessionState(database, workspaceRoot, session);
+  } finally { database.close(); }
+}
+
+export function reviewCurrentProductSession(databasePath: string, workspaceRoot: string): ProductSessionState {
+  const state = getCurrentProductSessionState(databasePath, workspaceRoot);
+  if (!state || state.session.status !== "active") throw new Error("No active Product Session to review.");
+  const failed = state.checks.filter((check) => check.status === "failed");
+  if (failed.length > 0) throw new Error(`Product Context review failed. ${failed.map((check) => `${check.name}: ${check.detail}.`).join(" ")}`);
+  const repository = openRepository(databasePath);
+  try { repository.updateProductSession(state.session.id, { status: "reviewed" }); } finally { repository.close(); }
+  return { ...state, session: { ...state.session, status: "reviewed" } };
+}
+
+export function closeCurrentProductSession(databasePath: string, workspaceRoot: string): ProductSessionRecord {
+  const state = getCurrentProductSessionState(databasePath, workspaceRoot);
+  if (!state || state.session.status !== "reviewed") throw new Error("Product Session must pass `nerv product review` before close.");
+  const failed = state.checks.filter((check) => check.status === "failed");
+  if (failed.length > 0) throw new Error(`Product Session ${state.session.id} is no longer coherent. ${failed.map((check) => `${check.name}: ${check.detail}.`).join(" ")}`);
+  const repository = openRepository(databasePath);
+  try {
+    const closedAt = new Date().toISOString();
+    repository.updateProductSession(state.session.id, { status: "closed", closed_at: closedAt });
+    repository.setCurrentProductSessionId("");
+    return { ...state.session, status: "closed", closed_at: closedAt };
+  } finally { repository.close(); }
 }
 
 function confirmedDecisionSections(content: string): Map<string, string> {

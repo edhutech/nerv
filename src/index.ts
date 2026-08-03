@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal, reviewProductContextProposal, productContextProposalStatus, applyProductContextProposal } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal, reviewProductContextProposal, productContextProposalStatus, applyProductContextProposal, getCurrentProductSessionState, reviewCurrentProductSession, closeCurrentProductSession } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -186,17 +186,20 @@ productCommand
       program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
       return;
     }
-    const repository = openRepository(status.databasePath);
     try {
-      const id = repository.getCurrentProductSessionId();
-      const session = id ? repository.getProductSession(id) : null;
-      const files = PRODUCT_CONTEXT_FILES.filter((file) => existsSync(join(status.workspaceRoot!, "product", file)));
-      const placeholders = files.filter((file) => /describe the|list the minimum|record important/i.test(readFileSync(join(status.workspaceRoot!, "product", file), "utf8")));
-      console.log(`Product Session: ${session ? `${session.id} (${session.status}, ${session.mode})` : "None"}`);
-      console.log(`Documents: ${files.length}/9`);
-      console.log(`Placeholders: ${placeholders.length === 0 ? "none" : placeholders.join(", ")}`);
-      console.log("Review the Product Context diff before using Git.");
-    } finally { repository.close(); }
+      const state = getCurrentProductSessionState(status.databasePath, status.workspaceRoot);
+      if (!state) { console.log("Product Session: None"); return; }
+      console.log(`Current Product Session: ${state.session.id} (${state.session.status}, ${state.session.mode})`);
+      console.log(`Resume: nerv product propose ${state.session.id} --proposal <file>`);
+      console.log("Proposals:");
+      if (state.proposals.length === 0) console.log("  none");
+      for (const proposal of state.proposals) console.log(`  ${proposal.id}: ${proposal.status} (resume: nerv product proposal ${proposal.id})`);
+      console.log("Apply state:");
+      if (state.materializations.length === 0) console.log("  none");
+      for (const materialization of state.materializations) console.log(`  ${materialization.proposal_id}: ${materialization.status} (resume: nerv product apply ${materialization.proposal_id})`);
+      console.log("Document checks:");
+      for (const check of state.checks) console.log(`  ${check.status}: ${check.name} - ${check.detail}`);
+    } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_STATUS_FAILED", exitCode: 1 }); }
   });
 
 productCommand
@@ -205,16 +208,10 @@ productCommand
   .action(() => {
     const status = getInitializedWorkspaceStatus(process.cwd());
     if (!status.initialized || !status.databasePath || !status.workspaceRoot) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
-    const repository = openRepository(status.databasePath);
     try {
-      const id = repository.getCurrentProductSessionId(); const session = id ? repository.getProductSession(id) : null;
-      if (!session || session.status !== "active") { program.error("No active Product Session to review.", { code: "NERV_PRODUCT_SESSION_NOT_ACTIVE", exitCode: 1 }); return; }
-      const missing = PRODUCT_CONTEXT_FILES.filter((file) => !existsSync(join(status.workspaceRoot!, "product", file)));
-      const placeholders = PRODUCT_CONTEXT_FILES.filter((file) => existsSync(join(status.workspaceRoot!, "product", file)) && /describe the|list the minimum|record important/i.test(readFileSync(join(status.workspaceRoot!, "product", file), "utf8")));
-      if (missing.length || placeholders.length) { program.error(`Product Context review failed. Missing: ${missing.join(", ") || "none"}. Placeholders: ${placeholders.join(", ") || "none"}.`, { code: "NERV_PRODUCT_REVIEW_FAILED", exitCode: 1 }); return; }
-      repository.updateProductSession(session.id, { status: "reviewed" });
-      console.log(`Product Session ${session.id} review passed. Review the diff before using Git.`);
-    } finally { repository.close(); }
+      const session = reviewCurrentProductSession(status.databasePath, status.workspaceRoot);
+      console.log(`Product Session ${session.session.id} review passed. Product Context is coherent and applied.`);
+    } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_REVIEW_FAILED", exitCode: 1 }); }
   });
 
 productCommand
@@ -223,13 +220,10 @@ productCommand
   .action(() => {
     const status = getInitializedWorkspaceStatus(process.cwd());
     if (!status.initialized || !status.databasePath) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
-    const repository = openRepository(status.databasePath);
     try {
-      const id = repository.getCurrentProductSessionId(); const session = id ? repository.getProductSession(id) : null;
-      if (!session || session.status !== "reviewed") { program.error("Product Session must pass `nerv product review` before close.", { code: "NERV_PRODUCT_SESSION_NOT_REVIEWED", exitCode: 1 }); return; }
-      repository.updateProductSession(session.id, { status: "closed", closed_at: new Date().toISOString() }); repository.setCurrentProductSessionId("");
+      const session = closeCurrentProductSession(status.databasePath, status.workspaceRoot!);
       console.log(`Closed Product Session ${session.id}.`);
-    } finally { repository.close(); }
+    } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_SESSION_CLOSE_FAILED", exitCode: 1 }); }
   });
 
 productCommand

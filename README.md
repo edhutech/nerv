@@ -114,9 +114,9 @@ nerv close
 | `nerv product [--input <paths...>]` | Prepare an agent-neutral Product Context session |
 | `nerv product propose <PRODUCT-###> --proposal <file>` | Persist a validated Product Context Proposal without changing canonical documents |
 | `nerv product proposal <PRODUCT-###-PROPOSAL-###>` | Show a Product Context Proposal by ID |
-| `nerv product status` | Show session state and Product Context checks |
-| `nerv product review` | Check required documents and placeholders before close |
-| `nerv product close` | Close a reviewed Product Session |
+| `nerv product status` | Show the current session, proposal/apply state, resumable IDs, and SQLite-Markdown checks |
+| `nerv product review` | Validate coherent, applied Product Context before close |
+| `nerv product close` | Close a reviewed, still-coherent Product Session |
 | `nerv repo` | Generate repo development context |
 | `nerv new task "<intent>"` | Create Agentic Task from intent |
 | `nerv new build "<intent>"` | Create Agentic Build from intent |
