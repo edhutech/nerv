@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { join } from "node:path";
 
 import Database from "better-sqlite3";
+import { createBuildFromIntent, syncBuildMarkdown } from "./build.js";
+import { createTaskFromIntent } from "./task.js";
+import { openRepository } from "./repository.js";
 
 export type IntakeRecord = {
   id: string;
@@ -118,5 +121,25 @@ export function reviewProposal(databasePath: string, proposalId: string, action:
 }
 export function intakeStatus(databasePath: string, intakeId: string): { intake: IntakeRecord; proposals: ProposalRecord[] } {
   const database = new Database(databasePath, { readonly: true }); try { const intake = database.prepare("SELECT * FROM intakes WHERE id = ?").get(intakeId.toUpperCase()) as IntakeRecord | undefined; if (!intake) throw new Error(`Intake ${intakeId.toUpperCase()} not found.`); return { intake, proposals: database.prepare("SELECT * FROM intake_proposals WHERE intake_id = ? ORDER BY version").all(intake.id) as ProposalRecord[] }; } finally { database.close(); }
+}
+export function applyProposal(databasePath: string, workspaceRoot: string, proposalId: string, dryRun: boolean): string[] {
+  const proposalRecord = getProposal(databasePath, proposalId); if (!proposalRecord) throw new Error(`Proposal ${proposalId.toUpperCase()} not found.`);
+  if (proposalRecord.status !== "approved") throw new Error(`Proposal ${proposalRecord.id} is not explicitly approved.`);
+  const proposal = JSON.parse(proposalRecord.proposal_json) as Proposal;
+  const summary = proposal.units.flatMap((unit) => unit.tasks.map((task) => `${unit.type}${unit.buildId ? `:${unit.buildId}` : unit.title ? `:${unit.title}` : ""} -> ${task.title}`));
+  if (dryRun) return summary;
+  const repository = openRepository(databasePath);
+  try {
+    for (const unit of proposal.units) {
+      let buildId: string | undefined = unit.type === "existing-build" ? unit.buildId : undefined;
+      if (unit.type === "new-build") buildId = createBuildFromIntent(databasePath, workspaceRoot, unit.title!).build.id;
+      for (const task of unit.tasks) createTaskFromIntent(databasePath, workspaceRoot, task.intent, { force: true, buildId });
+      if (buildId && unit.type === "new-build") { const build = repository.getBuild(buildId)!; syncBuildMarkdown(workspaceRoot, build, repository.listTasksByBuild(buildId)); }
+    }
+    const now = new Date().toISOString();
+    repository.setMetadata(`intake_apply:${proposalRecord.id}`, JSON.stringify(summary));
+    const database = new Database(databasePath); try { database.prepare("UPDATE intakes SET status = 'materialized', updated_at = ? WHERE id = ?").run(now, proposalRecord.intake_id); database.prepare("UPDATE intake_proposals SET status = 'materialized', updated_at = ? WHERE id = ?").run(now, proposalRecord.id); } finally { database.close(); }
+    return summary;
+  } finally { repository.close(); }
 }
 export function createPlanningEntrypoint(workspaceRoot: string, intake: IntakeRecord): string { const path = join(workspaceRoot, 'agent', 'intakes', intake.id, 'planning.md'); mkdirSync(join(workspaceRoot, 'agent', 'intakes', intake.id), { recursive: true }); writeFileSync(path, `# Planning entrypoint for ${intake.id}\n\nRead \`${intake.markdown_path}\` and return a JSON proposal to \`nerv intake propose ${intake.id} --input proposal.json\`. Nerv calls no agents or APIs. The JSON must contain rationale, context, units, and optional relationships. Units are standalone (one task), new-build (title plus tasks), or existing-build (buildId plus tasks). Each task needs title, intent, outcome, scope, optional dependencies, order, risk, and runSize.\n`, 'utf8'); return path; }
