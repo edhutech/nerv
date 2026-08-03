@@ -112,6 +112,8 @@ nerv close
 |---------|-------------|
 | `nerv init` | Initialize Nerv in the current repo |
 | `nerv product [--input <paths...>]` | Prepare an agent-neutral Product Context session |
+| `nerv product propose <PRODUCT-###> --proposal <file>` | Persist a validated Product Context Proposal without changing canonical documents |
+| `nerv product proposal <PRODUCT-###-PROPOSAL-###>` | Show a Product Context Proposal by ID |
 | `nerv product status` | Show session state and Product Context checks |
 | `nerv product review` | Check required documents and placeholders before close |
 | `nerv product close` | Close a reviewed Product Session |
@@ -167,7 +169,7 @@ is idempotent. Apply never starts Runs or creates Checkpoints. See
 
 ## Using with Coding Agents
 
-Product Context is independent of agents and providers. Nerv never opens an agent or calls an AI API. `nerv product` writes `.nerv/agent/product/run.md`; give that file to the agent you choose. It may update only `.nerv/product/`, asks only necessary questions, and requires you to review the diff before Git. A later `nerv product` resumes an active session; use `nerv product status`, then `nerv product review` and `nerv product close` when it is complete. Builds and checkpoints remain optional.
+Product Context is independent of agents and providers. Nerv never opens an agent or calls an AI API. `nerv product` writes `.nerv/agent/product/run.md`; give that file to the agent you choose. The agent returns structured JSON describing its assessment and proposed full-document changes. Persist it with `nerv product propose PRODUCT-### --proposal proposal.json`; it is recoverable through `nerv product proposal` and does not modify `.nerv/product/`. Temporary input paths and SHA-256 hashes are retained only as proposal traceability. Approval and application are deliberately separate steps. A later `nerv product` resumes an active session. Builds and checkpoints remain optional.
 
 When you start a Run with `nerv start <query>`, Nerv generates:
 

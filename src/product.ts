@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { createHash } from "node:crypto";
 
 import Database from "better-sqlite3";
 
-import { openRepository, type ProductSessionRecord } from "./repository.js";
+import { openRepository, type ProductContextProposalRecord, type ProductSessionRecord } from "./repository.js";
 
 const PRODUCT_FILES = [
   {
@@ -170,6 +171,23 @@ export type ProductSessionStartResult = {
   resumed: boolean;
 };
 
+export type ProductContextProposal = {
+  schemaVersion: 1;
+  assessment: {
+    mode: "creation" | "evolution";
+    confirmedFacts: ProposalObservation[];
+    gaps: ProposalObservation[];
+    contradictions: ProposalObservation[];
+    assumptions: ProposalObservation[];
+    pendingQuestions: ProposalObservation[];
+  };
+  changes: ProductContextChange[];
+};
+
+export type ProposalObservation = { id: string; statement: string; sources: string[] };
+export type ProductContextChange = { document: string; action: "create" | "update"; summary: string; rationale: string; proposedContent: string };
+const PRODUCT_CONTEXT_FILE_SET = new Set<string>(PRODUCT_FILES.map((file) => file.name));
+
 export function startProductSession(databasePath: string, hasExistingContext: boolean): ProductSessionStartResult {
   const repository = openRepository(databasePath);
 
@@ -211,6 +229,13 @@ export function discoverProductInputs(repoRoot: string, inputs: string[]): strin
     throw new Error("No compatible input files were found.");
   }
   return unique;
+}
+
+export function createProductInputManifest(repoRoot: string, inputs: string[]): string {
+  return JSON.stringify(inputs.map((input) => ({
+    path: input,
+    sha256: createHash("sha256").update(readFileSync(join(repoRoot, input))).digest("hex"),
+  })));
 }
 
 function collectInputFiles(path: string, repoRoot: string, discovered: string[]): void {
@@ -262,23 +287,84 @@ ${repoContext}
 
 ${inputList}
 
-## Allowed changes
+## Required output
 
-Modify only the nine Markdown documents in \`.nerv/product/\`. Do not modify application code, dependencies, configuration, Git state, or files outside \`.nerv/product/\`.
+Return a JSON Product Context Proposal. Do not modify the nine canonical Markdown documents. Do not modify application code, dependencies, configuration, Git state, or any other repository file. Persist the returned JSON with \`nerv product propose ${session.id} --proposal proposal.json\`.
 
 ## Interview and safe evolution
 
-First inspect the existing Product Context and identify only missing information, conflicts, and assumptions that block a useful update. Ask focused follow-up questions only when they are necessary; do not use a rigid questionnaire.
+First inspect the existing Product Context and identify only confirmed facts, missing information, conflicts, assumptions, and pending questions that block a useful update. Ask focused follow-up questions only when they are necessary; do not use a rigid questionnaire.
 
-Treat existing confirmed content as authoritative. Do not overwrite it silently. Before replacing a confirmed decision, show the proposed replacement and obtain explicit user confirmation. Record new decisions and replacements in \`decisions.md\`, preserve historical or obsolete material in \`evolution.md\`, and keep pending questions and assumptions visibly distinguished from confirmed facts in the document where they matter.
+Treat existing confirmed content as authoritative. Do not overwrite it silently. Before replacing a confirmed decision, include the proposed replacement in \`changes\`; approval and application are separate future steps. Preserve historical or obsolete material through a proposed change to \`evolution.md\`.
 
-Adapt temporary input material into the appropriate templates. Do not copy it literally and do not treat input paths as permanent sources. Keep the nine documents coherent: product, problem, users, scope, requirements, architecture, roadmap, decisions, and evolution must agree.
+Adapt temporary input material into a structured proposal. Do not copy it literally and do not treat input paths as permanent sources. Use schemaVersion 1 with assessment.mode (${session.mode}), five observation arrays (confirmedFacts, gaps, contradictions, assumptions, pendingQuestions), and changes. Each observation has a unique lowercase id, statement, and source paths. Each change names one canonical document, action (create or update), summary, rationale, and complete proposedContent. Keep the nine documents coherent: product, problem, users, scope, requirements, architecture, roadmap, decisions, and evolution must agree.
 
-Before Git is used, show the Product Context diff to the user for review.
+The proposal is durable and recoverable by ID but not approved or applied by this command.
 `;
   const path = join(entrypointDir, "run.md");
   writeFileSync(path, content, "utf8");
   return path;
+}
+
+export function parseProductContextProposal(source: string, expectedMode: string): ProductContextProposal {
+  let proposal: ProductContextProposal;
+  try { proposal = JSON.parse(source) as ProductContextProposal; } catch { throw new Error("Product Context Proposal must be valid JSON."); }
+  const assessment = proposal.assessment;
+  if (proposal.schemaVersion !== 1 || !assessment || assessment.mode !== expectedMode || !Array.isArray(proposal.changes)) {
+    throw new Error(`Product Context Proposal requires schemaVersion 1, assessment.mode ${expectedMode}, and changes.`);
+  }
+  const observationIds = new Set<string>();
+  for (const key of ["confirmedFacts", "gaps", "contradictions", "assumptions", "pendingQuestions"] as const) {
+    const observations = assessment[key];
+    if (!Array.isArray(observations)) throw new Error(`Product Context Proposal assessment.${key} must be an array.`);
+    for (const observation of observations) {
+      if (!observation?.id?.match(/^[a-z0-9][a-z0-9-]*$/) || observationIds.has(observation.id) || !observation.statement?.trim() || !Array.isArray(observation.sources) || observation.sources.some((path) => typeof path !== "string" || !path.trim())) {
+        throw new Error("Every assessment observation needs a unique lowercase id, statement, and source paths.");
+      }
+      observationIds.add(observation.id);
+    }
+  }
+  const documents = new Set<string>();
+  for (const change of proposal.changes) {
+    if (!PRODUCT_CONTEXT_FILE_SET.has(change?.document) || documents.has(change.document) || !["create", "update"].includes(change.action) || !change.summary?.trim() || !change.rationale?.trim() || !change.proposedContent?.trim()) {
+      throw new Error("Every change needs one unique Product Context document, create or update action, summary, rationale, and complete proposedContent.");
+    }
+    documents.add(change.document);
+  }
+  return proposal;
+}
+
+export function createProductContextProposal(databasePath: string, workspaceRoot: string, sessionId: string, source: string): ProductContextProposalRecord {
+  const repository = openRepository(databasePath);
+  try {
+    const session = repository.getProductSession(sessionId.toUpperCase());
+    if (!session) throw new Error(`Product Session ${sessionId.toUpperCase()} not found.`);
+    if (session.status !== "active") throw new Error(`Product Session ${session.id} cannot receive a proposal from ${session.status}.`);
+    const proposal = parseProductContextProposal(source, session.mode);
+    const prior = repository.listProductContextProposals(session.id);
+    const version = prior.length + 1;
+    const record = repository.createProductContextProposal({
+      id: `${session.id}-PROPOSAL-${String(version).padStart(3, "0")}`,
+      session_id: session.id,
+      version,
+      status: "proposed",
+      proposal_json: JSON.stringify(proposal, null, 2),
+      input_manifest: session.input_manifest ?? "[]",
+      markdown_path: join(workspaceRoot, "agent", "product", session.id, `proposal-${String(version).padStart(3, "0")}.md`),
+    });
+    mkdirSync(join(workspaceRoot, "agent", "product", session.id), { recursive: true });
+    writeFileSync(record.markdown_path, renderProductContextProposal(record), "utf8");
+    return record;
+  } finally { repository.close(); }
+}
+
+export function getProductContextProposal(databasePath: string, proposalId: string): ProductContextProposalRecord | null {
+  const repository = openRepository(databasePath);
+  try { return repository.getProductContextProposal(proposalId.toUpperCase()); } finally { repository.close(); }
+}
+
+function renderProductContextProposal(record: ProductContextProposalRecord): string {
+  return `# ${record.id}: Product Context Proposal\n\n## Status\n\n${record.status}\n\n## Product Session\n\n${record.session_id}\n\n## Version\n\n${record.version}\n\n## Temporary Input Trace\n\n\`\`\`json\n${record.input_manifest}\n\`\`\`\n\n## Proposal\n\n\`\`\`json\n${record.proposal_json}\n\`\`\`\n\n## Contract\n\nThis proposal is not approved and does not modify canonical Product Context.\n`;
 }
 
 export function scaffoldProductContext(workspaceRoot: string): ProductScaffoldResult {

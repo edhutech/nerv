@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, generateProductEntrypoint } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -119,6 +119,28 @@ program
   });
 
 productCommand
+  .command("propose")
+  .argument("<sessionId>", "Product Session ID.")
+  .requiredOption("--proposal <file>", "Product Context Proposal JSON file.")
+  .description("Validate and persist a Product Context Proposal without changing canonical documents.")
+  .action((sessionId: string, options: { proposal: string }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
+    try { const proposal = createProductContextProposal(status.databasePath, status.workspaceRoot, sessionId, readFileSync(options.proposal, "utf8")); console.log(`Recorded ${proposal.id} (version ${proposal.version}).`); console.log(`Markdown: ${proposal.markdown_path}`); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_PROPOSAL_INVALID", exitCode: 1 }); }
+  });
+
+productCommand
+  .command("proposal")
+  .argument("<proposalId>", "Product Context Proposal ID.")
+  .description("Show a recoverable Product Context Proposal by ID.")
+  .action((proposalId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    const proposal = status.databasePath ? getProductContextProposal(status.databasePath, proposalId) : null;
+    if (!proposal) { program.error(`Product Context Proposal ${proposalId.toUpperCase()} not found.`, { code: "NERV_PRODUCT_PROPOSAL_NOT_FOUND", exitCode: 1 }); return; }
+    console.log(`${proposal.id}: ${proposal.status}\nSession: ${proposal.session_id}\nMarkdown: ${proposal.markdown_path}\n${proposal.proposal_json}`);
+  });
+
+productCommand
   .command("status")
   .description("Show the current Product Session and Product Context checks.")
   .action(() => {
@@ -208,7 +230,9 @@ productCommand
       const productSession = startProductSession(status.databasePath!, hadExistingContext);
       const repository = openRepository(status.databasePath!);
       try {
-        repository.updateProductSession(productSession.session.id, { input_manifest: JSON.stringify(inputs) });
+        if (inputs.length > 0) {
+          repository.updateProductSession(productSession.session.id, { input_manifest: createProductInputManifest(status.repoRoot!, inputs) });
+        }
       } finally {
         repository.close();
       }

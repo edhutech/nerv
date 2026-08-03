@@ -93,6 +93,18 @@ export type ProductSessionRecord = {
   input_manifest: string | null;
 };
 
+export type ProductContextProposalRecord = {
+  id: string;
+  session_id: string;
+  version: number;
+  status: string;
+  proposal_json: string;
+  input_manifest: string;
+  created_at: string;
+  updated_at: string;
+  markdown_path: string;
+};
+
 export type CreateBuildInput = {
   id: string;
   title: string;
@@ -182,6 +194,9 @@ export type Repository = {
   updateProductSession(id: string, updates: Partial<Pick<ProductSessionRecord, "status" | "input_manifest" | "closed_at">>): void;
   getCurrentProductSessionId(): string | null;
   setCurrentProductSessionId(sessionId: string): void;
+  createProductContextProposal(input: Omit<ProductContextProposalRecord, "created_at" | "updated_at">): ProductContextProposalRecord;
+  getProductContextProposal(id: string): ProductContextProposalRecord | null;
+  listProductContextProposals(sessionId: string): ProductContextProposalRecord[];
 };
 
 export function openRepository(databasePath: string): Repository {
@@ -684,6 +699,12 @@ export function openRepository(databasePath: string): Repository {
   const updateProductSessionStmt = database.prepare(
     `UPDATE product_sessions SET status = @status, updated_at = @updatedAt, closed_at = @closedAt, input_manifest = @inputManifest WHERE id = @id`,
   );
+  const createProductContextProposalStmt = database.prepare(
+    `INSERT INTO product_context_proposals (id, session_id, version, status, proposal_json, input_manifest, created_at, updated_at, markdown_path)
+     VALUES (@id, @sessionId, @version, @status, @proposalJson, @inputManifest, @createdAt, @updatedAt, @markdownPath)`,
+  );
+  const getProductContextProposalStmt = database.prepare("SELECT * FROM product_context_proposals WHERE id = ?");
+  const listProductContextProposalsStmt = database.prepare("SELECT * FROM product_context_proposals WHERE session_id = ? ORDER BY version");
 
   const getCloseRecordStmt = database.prepare(
     `SELECT * FROM close_records WHERE run_id = ?`,
@@ -801,6 +822,18 @@ export function openRepository(databasePath: string): Repository {
     },
     setCurrentProductSessionId(sessionId: string): void {
       this.setMetadata("current_product_session_id", sessionId);
+    },
+    createProductContextProposal: database.transaction((input: Omit<ProductContextProposalRecord, "created_at" | "updated_at">): ProductContextProposalRecord => {
+      const now = new Date().toISOString();
+      const record: ProductContextProposalRecord = { ...input, created_at: now, updated_at: now };
+      createProductContextProposalStmt.run({ id: record.id, sessionId: record.session_id, version: record.version, status: record.status, proposalJson: record.proposal_json, inputManifest: record.input_manifest, createdAt: now, updatedAt: now, markdownPath: record.markdown_path });
+      return record;
+    }),
+    getProductContextProposal(id: string): ProductContextProposalRecord | null {
+      return (getProductContextProposalStmt.get(id) as ProductContextProposalRecord | undefined) ?? null;
+    },
+    listProductContextProposals(sessionId: string): ProductContextProposalRecord[] {
+      return listProductContextProposalsStmt.all(sessionId) as ProductContextProposalRecord[];
     },
   };
 }
