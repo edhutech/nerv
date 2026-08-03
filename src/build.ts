@@ -64,6 +64,19 @@ export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tas
   return markdownPath;
 }
 
+export function syncTaskMarkdown(workspaceRoot: string, task: TaskRecord): string {
+  const markdownPath = task.generated_markdown_path || join(workspaceRoot, "agent", "tasks", `${task.id}.md`);
+  if (!existsSync(markdownPath)) {
+    throw new Error(`Task Markdown for ${task.id} was not found at ${markdownPath}.`);
+  }
+  let content = readFileSync(markdownPath, "utf8");
+  content = replaceBuildSection(content, "Status", capitalizeFirst(task.status));
+  content = replaceBuildSection(content, "Parent Build", task.build_id ?? "None (standalone)");
+  content = replaceBuildSection(content, "Close summary", task.closed_at ? `Closed at ${task.closed_at}.` : "Pending.");
+  writeFileSync(markdownPath, content, "utf8");
+  return markdownPath;
+}
+
 function replaceBuildSection(content: string, heading: string, value: string, append = false): string {
   const pattern = new RegExp(`## ${heading}\\n\\n[\\s\\S]*?(?=\\n## |$)`);
   const section = `## ${heading}\n\n${value}`;

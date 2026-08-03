@@ -10,7 +10,7 @@ import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
 import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./task.js";
-import { createBuildFromIntent, planBuildTasks, syncBuildMarkdown } from "./build.js";
+import { createBuildFromIntent, planBuildTasks, syncBuildMarkdown, syncTaskMarkdown } from "./build.js";
 import { startRun } from "./run.js";
 import { cleanWorkspace } from "./clean.js";
 import { applyProposal, createIntake, createPlanningEntrypoint, createProposal, getIntake, getProposal, intakeStatus, readIntentInput, reviewProposal, verifyIntake } from "./intake.js";
@@ -470,6 +470,27 @@ newCommand
 const buildCommand = program
   .command("build")
   .description("Work with Agentic Builds.");
+
+const taskCommand = program.command("task").description("Work with generated Task Markdown.");
+taskCommand.command("sync")
+  .argument("<taskId>", "Task ID to reconcile with its Markdown.")
+  .description("Synchronize generated Task Markdown from durable Task state.")
+  .action((taskId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
+      program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
+      return;
+    }
+    const repository = openRepository(status.databasePath);
+    try {
+      const task = repository.getTask(taskId.toUpperCase());
+      if (!task) {
+        program.error(`Task ${taskId.toUpperCase()} not found.`, { code: "NERV_TASK_NOT_FOUND", exitCode: 1 });
+        return;
+      }
+      console.log(`Synchronized ${task.id} Markdown: ${syncTaskMarkdown(status.workspaceRoot, task)}`);
+    } finally { repository.close(); }
+  });
 
 buildCommand
   .command("plan")
@@ -1163,6 +1184,10 @@ program
       const task = repository.getTask(run.task_id);
       if (task && task.status !== "closed") {
         repository.updateTask(task.id, { status: "closed", closed_at: now });
+      }
+      const closedTask = task ? repository.getTask(task.id) : null;
+      if (closedTask) {
+        syncTaskMarkdown(status.workspaceRoot!, closedTask);
       }
 
       if (currentRunId === runId) {
