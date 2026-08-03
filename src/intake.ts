@@ -6,13 +6,17 @@ import Database from "better-sqlite3";
 import { createBuildFromIntent, syncBuildMarkdown } from "./build.js";
 import { createTaskFromIntent } from "./task.js";
 import { openRepository } from "./repository.js";
+import { discoverContext } from "./context.js";
 
 export type IntakeStatus = "captured" | "planning" | "changes_requested" | "approved" | "rejected" | "materialized";
 export type ProposalStatus = "proposed" | "changes_requested" | "approved" | "rejected" | "superseded" | "materialized";
 export type IntakeRecord = { id: string; original_intent: string; content_hash: string; status: IntakeStatus; approved_proposal_id: string | null; created_at: string; updated_at: string; markdown_path: string };
 export type ProposalRecord = { id: string; intake_id: string; version: number; status: ProposalStatus; parent_proposal_id: string | null; content_hash: string; proposal_json: string; created_at: string; updated_at: string; markdown_path: string };
 export type ProposalReviewRecord = { id: number; intake_id: string; proposal_id: string; decision: "changes_requested" | "rejected" | "approved"; superseding_proposal_id: string | null; created_at: string };
-type Proposal = { rationale: string; context: string; units: Array<{ type: "standalone" | "new-build" | "existing-build"; title?: string; buildId?: string; tasks: Array<{ title: string; intent: string; outcome: string; scope: string; dependencies?: string[]; order?: number; risk?: string; runSize?: string }> }>; relationships?: Array<{ from: string; to: string; type: string }> };
+export type ProposalTask = { id: string; title: string; intent: string; outcome: string; scope: string; dependencies: string[]; order: number; risk: string; runSize: string };
+export type ProposalUnit = { id: string; type: "standalone" | "new-build" | "existing-build"; title?: string; buildId?: string; justification: string; tasks: ProposalTask[] };
+export type ProposalRelationship = { from: string; to: string; type: string; rationale: string };
+export type Proposal = { schemaVersion: 1; rationale: string; context: string; units: ProposalUnit[]; relationships: ProposalRelationship[] };
 
 function hash(content: string): string { return createHash("sha256").update(content, "utf8").digest("hex"); }
 
@@ -75,16 +79,26 @@ export function verifyIntake(record: IntakeRecord): { valid: boolean; message: s
   return { valid, message: valid ? "SQLite and Markdown integrity verified." : "Intake content or Markdown does not match SQLite." };
 }
 
-function parseProposal(text: string): Proposal {
+export function parseProposal(text: string): Proposal {
   let proposal: Proposal; try { proposal = JSON.parse(text) as Proposal; } catch { throw new Error("Proposal must be valid JSON."); }
-  if (!proposal.rationale?.trim() || !proposal.context?.trim() || !Array.isArray(proposal.units) || proposal.units.length === 0) throw new Error("Proposal requires rationale, context, and at least one unit.");
+  if (proposal.schemaVersion !== 1 || !proposal.rationale?.trim() || !proposal.context?.trim() || !Array.isArray(proposal.units) || proposal.units.length === 0 || !Array.isArray(proposal.relationships)) throw new Error("Proposal requires schemaVersion 1, rationale, context, units, and relationships.");
+  const unitIds = new Set<string>(); const taskIds = new Set<string>(); const orders = new Set<number>();
   for (const unit of proposal.units) {
+    if (!unit.id?.match(/^unit-[a-z0-9-]+$/) || unitIds.has(unit.id)) throw new Error("Every proposal unit requires a unique unit-... id.");
+    unitIds.add(unit.id);
     if (!["standalone", "new-build", "existing-build"].includes(unit.type) || !Array.isArray(unit.tasks) || unit.tasks.length === 0) throw new Error("Every proposal unit needs a valid type and at least one task.");
     if (unit.type === "standalone" && unit.tasks.length !== 1) throw new Error("A standalone unit must contain exactly one task.");
     if (unit.type === "new-build" && !unit.title?.trim()) throw new Error("A new-build unit requires a title.");
     if (unit.type === "existing-build" && !unit.buildId?.match(/^BUILD-\d+$/)) throw new Error("An existing-build unit requires a BUILD-### buildId.");
-    for (const task of unit.tasks) if (!task.title?.trim() || !task.intent?.trim() || !task.outcome?.trim() || !task.scope?.trim()) throw new Error("Every proposed task requires title, intent, outcome, and scope.");
+    if (!unit.justification?.trim()) throw new Error("Every proposal unit requires planning justification.");
+    for (const task of unit.tasks) {
+      if (!task.id?.match(/^task-[a-z0-9-]+$/) || taskIds.has(task.id) || !task.title?.trim() || !task.intent?.trim() || !task.outcome?.trim() || !task.scope?.trim() || !task.risk?.trim() || !task.runSize?.trim() || !Number.isSafeInteger(task.order) || task.order < 1 || orders.has(task.order) || !Array.isArray(task.dependencies)) throw new Error("Every proposed task requires unique task-... id, title, intent, outcome, scope, risk, runSize, dependencies, and a unique positive order.");
+      taskIds.add(task.id); orders.add(task.order);
+    }
   }
+  for (const unit of proposal.units) for (const task of unit.tasks) for (const dependency of task.dependencies) if (!taskIds.has(dependency) || dependency === task.id) throw new Error(`Task ${task.id} has an invalid dependency.`);
+  const relationships = new Set<string>();
+  for (const relationship of proposal.relationships) { if (!unitIds.has(relationship.from) || !unitIds.has(relationship.to) || relationship.from === relationship.to || !relationship.type?.trim() || !relationship.rationale?.trim() || relationships.has(`${relationship.from}:${relationship.to}:${relationship.type}`)) throw new Error("Relationships must link distinct known units with type and rationale."); relationships.add(`${relationship.from}:${relationship.to}:${relationship.type}`); }
   return proposal;
 }
 
@@ -145,4 +159,4 @@ export function applyProposal(databasePath: string, workspaceRoot: string, propo
   } finally { repository.close(); }
 }
 
-export function createPlanningEntrypoint(workspaceRoot: string, intake: IntakeRecord): string { const path = join(workspaceRoot, "agent", "intakes", intake.id, "planning.md"); mkdirSync(join(workspaceRoot, "agent", "intakes", intake.id), { recursive: true }); atomicWrite(path, `# Planning entrypoint for ${intake.id}\n\nRead \`../${intake.id}.md\` and return a JSON proposal to \`nerv intake propose ${intake.id} --input proposal.json\`. Nerv calls no agents or APIs. The JSON must contain rationale, context, units, and optional relationships. Units are standalone (one task), new-build (title plus tasks), or existing-build (buildId plus tasks). Each task needs title, intent, outcome, scope, optional dependencies, order, risk, and runSize.\n`); return path; }
+export function createPlanningEntrypoint(workspaceRoot: string, intake: IntakeRecord): string { const path = join(workspaceRoot, "agent", "intakes", intake.id, "planning.md"); const context = discoverContext(workspaceRoot, join(workspaceRoot, "nerv.db")); mkdirSync(join(workspaceRoot, "agent", "intakes", intake.id), { recursive: true }); atomicWrite(path, `# Portable planning package for ${intake.id}\n\nGive this package to any external agent. Nerv does not call models, providers, SDKs, or APIs. The agent returns JSON; it does not need an active Run, Product Session, or remembered conversation.\n\n## Read\n\n- \`../${intake.id}.md\` (immutable original Intent)\n${context.productContext.available ? "- `../../../product/` (available Product Context)" : "- Product Context is not available."}\n${context.repoContext.available ? "- `../../../repo/development.md` (available Repo Context)" : "- Repo Context is not available."}\n\n## Submit\n\n\`nerv intake propose ${intake.id} --input proposal.json\`\n\n## Proposal JSON schema\n\n\`schemaVersion\` must be \`1\`. Include non-empty \`rationale\`, \`context\`, \`units\`, and \`relationships\`. Every unit has a unique \`unit-...\` id, \`justification\`, and type: \`standalone\` (exactly one Task), \`new-build\` (title plus Tasks), or \`existing-build\` (a real \`buildId\` plus Tasks). Every Task has a unique \`task-...\` id, title, intent, outcome, scope, dependencies, unique positive order, risk, and runSize. Relationships link two unit IDs with type and rationale.\n\nUse \`nerv intake proposal <PROPOSAL-ID>\`, \`nerv intake review <PROPOSAL-ID> --action approved\`, and \`nerv intake apply <PROPOSAL-ID> --dry-run\` after submission.\n`); return path; }

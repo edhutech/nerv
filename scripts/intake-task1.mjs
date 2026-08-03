@@ -34,7 +34,7 @@ try {
   assert(readFileSync(intakePath, "utf8").includes(direct), "Markdown did not preserve exact intent");
   run(["intake", "verify", "INTAKE-001"]);
   const proposal1 = join(temp, "proposal-1.json");
-  writeFileSync(proposal1, JSON.stringify({ rationale: "r", context: "c", units: [{ type: "standalone", tasks: [{ title: "t", intent: "i", outcome: "o", scope: "s" }] }] }), "utf8");
+  writeFileSync(proposal1, JSON.stringify({ schemaVersion: 1, rationale: "r", context: "c", relationships: [], units: [{ id: "unit-one", type: "standalone", justification: "small isolated change", tasks: [{ id: "task-one", title: "t", intent: "i", outcome: "o", scope: "s", dependencies: [], order: 1, risk: "low", runSize: "small" }] }] }), "utf8");
   run(["intake", "propose", "INTAKE-001", "--input", proposal1]);
   run(["intake", "review", "INTAKE-001-PROPOSAL-001", "--action", "changes-requested"]);
   run(["intake", "review", "INTAKE-001-PROPOSAL-001", "--action", "approved"], 1);
