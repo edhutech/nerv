@@ -102,4 +102,21 @@ export function createProposal(databasePath: string, workspaceRoot: string, inta
 }
 
 export function getProposal(databasePath: string, id: string): ProposalRecord | null { const database = new Database(databasePath, { readonly: true }); try { return (database.prepare("SELECT * FROM intake_proposals WHERE id = ?").get(id.toUpperCase()) as ProposalRecord | undefined) ?? null; } finally { database.close(); } }
+export function reviewProposal(databasePath: string, proposalId: string, action: "changes-requested" | "rejected" | "approved"): ProposalRecord {
+  const database = new Database(databasePath); try {
+    const proposal = database.prepare("SELECT * FROM intake_proposals WHERE id = ?").get(proposalId.toUpperCase()) as ProposalRecord | undefined;
+    if (!proposal) throw new Error(`Proposal ${proposalId.toUpperCase()} not found.`);
+    if (proposal.status !== "proposed") throw new Error(`Proposal ${proposal.id} cannot transition from ${proposal.status}.`);
+    const now = new Date().toISOString();
+    database.transaction(() => {
+      if (action === "approved") database.prepare("UPDATE intake_proposals SET status = 'superseded', updated_at = ? WHERE intake_id = ? AND status = 'approved'").run(now, proposal.intake_id);
+      database.prepare("UPDATE intake_proposals SET status = ?, updated_at = ? WHERE id = ?").run(action, now, proposal.id);
+      database.prepare("UPDATE intakes SET status = ?, updated_at = ? WHERE id = ?").run(action === "approved" ? "approved" : action, now, proposal.intake_id);
+    })();
+    return { ...proposal, status: action, updated_at: now };
+  } finally { database.close(); }
+}
+export function intakeStatus(databasePath: string, intakeId: string): { intake: IntakeRecord; proposals: ProposalRecord[] } {
+  const database = new Database(databasePath, { readonly: true }); try { const intake = database.prepare("SELECT * FROM intakes WHERE id = ?").get(intakeId.toUpperCase()) as IntakeRecord | undefined; if (!intake) throw new Error(`Intake ${intakeId.toUpperCase()} not found.`); return { intake, proposals: database.prepare("SELECT * FROM intake_proposals WHERE intake_id = ? ORDER BY version").all(intake.id) as ProposalRecord[] }; } finally { database.close(); }
+}
 export function createPlanningEntrypoint(workspaceRoot: string, intake: IntakeRecord): string { const path = join(workspaceRoot, 'agent', 'intakes', intake.id, 'planning.md'); mkdirSync(join(workspaceRoot, 'agent', 'intakes', intake.id), { recursive: true }); writeFileSync(path, `# Planning entrypoint for ${intake.id}\n\nRead \`${intake.markdown_path}\` and return a JSON proposal to \`nerv intake propose ${intake.id} --input proposal.json\`. Nerv calls no agents or APIs. The JSON must contain rationale, context, units, and optional relationships. Units are standalone (one task), new-build (title plus tasks), or existing-build (buildId plus tasks). Each task needs title, intent, outcome, scope, optional dependencies, order, risk, and runSize.\n`, 'utf8'); return path; }
