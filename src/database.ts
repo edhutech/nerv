@@ -14,6 +14,8 @@ const REQUIRED_TABLES = [
   "intakes",
   "intake_proposals",
   "intake_proposal_reviews",
+  "intake_materializations",
+  "intake_materialization_items",
 ] as const;
 
 const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string[]> = {
@@ -61,6 +63,8 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   intakes: ["id", "original_intent", "content_hash", "status", "approved_proposal_id", "created_at", "updated_at", "markdown_path"],
   intake_proposals: ["id", "intake_id", "version", "status", "parent_proposal_id", "content_hash", "proposal_json", "created_at", "updated_at", "markdown_path"],
   intake_proposal_reviews: ["id", "intake_id", "proposal_id", "decision", "superseding_proposal_id", "created_at"],
+  intake_materializations: ["id", "intake_id", "proposal_id", "status", "plan_json", "created_at", "updated_at"],
+  intake_materialization_items: ["materialization_id", "unit_id", "task_ref", "build_id", "task_id", "metadata_json"],
 };
 
 const SCHEMA_STATEMENTS = [
@@ -176,9 +180,19 @@ const SCHEMA_STATEMENTS = [
     decision TEXT NOT NULL, superseding_proposal_id TEXT, created_at TEXT NOT NULL,
     FOREIGN KEY (intake_id) REFERENCES intakes(id), FOREIGN KEY (proposal_id) REFERENCES intake_proposals(id)
   )`,
+  `CREATE TABLE IF NOT EXISTS intake_materializations (
+    id TEXT PRIMARY KEY, intake_id TEXT NOT NULL, proposal_id TEXT NOT NULL UNIQUE, status TEXT NOT NULL,
+    plan_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    FOREIGN KEY (intake_id) REFERENCES intakes(id), FOREIGN KEY (proposal_id) REFERENCES intake_proposals(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS intake_materialization_items (
+    materialization_id TEXT NOT NULL, unit_id TEXT NOT NULL, task_ref TEXT NOT NULL, build_id TEXT,
+    task_id TEXT NOT NULL, metadata_json TEXT NOT NULL, PRIMARY KEY (materialization_id, task_ref),
+    FOREIGN KEY (materialization_id) REFERENCES intake_materializations(id), FOREIGN KEY (build_id) REFERENCES builds(id), FOREIGN KEY (task_id) REFERENCES tasks(id)
+  )`,
 ] as const;
 
-const SCHEMA_VERSION = "5";
+const SCHEMA_VERSION = "6";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -332,6 +346,12 @@ function migrateSchema(database: Database.Database): void {
       decision TEXT NOT NULL, superseding_proposal_id TEXT, created_at TEXT NOT NULL,
       FOREIGN KEY (intake_id) REFERENCES intakes(id), FOREIGN KEY (proposal_id) REFERENCES intake_proposals(id)
     )`);
+  }
+  if (!hasTable(database, "intake_materializations")) {
+    database.exec(`CREATE TABLE intake_materializations (id TEXT PRIMARY KEY, intake_id TEXT NOT NULL, proposal_id TEXT NOT NULL UNIQUE, status TEXT NOT NULL, plan_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (intake_id) REFERENCES intakes(id), FOREIGN KEY (proposal_id) REFERENCES intake_proposals(id))`);
+  }
+  if (!hasTable(database, "intake_materialization_items")) {
+    database.exec(`CREATE TABLE intake_materialization_items (materialization_id TEXT NOT NULL, unit_id TEXT NOT NULL, task_ref TEXT NOT NULL, build_id TEXT, task_id TEXT NOT NULL, metadata_json TEXT NOT NULL, PRIMARY KEY (materialization_id, task_ref), FOREIGN KEY (materialization_id) REFERENCES intake_materializations(id), FOREIGN KEY (build_id) REFERENCES builds(id), FOREIGN KEY (task_id) REFERENCES tasks(id))`);
   }
 
   for (const [tableName, columnNames] of Object.entries(MIGRATED_COLUMNS)) {

@@ -3,8 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { join } from "node:path";
 
 import Database from "better-sqlite3";
-import { createBuildFromIntent, syncBuildMarkdown } from "./build.js";
-import { createTaskFromIntent } from "./task.js";
+import { syncBuildMarkdown } from "./build.js";
 import { openRepository } from "./repository.js";
 import { discoverContext } from "./context.js";
 
@@ -147,16 +146,54 @@ export function intakeStatus(databasePath: string, intakeId: string): { intake: 
   const database = new Database(databasePath, { readonly: true }); try { const intake = database.prepare("SELECT * FROM intakes WHERE id = ?").get(intakeId.toUpperCase()) as IntakeRecord | undefined; if (!intake) throw new Error(`Intake ${intakeId.toUpperCase()} not found.`); return { intake, proposals: database.prepare("SELECT * FROM intake_proposals WHERE intake_id = ? ORDER BY version").all(intake.id) as ProposalRecord[], reviews: listReviews(database, intake.id) }; } finally { database.close(); }
 }
 
+type MaterializationPlan = { intake: string; approvedProposal: string; materializationId: string; newBuilds: Array<{ unit: string; id: string; title: string }>; existingBuilds: string[]; tasks: Array<{ unit: string; ref: string; id: string; buildId: string | null; title: string; dependencies: string[]; order: number; risk: string; runSize: string }>; relationships: ProposalRelationship[]; runs: "none" };
+
+function nextNumber(database: Database.Database, table: "builds" | "tasks", prefix: string): number { return (database.prepare(`SELECT id FROM ${table}`).all() as { id: string }[]).reduce((maximum, row) => Math.max(maximum, Number(row.id.slice(prefix.length)) || 0), 0) + 1; }
+function formatId(prefix: string, number: number): string { return `${prefix}${String(number).padStart(3, "0")}`; }
+function createMaterializationPlan(database: Database.Database, record: ProposalRecord, proposal: Proposal): MaterializationPlan {
+  let buildNumber = nextNumber(database, "builds", "BUILD-"); let taskNumber = nextNumber(database, "tasks", "TASK-");
+  const newBuilds: MaterializationPlan["newBuilds"] = []; const existingBuilds: string[] = []; const tasks: MaterializationPlan["tasks"] = [];
+  for (const unit of proposal.units) {
+    let buildId: string | null = null;
+    if (unit.type === "new-build") { buildId = formatId("BUILD-", buildNumber++); newBuilds.push({ unit: unit.id, id: buildId, title: unit.title! }); }
+    if (unit.type === "existing-build") { buildId = unit.buildId!; if (!database.prepare("SELECT id FROM builds WHERE id = ?").get(buildId)) throw new Error(`Build ${buildId} not found.`); if (!existingBuilds.includes(buildId)) existingBuilds.push(buildId); }
+    for (const task of unit.tasks) tasks.push({ unit: unit.id, ref: task.id, id: formatId("TASK-", taskNumber++), buildId, title: task.title, dependencies: task.dependencies, order: task.order, risk: task.risk, runSize: task.runSize });
+  }
+  return { intake: record.intake_id, approvedProposal: record.id, materializationId: `${record.id}-MATERIALIZATION`, newBuilds, existingBuilds, tasks, relationships: proposal.relationships, runs: "none" };
+}
+function materializationSummary(plan: MaterializationPlan): string[] { return [JSON.stringify(plan, null, 2)]; }
+function writeMaterializedMarkdown(workspaceRoot: string, plan: MaterializationPlan, proposal: Proposal): void {
+  const taskByRef = new Map(proposal.units.flatMap((unit) => unit.tasks.map((task) => [task.id, task])));
+  for (const build of plan.newBuilds) {
+    const path = join(workspaceRoot, "agent", "builds", `${build.id}.md`); mkdirSync(join(workspaceRoot, "agent", "builds"), { recursive: true });
+    if (!existsSync(path)) atomicWrite(path, `# ${build.id}: ${build.title}\n\n## Status\n\nProposed\n\n## Build Goal\n\nMaterialized from ${plan.approvedProposal}.\n\n## Materialization\n\n- Intake: ${plan.intake}\n- Proposal: ${plan.approvedProposal}\n- Materialization: ${plan.materializationId}\n\n## Close summary\n\nPending.\n`);
+  }
+  for (const item of plan.tasks) { const task = taskByRef.get(item.ref)!; const path = join(workspaceRoot, "agent", "tasks", `${item.id}.md`); mkdirSync(join(workspaceRoot, "agent", "tasks"), { recursive: true }); if (!existsSync(path)) atomicWrite(path, `# ${item.id}: ${task.title}\n\n## Status\n\nProposed\n\n## Parent Build\n\n${item.buildId ?? "None (standalone)"}\n\n## Task Goal\n\n${task.intent}\n\n## Scope\n\n${task.scope}\n\n## Expected Outcome\n\n${task.outcome}\n\n## Planning Metadata\n\n- Intake: ${plan.intake}\n- Proposal: ${plan.approvedProposal}\n- Materialization: ${plan.materializationId}\n- Order: ${task.order}\n- Dependencies: ${task.dependencies.join(", ") || "None"}\n- Risk: ${task.risk}\n- Run size: ${task.runSize}\n`); }
+  const repository = openRepository(join(workspaceRoot, "nerv.db")); try { for (const build of plan.newBuilds) { const record = repository.getBuild(build.id); if (record) syncBuildMarkdown(workspaceRoot, record, repository.listTasksByBuild(build.id)); } } finally { repository.close(); }
+}
 export function applyProposal(databasePath: string, workspaceRoot: string, proposalId: string, dryRun: boolean): string[] {
-  const proposalRecord = getProposal(databasePath, proposalId); if (!proposalRecord) throw new Error(`Proposal ${proposalId.toUpperCase()} not found.`);
-  if (proposalRecord.status !== "approved") throw new Error(`Proposal ${proposalRecord.id} is not explicitly approved.`);
-  const proposal = JSON.parse(proposalRecord.proposal_json) as Proposal; const summary = proposal.units.flatMap((unit) => unit.tasks.map((task) => `${unit.type}${unit.buildId ? `:${unit.buildId}` : unit.title ? `:${unit.title}` : ""} -> ${task.title}`));
-  if (dryRun) return summary;
-  const repository = openRepository(databasePath);
+  const database = new Database(databasePath); database.pragma("foreign_keys = ON");
   try {
-    for (const unit of proposal.units) { let buildId: string | undefined = unit.type === "existing-build" ? unit.buildId : undefined; if (unit.type === "new-build") buildId = createBuildFromIntent(databasePath, workspaceRoot, unit.title!).build.id; for (const task of unit.tasks) createTaskFromIntent(databasePath, workspaceRoot, task.intent, { force: true, buildId }); if (buildId && unit.type === "new-build") { const build = repository.getBuild(buildId)!; syncBuildMarkdown(workspaceRoot, build, repository.listTasksByBuild(buildId)); } }
-    const now = new Date().toISOString(); repository.setMetadata(`intake_apply:${proposalRecord.id}`, JSON.stringify(summary)); const database = new Database(databasePath); try { database.prepare("UPDATE intakes SET status = 'materialized', updated_at = ? WHERE id = ?").run(now, proposalRecord.intake_id); database.prepare("UPDATE intake_proposals SET status = 'materialized', updated_at = ? WHERE id = ?").run(now, proposalRecord.id); } finally { database.close(); } return summary;
-  } finally { repository.close(); }
+    const proposalRecord = database.prepare("SELECT * FROM intake_proposals WHERE id = ?").get(proposalId.toUpperCase()) as ProposalRecord | undefined; if (!proposalRecord) throw new Error(`Proposal ${proposalId.toUpperCase()} not found.`);
+    const intake = database.prepare("SELECT * FROM intakes WHERE id = ?").get(proposalRecord.intake_id) as IntakeRecord;
+    if (intake.approved_proposal_id !== proposalRecord.id && proposalRecord.status !== "materialized") throw new Error(`Proposal ${proposalRecord.id} is not the approved version for ${intake.id}.`);
+    const proposal = parseProposal(proposalRecord.proposal_json);
+    let materialization = database.prepare("SELECT * FROM intake_materializations WHERE proposal_id = ?").get(proposalRecord.id) as { id: string; status: string; plan_json: string } | undefined;
+    const plan = materialization ? JSON.parse(materialization.plan_json) as MaterializationPlan : createMaterializationPlan(database, proposalRecord, proposal);
+    if (dryRun) return materializationSummary(plan);
+    if (!materialization) {
+      const now = new Date().toISOString();
+      database.transaction(() => {
+        for (const build of plan.newBuilds) database.prepare("INSERT INTO builds (id,title,status,created_at,updated_at,closed_at,intent,goal,user_value,scope,out_of_scope,acceptance_criteria,validation,risks,generated_markdown_path) VALUES (?,?, 'proposed', ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(build.id, build.title, now, now, `Materialized from ${proposalRecord.id}.`, `Deliver ${build.title}.`, "Derived from approved Proposal.", "Materialized approved planning unit.", "Outside the approved Proposal.", "- Approved Proposal is materialized.", "- pnpm validate", "- Follow approved Proposal risk data.", join(workspaceRoot, "agent", "builds", `${build.id}.md`));
+        for (const item of plan.tasks) { const task = proposal.units.flatMap((unit) => unit.tasks).find((candidate) => candidate.id === item.ref)!; database.prepare("INSERT INTO tasks (id,build_id,title,status,created_at,updated_at,closed_at,intent,scope,out_of_scope,acceptance_criteria,validation,risks,generated_markdown_path) VALUES (?,?,?,'proposed',?,?,NULL,?,?,?,?,?,?,?)").run(item.id, item.buildId, task.title, now, now, task.intent, task.scope, "Outside the approved Proposal.", `- ${task.outcome}`, "- pnpm validate", `- ${task.risk}; run size: ${task.runSize}`, join(workspaceRoot, "agent", "tasks", `${item.id}.md`)); }
+        database.prepare("INSERT INTO intake_materializations (id,intake_id,proposal_id,status,plan_json,created_at,updated_at) VALUES (?, ?, ?, 'pending_markdown', ?, ?, ?)").run(plan.materializationId, intake.id, proposalRecord.id, JSON.stringify(plan), now, now);
+        for (const item of plan.tasks) database.prepare("INSERT INTO intake_materialization_items (materialization_id,unit_id,task_ref,build_id,task_id,metadata_json) VALUES (?, ?, ?, ?, ?, ?)").run(plan.materializationId, item.unit, item.ref, item.buildId, item.id, JSON.stringify(item));
+        database.prepare("UPDATE intakes SET status='materialized', updated_at=? WHERE id=?").run(now, intake.id); database.prepare("UPDATE intake_proposals SET status='materialized', updated_at=? WHERE id=?").run(now, proposalRecord.id);
+      })(); materialization = { id: plan.materializationId, status: "pending_markdown", plan_json: JSON.stringify(plan) };
+    }
+    if (materialization.status !== "complete") { writeMaterializedMarkdown(workspaceRoot, plan, proposal); database.prepare("UPDATE intake_materializations SET status='complete', updated_at=? WHERE id=?").run(new Date().toISOString(), materialization.id); }
+    return materializationSummary(plan);
+  } finally { database.close(); }
 }
 
 export function createPlanningEntrypoint(workspaceRoot: string, intake: IntakeRecord): string { const path = join(workspaceRoot, "agent", "intakes", intake.id, "planning.md"); const context = discoverContext(workspaceRoot, join(workspaceRoot, "nerv.db")); mkdirSync(join(workspaceRoot, "agent", "intakes", intake.id), { recursive: true }); atomicWrite(path, `# Portable planning package for ${intake.id}\n\nGive this package to any external agent. Nerv does not call models, providers, SDKs, or APIs. The agent returns JSON; it does not need an active Run, Product Session, or remembered conversation.\n\n## Read\n\n- \`../${intake.id}.md\` (immutable original Intent)\n${context.productContext.available ? "- `../../../product/` (available Product Context)" : "- Product Context is not available."}\n${context.repoContext.available ? "- `../../../repo/development.md` (available Repo Context)" : "- Repo Context is not available."}\n\n## Submit\n\n\`nerv intake propose ${intake.id} --input proposal.json\`\n\n## Proposal JSON schema\n\n\`schemaVersion\` must be \`1\`. Include non-empty \`rationale\`, \`context\`, \`units\`, and \`relationships\`. Every unit has a unique \`unit-...\` id, \`justification\`, and type: \`standalone\` (exactly one Task), \`new-build\` (title plus Tasks), or \`existing-build\` (a real \`buildId\` plus Tasks). Every Task has a unique \`task-...\` id, title, intent, outcome, scope, dependencies, unique positive order, risk, and runSize. Relationships link two unit IDs with type and rationale.\n\nUse \`nerv intake proposal <PROPOSAL-ID>\`, \`nerv intake review <PROPOSAL-ID> --action approved\`, and \`nerv intake apply <PROPOSAL-ID> --dry-run\` after submission.\n`); return path; }
