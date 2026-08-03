@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { openRepository, type BuildRecord, type TaskRecord } from "./repository.js";
@@ -48,6 +48,27 @@ export type PlanBuildResult = {
   tasks: TaskRecord[];
   skipped: boolean;
 };
+
+export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[]): string {
+  const markdownPath = build.generated_markdown_path || join(workspaceRoot, "agent", "builds", `${build.id}.md`);
+  if (!existsSync(markdownPath)) {
+    throw new Error(`Build Markdown for ${build.id} was not found at ${markdownPath}.`);
+  }
+  const progress = `${tasks.filter((task) => task.status === "closed").length}/${tasks.length} task(s) closed`;
+  const closeSummary = build.closed_at ? `Closed at ${build.closed_at}. ${progress}.` : "Pending.";
+  let content = readFileSync(markdownPath, "utf8");
+  content = replaceBuildSection(content, "Status", capitalizeFirst(build.status));
+  content = replaceBuildSection(content, "Task Progress", progress, true);
+  content = replaceBuildSection(content, "Close summary", closeSummary);
+  writeFileSync(markdownPath, content, "utf8");
+  return markdownPath;
+}
+
+function replaceBuildSection(content: string, heading: string, value: string, append = false): string {
+  const pattern = new RegExp(`## ${heading}\\n\\n[\\s\\S]*?(?=\\n## |$)`);
+  const section = `## ${heading}\n\n${value}`;
+  return pattern.test(content) ? content.replace(pattern, section) : append ? `${content.trimEnd()}\n\n${section}\n` : content;
+}
 
 export function planBuildTasks(
   databasePath: string,

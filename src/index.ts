@@ -10,7 +10,7 @@ import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
 import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./task.js";
-import { createBuildFromIntent, planBuildTasks } from "./build.js";
+import { createBuildFromIntent, planBuildTasks, syncBuildMarkdown } from "./build.js";
 import { startRun } from "./run.js";
 import { cleanWorkspace } from "./clean.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -493,6 +493,28 @@ buildCommand
         exitCode: 1,
       });
     }
+  });
+
+buildCommand
+  .command("sync")
+  .argument("<buildId>", "Build ID to reconcile with its Markdown.")
+  .description("Synchronize generated Build Markdown from durable Build state.")
+  .action((buildId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
+      program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
+      return;
+    }
+    const repository = openRepository(status.databasePath);
+    try {
+      const build = repository.getBuild(buildId.toUpperCase());
+      if (!build) {
+        program.error(`Build ${buildId.toUpperCase()} not found.`, { code: "NERV_BUILD_NOT_FOUND", exitCode: 1 });
+        return;
+      }
+      const path = syncBuildMarkdown(status.workspaceRoot, build, repository.listTasksByBuild(build.id));
+      console.log(`Synchronized ${build.id} Markdown: ${path}`);
+    } finally { repository.close(); }
   });
 
 program
@@ -1121,8 +1143,11 @@ program
 
           if (openTasks === 0 && closedTasks === totalTasks && totalTasks > 0) {
             repository.updateBuild(task.build_id, { status: "closed", closed_at: now });
+            const closedBuild = repository.getBuild(task.build_id)!;
+            syncBuildMarkdown(status.workspaceRoot!, closedBuild, repository.listTasksByBuild(task.build_id));
             buildUpdateMessage = `Build ${task.build_id} also marked closed (all ${totalTasks} task(s) complete).`;
           } else {
+            syncBuildMarkdown(status.workspaceRoot!, build, repository.listTasksByBuild(task.build_id));
             buildUpdateMessage = `Build ${task.build_id} progress: ${closedTasks}/${totalTasks} task(s) closed.`;
           }
         }

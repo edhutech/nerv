@@ -2426,9 +2426,13 @@ function runCloseChecks() {
             if (build.status !== "closed") {
               fail("close marks build closed when all tasks done", `build status: ${build.status}`, "");
             }
-            if (!build.closed_at) {
-              fail("close marks build closed when all tasks done", "build closed_at not set", "");
-            }
+          if (!build.closed_at) {
+            fail("close marks build closed when all tasks done", "build closed_at not set", "");
+          }
+          const markdown = readFileSync(join(buildRepoRoot, ".nerv/agent/builds/BUILD-001.md"), "utf8");
+          if (!markdown.includes("## Status\n\nClosed") || !markdown.includes("## Task Progress\n\n3/3 task(s) closed") || !markdown.includes("## Close summary\n\nClosed at")) {
+            fail("close marks build closed when all tasks done", "Build Markdown was not synchronized", markdown);
+          }
           } finally {
             repository.close();
           }
