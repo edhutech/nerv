@@ -12,6 +12,7 @@ const REQUIRED_TABLES = [
   "metadata",
   "product_sessions",
   "intakes",
+  "intake_proposals",
 ] as const;
 
 const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string[]> = {
@@ -57,6 +58,7 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   metadata: ["key", "value", "updated_at"],
   product_sessions: ["id", "status", "mode", "created_at", "updated_at", "closed_at", "input_manifest"],
   intakes: ["id", "original_intent", "content_hash", "status", "created_at", "updated_at", "markdown_path"],
+  intake_proposals: ["id", "intake_id", "version", "status", "proposal_json", "created_at", "updated_at", "markdown_path"],
 };
 
 const SCHEMA_STATEMENTS = [
@@ -160,6 +162,11 @@ const SCHEMA_STATEMENTS = [
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     markdown_path TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS intake_proposals (
+    id TEXT PRIMARY KEY, intake_id TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL,
+    proposal_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, markdown_path TEXT NOT NULL,
+    UNIQUE(intake_id, version), FOREIGN KEY (intake_id) REFERENCES intakes(id)
   )`,
 ] as const;
 
@@ -300,6 +307,13 @@ function migrateSchema(database: Database.Database): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       markdown_path TEXT NOT NULL
+    )`);
+  }
+  if (!hasTable(database, "intake_proposals")) {
+    database.exec(`CREATE TABLE intake_proposals (
+      id TEXT PRIMARY KEY, intake_id TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL,
+      proposal_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, markdown_path TEXT NOT NULL,
+      UNIQUE(intake_id, version), FOREIGN KEY (intake_id) REFERENCES intakes(id)
     )`);
   }
 

@@ -13,7 +13,7 @@ import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./ta
 import { createBuildFromIntent, planBuildTasks, syncBuildMarkdown } from "./build.js";
 import { startRun } from "./run.js";
 import { cleanWorkspace } from "./clean.js";
-import { createIntake, getIntake, readIntentInput, verifyIntake } from "./intake.js";
+import { createIntake, createPlanningEntrypoint, createProposal, getIntake, getProposal, readIntentInput, verifyIntake } from "./intake.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -72,6 +72,10 @@ for (const [name, description, action] of [
     if (name === "verify" && !verifyIntake(record).valid) process.exitCode = 1;
   });
 }
+
+intakeCommand.command("context").argument("<intakeId>").description("Generate an agent-neutral planning entrypoint.").action((id: string) => { const status = getInitializedWorkspaceStatus(process.cwd()); const intake = status.databasePath ? getIntake(status.databasePath, id) : null; if (!intake || !status.workspaceRoot) { program.error(`Intake ${id.toUpperCase()} not found.`, { code: "NERV_INTAKE_NOT_FOUND", exitCode: 1 }); return; } console.log(`Give any external agent this file: ${createPlanningEntrypoint(status.workspaceRoot, intake)}`); });
+intakeCommand.command("propose").argument("<intakeId>").requiredOption("--input <file>", "Proposal JSON file.").description("Validate and persist a versioned planning proposal without materializing work.").action((id: string, options: { input: string }) => { const status = getInitializedWorkspaceStatus(process.cwd()); if (!status.databasePath || !status.workspaceRoot) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; } try { const proposal = createProposal(status.databasePath, status.workspaceRoot, id, readFileSync(options.input, 'utf8')); console.log(`Recorded ${proposal.id} (version ${proposal.version}).`); console.log(`Markdown: ${proposal.markdown_path}`); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PROPOSAL_INVALID", exitCode: 1 }); } });
+intakeCommand.command("proposal").argument("<proposalId>").description("Show a versioned planning proposal.").action((id: string) => { const status = getInitializedWorkspaceStatus(process.cwd()); const proposal = status.databasePath ? getProposal(status.databasePath, id) : null; if (!proposal) { program.error(`Proposal ${id.toUpperCase()} not found.`, { code: "NERV_PROPOSAL_NOT_FOUND", exitCode: 1 }); return; } console.log(`${proposal.id}: ${proposal.status}\nMarkdown: ${proposal.markdown_path}\n${proposal.proposal_json}`); });
 
 program
   .command("init")
