@@ -130,6 +130,41 @@ nerv close
 | `nerv status` | Show workspace status |
 | `nerv clean` | Clean generated artifacts |
 
+## Intent Intake
+
+Intent Intake is a portable, approval-gated planning flow. It captures the
+original Intent exactly as UTF-8 bytes from one direct argument or one
+`--input` file, computes SHA-256 over that exact captured text, and never
+creates Tasks, Builds, Runs, Checkpoints, or Reviews during capture.
+
+```bash
+nerv intake create --input intent.md
+nerv intake context INTAKE-001
+# Give the printed package to any external agent. Nerv calls no AI or API.
+nerv intake propose INTAKE-001 --input proposal.json
+nerv intake review INTAKE-001-PROPOSAL-001 --action changes-requested
+nerv intake propose INTAKE-001 --input revised-proposal.json
+nerv intake review INTAKE-001-PROPOSAL-002 --action approved
+nerv intake apply INTAKE-001-PROPOSAL-002 --dry-run
+nerv intake apply INTAKE-001-PROPOSAL-002
+```
+
+Intake and Proposal versions have separate lifecycles. An Intake is captured,
+planned, changes-requested, approved, rejected, or materialized. A Proposal is
+proposed, changes-requested, approved, rejected, or materialized. Decisions
+are append-only SQLite records and Markdown shows version and review history.
+Only a new version following `changes-requested` is accepted; the original
+Intent and prior Proposal remain unchanged.
+
+The versioned canonical Proposal format, all four planning forms, structured
+dependencies and relationships are documented in
+[`docs/proposal-contract.md`](docs/proposal-contract.md). Apply uses the same
+plan as dry run. SQLite commits an auditable materialization first; a failed
+Markdown phase remains recoverable by repeating apply, and a completed repeat
+is idempotent. Apply never starts Runs or creates Checkpoints. See
+[`docs/materialization.md`](docs/materialization.md) and
+[`docs/intake-lifecycle.md`](docs/intake-lifecycle.md).
+
 ## Using with Coding Agents
 
 Product Context is independent of agents and providers. Nerv never opens an agent or calls an AI API. `nerv product` writes `.nerv/agent/product/run.md`; give that file to the agent you choose. It may update only `.nerv/product/`, asks only necessary questions, and requires you to review the diff before Git. A later `nerv product` resumes an active session; use `nerv product status`, then `nerv product review` and `nerv product close` when it is complete. Builds and checkpoints remain optional.
