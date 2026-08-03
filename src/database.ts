@@ -13,6 +13,7 @@ const REQUIRED_TABLES = [
   "product_sessions",
   "intakes",
   "intake_proposals",
+  "intake_proposal_reviews",
 ] as const;
 
 const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string[]> = {
@@ -57,8 +58,9 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
   metadata: ["key", "value", "updated_at"],
   product_sessions: ["id", "status", "mode", "created_at", "updated_at", "closed_at", "input_manifest"],
-  intakes: ["id", "original_intent", "content_hash", "status", "created_at", "updated_at", "markdown_path"],
-  intake_proposals: ["id", "intake_id", "version", "status", "proposal_json", "created_at", "updated_at", "markdown_path"],
+  intakes: ["id", "original_intent", "content_hash", "status", "approved_proposal_id", "created_at", "updated_at", "markdown_path"],
+  intake_proposals: ["id", "intake_id", "version", "status", "parent_proposal_id", "content_hash", "proposal_json", "created_at", "updated_at", "markdown_path"],
+  intake_proposal_reviews: ["id", "intake_id", "proposal_id", "decision", "superseding_proposal_id", "created_at"],
 };
 
 const SCHEMA_STATEMENTS = [
@@ -159,18 +161,24 @@ const SCHEMA_STATEMENTS = [
     original_intent TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     status TEXT NOT NULL,
+    approved_proposal_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     markdown_path TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS intake_proposals (
     id TEXT PRIMARY KEY, intake_id TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL,
-    proposal_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, markdown_path TEXT NOT NULL,
+    parent_proposal_id TEXT, content_hash TEXT NOT NULL, proposal_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, markdown_path TEXT NOT NULL,
     UNIQUE(intake_id, version), FOREIGN KEY (intake_id) REFERENCES intakes(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS intake_proposal_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, intake_id TEXT NOT NULL, proposal_id TEXT NOT NULL,
+    decision TEXT NOT NULL, superseding_proposal_id TEXT, created_at TEXT NOT NULL,
+    FOREIGN KEY (intake_id) REFERENCES intakes(id), FOREIGN KEY (proposal_id) REFERENCES intake_proposals(id)
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "4";
+const SCHEMA_VERSION = "5";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -193,6 +201,8 @@ const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonl
     "risks",
     "generated_markdown_path",
   ],
+  intakes: ["approved_proposal_id"],
+  intake_proposals: ["parent_proposal_id", "content_hash"],
 };
 
 export function initializeDatabase(databasePath: string): void {
@@ -312,8 +322,15 @@ function migrateSchema(database: Database.Database): void {
   if (!hasTable(database, "intake_proposals")) {
     database.exec(`CREATE TABLE intake_proposals (
       id TEXT PRIMARY KEY, intake_id TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL,
-      proposal_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, markdown_path TEXT NOT NULL,
+      parent_proposal_id TEXT, content_hash TEXT NOT NULL DEFAULT '', proposal_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, markdown_path TEXT NOT NULL,
       UNIQUE(intake_id, version), FOREIGN KEY (intake_id) REFERENCES intakes(id)
+    )`);
+  }
+  if (!hasTable(database, "intake_proposal_reviews")) {
+    database.exec(`CREATE TABLE intake_proposal_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, intake_id TEXT NOT NULL, proposal_id TEXT NOT NULL,
+      decision TEXT NOT NULL, superseding_proposal_id TEXT, created_at TEXT NOT NULL,
+      FOREIGN KEY (intake_id) REFERENCES intakes(id), FOREIGN KEY (proposal_id) REFERENCES intake_proposals(id)
     )`);
   }
 
