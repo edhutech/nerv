@@ -13,6 +13,7 @@ import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./ta
 import { createBuildFromIntent, planBuildTasks, syncBuildMarkdown } from "./build.js";
 import { startRun } from "./run.js";
 import { cleanWorkspace } from "./clean.js";
+import { createIntake, getIntake, readIntentInput, verifyIntake } from "./intake.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -43,6 +44,34 @@ program
   .version("0.0.0");
 
 const productCommand = program.command("product");
+const intakeCommand = program.command("intake").description("Capture immutable, portable Intent Intake records.");
+
+intakeCommand.command("create")
+  .argument("[intent]", "Original Intent already interpreted by the shell.")
+  .option("--input <file>", "Read the original Intent literally as UTF-8 from a file.")
+  .description("Capture an immutable original Intent without creating work units.")
+  .action((intent: string | undefined, options: { input?: string }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
+    try {
+      const intake = createIntake(status.databasePath, status.workspaceRoot, readIntentInput(intent, options.input));
+      console.log(`Captured ${intake.id}.`); console.log(`Markdown: ${intake.markdown_path}`); console.log(`SHA-256: ${intake.content_hash}`);
+    } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_INTAKE_CREATE_FAILED", exitCode: 1 }); }
+  });
+
+for (const [name, description, action] of [
+  ["show", "Show an Intake by ID.", (record: ReturnType<typeof getIntake>) => record ? console.log(`${record.id}: ${record.status}\nMarkdown: ${record.markdown_path}\nSHA-256: ${record.content_hash}`) : null],
+  ["verify", "Verify an Intake hash and its Markdown artifact.", (record: ReturnType<typeof getIntake>) => record ? console.log(verifyIntake(record).message) : null],
+] as const) {
+  intakeCommand.command(name).argument("<intakeId>").description(description).action((intakeId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
+    const record = getIntake(status.databasePath, intakeId);
+    if (!record) { program.error(`Intake ${intakeId.toUpperCase()} not found.`, { code: "NERV_INTAKE_NOT_FOUND", exitCode: 1 }); return; }
+    action(record);
+    if (name === "verify" && !verifyIntake(record).valid) process.exitCode = 1;
+  });
+}
 
 program
   .command("init")
