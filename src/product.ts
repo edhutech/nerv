@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync, statSync, renameSync, unlinkSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -186,7 +186,24 @@ export type ProductContextProposal = {
 
 export type ProposalObservation = { id: string; statement: string; sources: string[] };
 export type ProductContextChange = { document: string; action: "create" | "update"; summary: string; rationale: string; proposedContent: string };
+export type ProductContextProposalReview = { id: number; session_id: string; proposal_id: string; decision: "changes_requested" | "rejected" | "approved"; superseding_proposal_id: string | null; created_at: string };
+type ProductContextMaterialization = { id: string; session_id: string; proposal_id: string; status: "pending_markdown" | "complete"; plan_json: string; decision_replacement_confirmed_at: string | null; created_at: string; updated_at: string };
+type ProductContextMaterializationPlan = {
+  proposal: string;
+  session: string;
+  materializationId: string;
+  documents: Array<{ document: string; action: "create" | "update"; previousContent: string | null; previousHash: string | null; proposedContent: string; proposedHash: string }>;
+  replacedDecisions: string[];
+  runs: "none";
+};
 const PRODUCT_CONTEXT_FILE_SET = new Set<string>(PRODUCT_FILES.map((file) => file.name));
+
+function hash(content: string): string { return createHash("sha256").update(content, "utf8").digest("hex"); }
+
+function atomicWrite(path: string, content: string): void {
+  const temporaryPath = `${path}.tmp`;
+  try { writeFileSync(temporaryPath, content, "utf8"); renameSync(temporaryPath, path); } finally { if (existsSync(temporaryPath)) unlinkSync(temporaryPath); }
+}
 
 export function startProductSession(databasePath: string, hasExistingContext: boolean): ProductSessionStartResult {
   const repository = openRepository(databasePath);
@@ -342,6 +359,10 @@ export function createProductContextProposal(databasePath: string, workspaceRoot
     if (session.status !== "active") throw new Error(`Product Session ${session.id} cannot receive a proposal from ${session.status}.`);
     const proposal = parseProductContextProposal(source, session.mode);
     const prior = repository.listProductContextProposals(session.id);
+    const previous = prior.at(-1);
+    if (previous && previous.status !== "changes_requested") {
+      throw new Error(`Product Session ${session.id} needs a changes-requested decision before a new proposal version.`);
+    }
     const version = prior.length + 1;
     const record = repository.createProductContextProposal({
       id: `${session.id}-PROPOSAL-${String(version).padStart(3, "0")}`,
@@ -365,6 +386,126 @@ export function getProductContextProposal(databasePath: string, proposalId: stri
 
 function renderProductContextProposal(record: ProductContextProposalRecord): string {
   return `# ${record.id}: Product Context Proposal\n\n## Status\n\n${record.status}\n\n## Product Session\n\n${record.session_id}\n\n## Version\n\n${record.version}\n\n## Temporary Input Trace\n\n\`\`\`json\n${record.input_manifest}\n\`\`\`\n\n## Proposal\n\n\`\`\`json\n${record.proposal_json}\n\`\`\`\n\n## Contract\n\nThis proposal is not approved and does not modify canonical Product Context.\n`;
+}
+
+function renderProductContextProposalWithReviews(record: ProductContextProposalRecord, reviews: ProductContextProposalReview[]): string {
+  const history = reviews.length === 0 ? "- No decisions recorded." : reviews.map((review) => `- ${review.created_at}: ${review.decision}${review.superseding_proposal_id ? `; superseded by ${review.superseding_proposal_id}` : ""}.`).join("\n");
+  return renderProductContextProposal(record).replace("## Proposal", `## Review History\n\n${history}\n\n## Proposal`).replace("This proposal is not approved and does not modify canonical Product Context.", record.status === "approved" ? "This proposal is approved but is not applied until `nerv product apply` runs." : record.status === "applied" ? "This proposal has been applied through its durable materialization ledger." : "This proposal is not approved and does not modify canonical Product Context.");
+}
+
+function syncProductProposalMarkdown(database: Database.Database, sessionId: string): void {
+  const proposals = database.prepare("SELECT * FROM product_context_proposals WHERE session_id = ? ORDER BY version").all(sessionId) as ProductContextProposalRecord[];
+  const reviews = database.prepare("SELECT * FROM product_context_proposal_reviews WHERE session_id = ? ORDER BY id").all(sessionId) as ProductContextProposalReview[];
+  for (const proposal of proposals) atomicWrite(proposal.markdown_path, renderProductContextProposalWithReviews(proposal, reviews.filter((review) => review.proposal_id === proposal.id)));
+}
+
+export function reviewProductContextProposal(databasePath: string, proposalId: string, action: "changes-requested" | "rejected" | "approved"): ProductContextProposalRecord {
+  const database = new Database(databasePath); database.pragma("foreign_keys = ON");
+  try {
+    const proposal = database.prepare("SELECT * FROM product_context_proposals WHERE id = ?").get(proposalId.toUpperCase()) as ProductContextProposalRecord | undefined;
+    if (!proposal) throw new Error(`Product Context Proposal ${proposalId.toUpperCase()} not found.`);
+    if (proposal.status !== "proposed") throw new Error(`Product Context Proposal ${proposal.id} cannot transition from ${proposal.status}.`);
+    const decision = action === "changes-requested" ? "changes_requested" : action;
+    const now = new Date().toISOString();
+    database.transaction(() => {
+      database.prepare("UPDATE product_context_proposals SET status = ?, updated_at = ? WHERE id = ?").run(decision, now, proposal.id);
+      database.prepare("INSERT INTO product_context_proposal_reviews (session_id, proposal_id, decision, superseding_proposal_id, created_at) VALUES (?, ?, ?, NULL, ?)").run(proposal.session_id, proposal.id, decision, now);
+    })();
+    syncProductProposalMarkdown(database, proposal.session_id);
+    return { ...proposal, status: decision, updated_at: now };
+  } finally { database.close(); }
+}
+
+export function productContextProposalStatus(databasePath: string, sessionId: string): { proposals: ProductContextProposalRecord[]; reviews: ProductContextProposalReview[]; materializations: ProductContextMaterialization[] } {
+  const database = new Database(databasePath, { readonly: true });
+  try {
+    const normalized = sessionId.toUpperCase();
+    const session = database.prepare("SELECT id FROM product_sessions WHERE id = ?").get(normalized);
+    if (!session) throw new Error(`Product Session ${normalized} not found.`);
+    return {
+      proposals: database.prepare("SELECT * FROM product_context_proposals WHERE session_id = ? ORDER BY version").all(normalized) as ProductContextProposalRecord[],
+      reviews: database.prepare("SELECT * FROM product_context_proposal_reviews WHERE session_id = ? ORDER BY id").all(normalized) as ProductContextProposalReview[],
+      materializations: database.prepare("SELECT * FROM product_context_materializations WHERE session_id = ? ORDER BY created_at").all(normalized) as ProductContextMaterialization[],
+    };
+  } finally { database.close(); }
+}
+
+function confirmedDecisionSections(content: string): Map<string, string> {
+  const sections = new Map<string, string>();
+  const matches = [...content.matchAll(/^###\s+(.+)\n([\s\S]*?)(?=^###\s+|(?![\s\S]))/gm)];
+  for (const match of matches) {
+    const summary = match[1].trim();
+    if (summary !== "Format" && /\*\*Status\*\*:\s*Accepted\b/i.test(match[2])) sections.set(summary, match[0]);
+  }
+  return sections;
+}
+
+function createProductContextMaterializationPlan(workspaceRoot: string, record: ProductContextProposalRecord, proposal: ProductContextProposal): ProductContextMaterializationPlan {
+  const productDir = join(workspaceRoot, "product");
+  const documents = proposal.changes.map((change) => {
+    const path = join(productDir, change.document);
+    const exists = existsSync(path);
+    if ((change.action === "create" && exists) || (change.action === "update" && !exists)) throw new Error(`Product Context change for ${change.document} requires ${change.action === "create" ? "a missing" : "an existing"} canonical document.`);
+    const previousContent = exists ? readFileSync(path, "utf8") : null;
+    return { document: change.document, action: change.action, previousContent, previousHash: previousContent === null ? null : hash(previousContent), proposedContent: change.proposedContent, proposedHash: hash(change.proposedContent) };
+  });
+  const decisionChange = documents.find((change) => change.document === "decisions.md");
+  const replacedDecisions = decisionChange?.previousContent ? [...confirmedDecisionSections(decisionChange.previousContent).keys()].filter((summary) => !confirmedDecisionSections(decisionChange.proposedContent).has(summary)) : [];
+  if (replacedDecisions.length > 0) {
+    const evolution = documents.find((change) => change.document === "evolution.md");
+    const originalDecisions = confirmedDecisionSections(decisionChange!.previousContent!);
+    if (!evolution || replacedDecisions.some((summary) => !evolution.proposedContent.includes(originalDecisions.get(summary)!))) throw new Error("Replacing confirmed decisions requires an evolution.md change that preserves every replaced decision.");
+  }
+  return { proposal: record.id, session: record.session_id, materializationId: `${record.id}-MATERIALIZATION`, documents, replacedDecisions, runs: "none" };
+}
+
+function writeProductContextMaterialization(workspaceRoot: string, plan: ProductContextMaterializationPlan): void {
+  for (const document of plan.documents) {
+    const path = join(workspaceRoot, "product", document.document);
+    const current = existsSync(path) ? readFileSync(path, "utf8") : null;
+    if (current === document.proposedContent) continue;
+    if ((current === null ? null : hash(current)) !== document.previousHash) throw new Error(`Canonical Product Context changed while ${plan.proposal} was pending: ${document.document}. Resolve the conflict before retrying.`);
+    atomicWrite(path, document.proposedContent);
+  }
+}
+
+export function applyProductContextProposal(databasePath: string, workspaceRoot: string, proposalId: string, confirmDecisionReplacement: boolean): string[] {
+  const database = new Database(databasePath); database.pragma("foreign_keys = ON");
+  try {
+    const record = database.prepare("SELECT * FROM product_context_proposals WHERE id = ?").get(proposalId.toUpperCase()) as ProductContextProposalRecord | undefined;
+    if (!record) throw new Error(`Product Context Proposal ${proposalId.toUpperCase()} not found.`);
+    let materialization = database.prepare("SELECT * FROM product_context_materializations WHERE proposal_id = ?").get(record.id) as ProductContextMaterialization | undefined;
+    if (!materialization && record.status !== "approved") throw new Error(`Product Context Proposal ${record.id} must be explicitly approved before apply.`);
+    let plan: ProductContextMaterializationPlan;
+    if (!materialization) {
+      const session = database.prepare("SELECT * FROM product_sessions WHERE id = ?").get(record.session_id) as ProductSessionRecord | undefined;
+      if (!session) throw new Error(`Product Session ${record.session_id} not found.`);
+      plan = createProductContextMaterializationPlan(workspaceRoot, record, parseProductContextProposal(record.proposal_json, session.mode));
+      if (plan.replacedDecisions.length > 0 && !confirmDecisionReplacement) throw new Error(`Product Context Proposal ${record.id} replaces confirmed decisions (${plan.replacedDecisions.join(", ")}). Re-run with --confirm-decision-replacement after human confirmation.`);
+      const now = new Date().toISOString();
+      database.transaction(() => {
+        database.prepare("INSERT INTO product_context_materializations (id, session_id, proposal_id, status, plan_json, decision_replacement_confirmed_at, created_at, updated_at) VALUES (?, ?, ?, 'pending_markdown', ?, ?, ?, ?)").run(plan.materializationId, record.session_id, record.id, JSON.stringify(plan), plan.replacedDecisions.length > 0 ? now : null, now, now);
+        database.prepare("UPDATE product_context_proposals SET status = 'applying', updated_at = ? WHERE id = ?").run(now, record.id);
+        const decisions = plan.documents.find((document) => document.document === "decisions.md");
+        if (decisions) {
+          database.prepare("DELETE FROM decisions WHERE scope_type = 'product' AND scope_id = 'decisions.md'").run();
+          const insert = database.prepare("INSERT INTO decisions (scope_type, scope_id, summary, created_at) VALUES ('product', 'decisions.md', ?, ?)");
+          for (const decision of parseDecisions(decisions.proposedContent)) insert.run(decision.summary, now);
+        }
+      })();
+      materialization = { id: plan.materializationId, session_id: record.session_id, proposal_id: record.id, status: "pending_markdown", plan_json: JSON.stringify(plan), decision_replacement_confirmed_at: plan.replacedDecisions.length > 0 ? now : null, created_at: now, updated_at: now };
+    } else plan = JSON.parse(materialization.plan_json) as ProductContextMaterializationPlan;
+    if (materialization.status !== "complete") {
+      writeProductContextMaterialization(workspaceRoot, plan);
+      const now = new Date().toISOString();
+      database.transaction(() => {
+        database.prepare("UPDATE product_context_materializations SET status = 'complete', updated_at = ? WHERE id = ?").run(now, materialization!.id);
+        database.prepare("UPDATE product_context_proposals SET status = 'applied', updated_at = ? WHERE id = ?").run(now, record.id);
+      })();
+      syncProductProposalMarkdown(database, record.session_id);
+    }
+    return [JSON.stringify(plan, null, 2)];
+  } finally { database.close(); }
 }
 
 export function scaffoldProductContext(workspaceRoot: string): ProductScaffoldResult {
@@ -415,24 +556,18 @@ export function parseDecisionsFromFile(decisionsFilePath: string): ParsedDecisio
   }
 
   try {
-    const content = readFileSync(decisionsFilePath, "utf8");
-    const decisions: ParsedDecision[] = [];
-
-    const lines = content.split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("### ") && trimmed.length > 4) {
-        const summary = trimmed.slice(4).trim();
-        if (summary.length > 0 && summary !== "Format") {
-          decisions.push({ summary });
-        }
-      }
-    }
-
-    return decisions;
+    return parseDecisions(readFileSync(decisionsFilePath, "utf8"));
   } catch {
     return [];
   }
+}
+
+function parseDecisions(content: string): ParsedDecision[] {
+  return content.split("\n").flatMap((line) => {
+    const trimmed = line.trim();
+    const summary = trimmed.startsWith("### ") ? trimmed.slice(4).trim() : "";
+    return summary && summary !== "Format" ? [{ summary }] : [];
+  });
 }
 
 export function persistDecisions(databasePath: string, decisionsFilePath: string): number {

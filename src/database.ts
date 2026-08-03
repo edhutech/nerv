@@ -12,6 +12,8 @@ const REQUIRED_TABLES = [
   "metadata",
   "product_sessions",
   "product_context_proposals",
+  "product_context_proposal_reviews",
+  "product_context_materializations",
   "intakes",
   "intake_proposals",
   "intake_proposal_reviews",
@@ -62,6 +64,8 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   metadata: ["key", "value", "updated_at"],
   product_sessions: ["id", "status", "mode", "created_at", "updated_at", "closed_at", "input_manifest"],
   product_context_proposals: ["id", "session_id", "version", "status", "proposal_json", "input_manifest", "created_at", "updated_at", "markdown_path"],
+  product_context_proposal_reviews: ["id", "session_id", "proposal_id", "decision", "superseding_proposal_id", "created_at"],
+  product_context_materializations: ["id", "session_id", "proposal_id", "status", "plan_json", "decision_replacement_confirmed_at", "created_at", "updated_at"],
   intakes: ["id", "original_intent", "content_hash", "status", "approved_proposal_id", "created_at", "updated_at", "markdown_path"],
   intake_proposals: ["id", "intake_id", "version", "status", "parent_proposal_id", "content_hash", "proposal_json", "created_at", "updated_at", "markdown_path"],
   intake_proposal_reviews: ["id", "intake_id", "proposal_id", "decision", "superseding_proposal_id", "created_at"],
@@ -175,6 +179,28 @@ const SCHEMA_STATEMENTS = [
     UNIQUE(session_id, version),
     FOREIGN KEY (session_id) REFERENCES product_sessions(id)
   )`,
+  `CREATE TABLE IF NOT EXISTS product_context_proposal_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    proposal_id TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    superseding_proposal_id TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES product_sessions(id),
+    FOREIGN KEY (proposal_id) REFERENCES product_context_proposals(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS product_context_materializations (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    proposal_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL,
+    plan_json TEXT NOT NULL,
+    decision_replacement_confirmed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES product_sessions(id),
+    FOREIGN KEY (proposal_id) REFERENCES product_context_proposals(id)
+  )`,
   `CREATE TABLE IF NOT EXISTS intakes (
     id TEXT PRIMARY KEY,
     original_intent TEXT NOT NULL,
@@ -207,7 +233,7 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "7";
+const SCHEMA_VERSION = "8";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -342,6 +368,20 @@ function migrateSchema(database: Database.Database): void {
       proposal_json TEXT NOT NULL, input_manifest TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
       markdown_path TEXT NOT NULL, UNIQUE(session_id, version),
       FOREIGN KEY (session_id) REFERENCES product_sessions(id)
+    )`);
+  }
+  if (!hasTable(database, "product_context_proposal_reviews")) {
+    database.exec(`CREATE TABLE product_context_proposal_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, proposal_id TEXT NOT NULL,
+      decision TEXT NOT NULL, superseding_proposal_id TEXT, created_at TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES product_sessions(id), FOREIGN KEY (proposal_id) REFERENCES product_context_proposals(id)
+    )`);
+  }
+  if (!hasTable(database, "product_context_materializations")) {
+    database.exec(`CREATE TABLE product_context_materializations (
+      id TEXT PRIMARY KEY, session_id TEXT NOT NULL, proposal_id TEXT NOT NULL UNIQUE, status TEXT NOT NULL,
+      plan_json TEXT NOT NULL, decision_replacement_confirmed_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES product_sessions(id), FOREIGN KEY (proposal_id) REFERENCES product_context_proposals(id)
     )`);
   }
 

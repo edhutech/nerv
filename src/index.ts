@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal, reviewProductContextProposal, productContextProposalStatus, applyProductContextProposal } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -138,6 +138,43 @@ productCommand
     const proposal = status.databasePath ? getProductContextProposal(status.databasePath, proposalId) : null;
     if (!proposal) { program.error(`Product Context Proposal ${proposalId.toUpperCase()} not found.`, { code: "NERV_PRODUCT_PROPOSAL_NOT_FOUND", exitCode: 1 }); return; }
     console.log(`${proposal.id}: ${proposal.status}\nSession: ${proposal.session_id}\nMarkdown: ${proposal.markdown_path}\n${proposal.proposal_json}`);
+  });
+
+productCommand
+  .command("review-proposal")
+  .argument("<proposalId>", "Product Context Proposal ID.")
+  .requiredOption("--action <action>", "changes-requested, rejected, or approved.")
+  .description("Record an explicit human decision for a Product Context Proposal.")
+  .action((proposalId: string, options: { action: "changes-requested" | "rejected" | "approved" }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !["changes-requested", "rejected", "approved"].includes(options.action)) { program.error("A valid review action is required.", { code: "NERV_PRODUCT_PROPOSAL_REVIEW_INVALID", exitCode: 1 }); return; }
+    try { console.log(`Product Context Proposal ${reviewProductContextProposal(status.databasePath, proposalId, options.action).id} ${options.action}.`); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_PROPOSAL_REVIEW_FAILED", exitCode: 1 }); }
+  });
+
+productCommand
+  .command("proposal-status")
+  .argument("<sessionId>", "Product Session ID.")
+  .description("Show proposal decisions and recoverable Product Context apply state.")
+  .action((sessionId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
+    try {
+      const result = productContextProposalStatus(status.databasePath, sessionId);
+      for (const proposal of result.proposals) console.log(`${proposal.id}: ${proposal.status}`);
+      for (const review of result.reviews) console.log(`Review ${review.id}: ${review.proposal_id} ${review.decision}`);
+      for (const materialization of result.materializations) console.log(`Apply ${materialization.id}: ${materialization.status}`);
+    } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_PROPOSAL_STATUS_FAILED", exitCode: 1 }); }
+  });
+
+productCommand
+  .command("apply")
+  .argument("<proposalId>", "Approved Product Context Proposal ID.")
+  .option("--confirm-decision-replacement", "Confirm human approval for replacing accepted decisions.")
+  .description("Apply one explicitly approved Product Context Proposal; never starts Runs.")
+  .action((proposalId: string, options: { confirmDecisionReplacement?: boolean }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) { program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 }); return; }
+    try { for (const line of applyProductContextProposal(status.databasePath, status.workspaceRoot, proposalId, Boolean(options.confirmDecisionReplacement))) console.log(line); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { code: "NERV_PRODUCT_PROPOSAL_APPLY_FAILED", exitCode: 1 }); }
   });
 
 productCommand
