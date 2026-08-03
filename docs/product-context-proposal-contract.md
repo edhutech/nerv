@@ -54,6 +54,12 @@ Retry the same command after an interruption; it reuses the saved plan and
 does not duplicate state. It refuses to overwrite a document that changed
 outside that plan while pending. Apply never starts Runs or creates Checkpoints.
 
+`nerv product status` reconstructs the current session, proposal decisions,
+materialization state, and SQLite-to-Markdown checks after a process restart.
+Only a session with no pending decisions, an applied proposal, matching
+Markdown, and a matching decision index can pass `nerv product review` and
+then `nerv product close`.
+
 Replacing an accepted decision is a separate safety barrier. The proposal must
 also preserve the complete replaced decision in its `evolution.md` change, and
 the human must run apply with `--confirm-decision-replacement`. The confirmation

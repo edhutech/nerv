@@ -85,22 +85,31 @@ nerv product
 # Optional temporary source material stays in your repository:
 nerv product --input product-brief.md notes/
 
-# 3. Create an Agentic Task from intent
+# 3. Persist an external agent's proposal, then review it explicitly
+nerv product propose PRODUCT-001 --proposal proposal.json
+nerv product review-proposal PRODUCT-001-PROPOSAL-001 --action approved
+nerv product apply PRODUCT-001-PROPOSAL-001
+nerv product status
+
+# Product Context is SQLite-backed and recoverable after restarting Nerv.
+# Apply never invokes AI or creates Runs or Checkpoints.
+
+# 4. Create an Agentic Task from intent
 nerv new task "Add Google login without breaking email auth"
 
-# 4. Start a Run
+# 5. Start a Run
 nerv start login
 
-# 5. Give your coding agent this file:
+# 6. Give your coding agent this file:
 #    .nerv/agent/runs/RUN-001/run.md
 
-# 6. Save progress
+# 7. Save progress
 nerv checkpoint --summary "Implemented OAuth flow" --files "src/auth/google.ts"
 
-# 7. Review work
+# 8. Review work
 nerv review --outcome passed --summary "All criteria met" --validation passed
 
-# 8. Commit and close
+# 9. Commit and close
 git add .
 git commit -m "TASK-001: Add Google login"
 nerv close

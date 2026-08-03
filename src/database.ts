@@ -256,6 +256,11 @@ const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonl
     "risks",
     "generated_markdown_path",
   ],
+  // Product Context lifecycle columns were introduced after the initial session tables.
+  // They are additive so existing local workspaces remain usable.
+  product_sessions: ["input_manifest"],
+  product_context_proposals: ["input_manifest"],
+  product_context_materializations: ["decision_replacement_confirmed_at"],
   intakes: ["approved_proposal_id"],
   intake_proposals: ["parent_proposal_id", "content_hash"],
 };

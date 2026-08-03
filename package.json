@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke": "node scripts/smoke-cli.mjs && node scripts/product-context-proposal.mjs && node scripts/product-context-apply.mjs && node scripts/product-context-session.mjs",
+    "smoke": "node scripts/smoke-cli.mjs && node scripts/product-context-proposal.mjs && node scripts/product-context-apply.mjs && node scripts/product-context-session.mjs && node scripts/product-context-e2e.mjs",
     "validate": "pnpm build && pnpm typecheck && pnpm smoke"
   },
   "devDependencies": {

@@ -443,7 +443,10 @@ function productSessionState(database: Database.Database, workspaceRoot: string,
   checks.push({ name: "Canonical documents", status: missing.length === 0 ? "passed" : "failed", detail: missing.length === 0 ? "9/9 present" : `missing ${missing.join(", ")}` });
   checks.push({ name: "Placeholder content", status: placeholders.length === 0 ? "passed" : "failed", detail: placeholders.length === 0 ? "none" : placeholders.join(", ") });
 
-  const pending = proposals.filter((proposal) => ["proposed", "changes_requested", "approved", "applying"].includes(proposal.status));
+  const pending = proposals.filter((proposal, index) =>
+    ["proposed", "approved", "applying"].includes(proposal.status)
+    || (proposal.status === "changes_requested" && index === proposals.length - 1),
+  );
   checks.push({ name: "Proposal decisions", status: pending.length === 0 ? "passed" : "failed", detail: pending.length === 0 ? "no pending decisions" : `pending ${pending.map((proposal) => proposal.id).join(", ")}` });
   const applied = proposals.filter((proposal) => proposal.status === "applied");
   checks.push({ name: "Applied proposal", status: applied.length > 0 ? "passed" : "failed", detail: applied.length > 0 ? applied.map((proposal) => proposal.id).join(", ") : "no applied proposal; historical sessions must be resumed with an approved proposal" });
