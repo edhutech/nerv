@@ -2,27 +2,25 @@
 
 ## Commands
 
-- Use `pnpm`; the repo declares `packageManager: pnpm@10.33.4`.
-- Full validation: `pnpm validate`.
-- `pnpm validate` runs `pnpm build && pnpm typecheck && pnpm smoke` in the required order.
-- `pnpm smoke` runs `scripts/smoke-cli.mjs` against built `dist/index.js`; run `pnpm build` first if you are not using `pnpm validate`.
-- There is no `pnpm test` or `pnpm lint` script yet; do not report them as missing work unless the task asks for them.
+- Use `pnpm` (the pinned package manager is `pnpm@10.33.4`) with Node.js >= 20.
+- Run `pnpm validate` for full verification; its required order is build, typecheck, then smoke.
+- `pnpm smoke` exercises built `dist/index.js` through the CLI and Product Context scripts, so run `pnpm build` first when invoking smoke alone.
+- There are intentionally no `test` or `lint` scripts.
 
 ## Architecture
 
 - This is a Node.js TypeScript ESM CLI; the runtime entrypoint is `src/index.ts`, compiled to `dist/index.js` for the `nerv` bin.
 - TypeScript uses `module: NodeNext`; local TS imports should use `.js` specifiers, matching existing files.
-- SQLite is the source of truth for work state. Schema bootstrap and migration checks live in `src/database.ts`; repository access lives in `src/repository.ts`.
-- `.nerv/` is generated local workspace state and is gitignored. Commands should create or read it through workspace/repository helpers, not assume it exists.
-- Generated Markdown is the human/agent interface; SQLite remains the durable state.
+- SQLite is the durable source of truth; Markdown is a generated human/agent interface. Keep schema bootstrap and additive migration compatibility in `src/database.ts`, and state access in `src/repository.ts`.
+- `.nerv/` is gitignored, generated workspace state. Create and access it through `workspace.ts` and repository helpers, never by assuming it exists or editing `dist/`.
 
-## Repo Workflow
+## Manual Planning Workspace
 
-- `agent-workspace/` is a manual planning workspace for building the MVP, not the product runtime. Keep task/run/build notes there separate from CLI code in `src/`.
-- When implementing a planned task, update the matching `agent-workspace/tasks/TASK-*.md` and `agent-workspace/runs/RUN-*.md` evidence if the task workflow requires it.
-- `dist/` is ignored build output. Do not edit it manually.
+- `agent-workspace/` is the manual workspace for building Nerv itself, separate from the runtime implementation in `src/`.
+- For planned work, the selected `agent-workspace/tasks/TASK-*.md` is the active record for checkpoints, review, and close evidence. Do not create or update manual files in `agent-workspace/runs/`; they are historical.
+- Before closing a manual task, follow `agent-workspace/method/commit-system.md`; update its Build and product evolution when applicable.
 
 ## Smoke Test Gotchas
 
-- Smoke tests create temporary Git repos and initialized `.nerv/` workspaces; avoid hard-coding paths outside the temp repo.
-- If generated `run.md` links change, add smoke assertions for the exact links. Relative links are easy to break from `.nerv/agent/runs/RUN-###/run.md`.
+- Smoke tests create temporary Git repos and initialized `.nerv/` workspaces; never hard-code paths outside the temporary repo.
+- If generated `run.md` links change, assert their exact relative paths in smoke coverage; links from `.nerv/agent/runs/RUN-###/run.md` are especially easy to break.
