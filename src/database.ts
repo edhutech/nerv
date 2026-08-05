@@ -6,6 +6,7 @@ const REQUIRED_TABLES = [
   "runs",
   "checkpoints",
   "reviews",
+  "build_reviews",
   "close_records",
   "decisions",
   "status_history",
@@ -58,6 +59,7 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   runs: ["id", "task_id", "status", "created_at", "updated_at", "closed_at"],
   checkpoints: ["id", "run_id", "summary", "created_at"],
   reviews: ["id", "run_id", "outcome", "summary", "created_at"],
+  build_reviews: ["id", "build_id", "outcome", "summary", "created_at"],
   close_records: ["run_id", "commit_hash", "closed_at"],
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
@@ -136,6 +138,14 @@ const SCHEMA_STATEMENTS = [
     summary TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS build_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    build_id TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (build_id) REFERENCES builds(id)
   )`,
   `CREATE TABLE IF NOT EXISTS close_records (
     run_id TEXT PRIMARY KEY,
@@ -233,7 +243,7 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "8";
+const SCHEMA_VERSION = "9";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -347,6 +357,17 @@ function hasRequiredColumns(database: Database.Database, tableName: (typeof REQU
 }
 
 function migrateSchema(database: Database.Database): void {
+  if (!hasTable(database, "build_reviews")) {
+    database.exec(`CREATE TABLE build_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      build_id TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (build_id) REFERENCES builds(id)
+    )`);
+  }
+
   if (!hasTable(database, "close_records")) {
     database.exec(`CREATE TABLE IF NOT EXISTS close_records (
       run_id TEXT PRIMARY KEY,

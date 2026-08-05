@@ -171,7 +171,7 @@ The close command will:
 - Verify a passed review exists
 - Capture the current Git commit hash automatically
 - Mark the Run and Task as closed
-- Update Build progress if applicable
+- Update Build progress if applicable; after the final Task, review and close the Build separately
 - Append to product evolution
 
 ## Git awareness

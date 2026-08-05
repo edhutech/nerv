@@ -1,7 +1,7 @@
 import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { openRepository, type BuildRecord, type TaskRecord } from "./repository.js";
+import { openRepository, type BuildRecord, type BuildReviewRecord, type TaskRecord } from "./repository.js";
 
 export type CreateBuildResult = {
   build: BuildRecord;
@@ -49,7 +49,7 @@ export type PlanBuildResult = {
   skipped: boolean;
 };
 
-export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[]): string {
+export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[], review?: BuildReviewRecord): string {
   const markdownPath = build.generated_markdown_path || join(workspaceRoot, "agent", "builds", `${build.id}.md`);
   if (!existsSync(markdownPath)) {
     throw new Error(`Build Markdown for ${build.id} was not found at ${markdownPath}.`);
@@ -59,6 +59,7 @@ export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tas
   let content = readFileSync(markdownPath, "utf8");
   content = replaceBuildSection(content, "Status", capitalizeFirst(build.status));
   content = replaceBuildSection(content, "Task Progress", progress, true);
+  if (review) content = replaceBuildSection(content, "Review", `${capitalizeFirst(review.outcome)} on ${review.created_at}. ${review.summary}`);
   content = replaceBuildSection(content, "Close summary", closeSummary);
   writeFileSync(markdownPath, content, "utf8");
   return markdownPath;
@@ -205,7 +206,7 @@ function capitalizeFirst(text: string): string {
   if (text.length === 0) {
     return text;
   }
-  return text[0].toUpperCase() + text.slice(1);
+  return text[0].toUpperCase() + text.slice(1).replaceAll("_", " ");
 }
 
 function generateBuildMarkdown(

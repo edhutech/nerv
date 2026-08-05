@@ -726,3 +726,11 @@ Completed${buildInfo}. Task closed on ${date}.
 
   return evolutionPath;
 }
+
+export function appendBuildProductEvolution(workspaceRoot: string, entry: { buildId: string; buildTitle: string; closedAt: string }): string | null {
+  const evolutionPath = join(workspaceRoot, "product", "evolution.md");
+  if (!existsSync(evolutionPath)) return null;
+  const date = entry.closedAt.split("T")[0];
+  appendFileSync(evolutionPath, `\n\n### ${date}: Closed ${entry.buildId}\n\n**Build**: ${entry.buildTitle}\n\nCompleted after Build-level review on ${date}.\n`, "utf8");
+  return evolutionPath;
+}

@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 
 import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } from "./workspace.js";
-import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal, reviewProductContextProposal, productContextProposalStatus, applyProductContextProposal, getCurrentProductSessionState, reviewCurrentProductSession, closeCurrentProductSession } from "./product.js";
+import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, appendBuildProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal, reviewProductContextProposal, productContextProposalStatus, applyProductContextProposal, getCurrentProductSessionState, reviewCurrentProductSession, closeCurrentProductSession } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { openRepository } from "./repository.js";
@@ -608,6 +608,105 @@ buildCommand
   });
 
 buildCommand
+  .command("review")
+  .argument("<buildId>", "Build ID to review.")
+  .requiredOption("--outcome <outcome>", "Review outcome: passed or failed.")
+  .requiredOption("--summary <summary>", "Review summary.")
+  .option("--validation <validation>", "Validation status: passed, failed, or not_run.")
+  .option("--evidence <evidence>", "Evidence summary.")
+  .description("Review a completed Build as a whole before closing it.")
+  .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string }) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
+      program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
+      return;
+    }
+    const outcome = options.outcome.trim().toLowerCase();
+    const summary = options.summary.trim();
+    const validation = options.validation?.trim().toLowerCase() || "not_run";
+    if (!["passed", "failed"].includes(outcome)) {
+      program.error("Build review outcome must be 'passed' or 'failed'.", { code: "NERV_BUILD_REVIEW_OUTCOME_INVALID", exitCode: 1 });
+      return;
+    }
+    if (!summary) {
+      program.error("Build review summary is required.", { code: "NERV_BUILD_REVIEW_SUMMARY_REQUIRED", exitCode: 1 });
+      return;
+    }
+    if (!["passed", "failed", "not_run"].includes(validation)) {
+      program.error("Validation status must be 'passed', 'failed', or 'not_run'.", { code: "NERV_BUILD_REVIEW_VALIDATION_INVALID", exitCode: 1 });
+      return;
+    }
+    const repository = openRepository(status.databasePath);
+    try {
+      const build = repository.getBuild(buildId.toUpperCase());
+      if (!build) {
+        program.error(`Build ${buildId.toUpperCase()} not found.`, { code: "NERV_BUILD_NOT_FOUND", exitCode: 1 });
+        return;
+      }
+      if (build.status === "closed") {
+        program.error(`Build ${build.id} is already closed.`, { code: "NERV_BUILD_ALREADY_CLOSED", exitCode: 1 });
+        return;
+      }
+      const totalTasks = repository.getBuildTaskCount(build.id);
+      const openTasks = repository.getBuildOpenTaskCount(build.id);
+      if (totalTasks === 0 || openTasks > 0) {
+        program.error(`Build ${build.id} cannot be reviewed until all of its Tasks are closed.`, { code: "NERV_BUILD_TASKS_OPEN", exitCode: 1 });
+        return;
+      }
+      const review = repository.createBuildReview({ build_id: build.id, outcome, summary });
+      if (outcome === "passed") repository.updateBuild(build.id, { status: "reviewed" });
+      const updatedBuild = repository.getBuild(build.id)!;
+      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, { outcome, summary, validation, evidence: options.evidence, git: captureGitContext(status.repoRoot ?? process.cwd()) });
+      syncBuildMarkdown(status.workspaceRoot, updatedBuild, repository.listTasksByBuild(build.id), review);
+      console.log(`Saved Build review ${review.id} for ${build.id}.`);
+      console.log(`  Outcome: ${outcome}`);
+      console.log(`  Validation: ${validation}`);
+      console.log(`  Review file: ${reviewPath}`);
+    } finally { repository.close(); }
+  });
+
+buildCommand
+  .command("close")
+  .argument("<buildId>", "Build ID to close.")
+  .description("Close a Build after all Tasks and its Build review have passed.")
+  .action((buildId: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
+      program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
+      return;
+    }
+    const repository = openRepository(status.databasePath);
+    try {
+      const build = repository.getBuild(buildId.toUpperCase());
+      if (!build) {
+        program.error(`Build ${buildId.toUpperCase()} not found.`, { code: "NERV_BUILD_NOT_FOUND", exitCode: 1 });
+        return;
+      }
+      if (build.status === "closed") {
+        program.error(`Build ${build.id} is already closed.`, { code: "NERV_BUILD_ALREADY_CLOSED", exitCode: 1 });
+        return;
+      }
+      const totalTasks = repository.getBuildTaskCount(build.id);
+      if (totalTasks === 0 || repository.getBuildOpenTaskCount(build.id) > 0) {
+        program.error(`Build ${build.id} cannot be closed until all of its Tasks are closed.`, { code: "NERV_BUILD_TASKS_OPEN", exitCode: 1 });
+        return;
+      }
+      if (!repository.hasPassedBuildReview(build.id)) {
+        program.error(`Build ${build.id} cannot be closed without a passed Build review.\nRun \`nerv build review ${build.id} --outcome passed --summary "..."\` first.`, { code: "NERV_BUILD_NOT_REVIEWED", exitCode: 1 });
+        return;
+      }
+      const now = new Date().toISOString();
+      repository.updateBuild(build.id, { status: "closed", closed_at: now });
+      const closedBuild = repository.getBuild(build.id)!;
+      syncBuildMarkdown(status.workspaceRoot, closedBuild, repository.listTasksByBuild(build.id));
+      const evolutionPath = appendBuildProductEvolution(status.workspaceRoot, { buildId: closedBuild.id, buildTitle: closedBuild.title, closedAt: now });
+      console.log(`Closed ${closedBuild.id}.`);
+      console.log("  Status: closed");
+      if (evolutionPath) console.log(`  Product evolution updated: ${evolutionPath}`);
+    } finally { repository.close(); }
+  });
+
+buildCommand
   .command("sync")
   .argument("<buildId>", "Build ID to reconcile with its Markdown.")
   .description("Synchronize generated Build Markdown from durable Build state.")
@@ -1109,6 +1208,56 @@ ${details.git.diff}
   return reviewPath;
 }
 
+function writeBuildReviewMarkdown(
+  workspaceRoot: string,
+  reviewId: number,
+  build: { id: string; title: string; acceptance_criteria: string | null; validation: string | null },
+  details: { outcome: string; summary: string; validation: string; evidence?: string; git: { status: string; diff: string } },
+): string {
+  const reviewDir = join(workspaceRoot, "agent", "builds", build.id, "reviews");
+  mkdirSync(reviewDir, { recursive: true });
+  const reviewPath = join(reviewDir, `review-${String(reviewId).padStart(3, "0")}.md`);
+  writeFileSync(reviewPath, `# Build Review ${reviewId}
+
+## Build
+
+${build.id}: ${build.title}
+
+## Outcome
+
+${details.outcome}
+
+## Summary
+
+${details.summary}
+
+## Validation
+
+${details.validation}
+
+## Evidence
+
+${formatOptionalText(details.evidence)}
+
+## Acceptance Criteria
+
+${build.acceptance_criteria || "Not specified."}
+
+## Expected Validation
+
+${build.validation || "Not specified."}
+
+## Git Status
+
+${details.git.status}
+
+## Git Diff Summary
+
+${details.git.diff}
+`, "utf8");
+  return reviewPath;
+}
+
 function captureGitContext(repoRoot: string): { status: string; diff: string } {
   try {
     const status = execFileSync("git", ["status", "--short"], {
@@ -1258,10 +1407,10 @@ program
           const openTasks = repository.getBuildOpenTaskCount(task.build_id);
 
           if (openTasks === 0 && closedTasks === totalTasks && totalTasks > 0) {
-            repository.updateBuild(task.build_id, { status: "closed", closed_at: now });
-            const closedBuild = repository.getBuild(task.build_id)!;
-            syncBuildMarkdown(status.workspaceRoot!, closedBuild, repository.listTasksByBuild(task.build_id));
-            buildUpdateMessage = `Build ${task.build_id} also marked closed (all ${totalTasks} task(s) complete).`;
+            repository.updateBuild(task.build_id, { status: "pending_review", closed_at: null });
+            const pendingReviewBuild = repository.getBuild(task.build_id)!;
+            syncBuildMarkdown(status.workspaceRoot!, pendingReviewBuild, repository.listTasksByBuild(task.build_id));
+            buildUpdateMessage = `Build ${task.build_id} has all ${totalTasks} task(s) complete and is ready for Build review.`;
           } else {
             syncBuildMarkdown(status.workspaceRoot!, build, repository.listTasksByBuild(task.build_id));
             buildUpdateMessage = `Build ${task.build_id} progress: ${closedTasks}/${totalTasks} task(s) closed.`;
