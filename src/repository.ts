@@ -77,6 +77,14 @@ export type ReviewRecord = {
   created_at: string;
 };
 
+export type BuildReviewRecord = {
+  id: number;
+  build_id: string;
+  outcome: string;
+  summary: string;
+  created_at: string;
+};
+
 export type CloseRecord = {
   run_id: string;
   commit_hash: string | null;
@@ -151,6 +159,12 @@ export type CreateReviewInput = {
   summary: string;
 };
 
+export type CreateBuildReviewInput = {
+  build_id: string;
+  outcome: string;
+  summary: string;
+};
+
 export type CreateCloseInput = {
   run_id: string;
   commit_hash?: string | null;
@@ -185,6 +199,9 @@ export type Repository = {
   createReview(input: CreateReviewInput): ReviewRecord;
   listReviews(runId: string): ReviewRecord[];
   hasPassedReview(runId: string): boolean;
+  createBuildReview(input: CreateBuildReviewInput): BuildReviewRecord;
+  listBuildReviews(buildId: string): BuildReviewRecord[];
+  hasPassedBuildReview(buildId: string): boolean;
   createCloseRecord(input: CreateCloseInput): CloseRecord;
   getCloseRecord(runId: string): CloseRecord | null;
   getCurrentRunId(): string | null;
@@ -337,6 +354,12 @@ export function openRepository(databasePath: string): Repository {
   const listReviewsStmt = database.prepare(
     `SELECT * FROM reviews WHERE run_id = ? ORDER BY id ASC`,
   );
+  const createBuildReviewStmt = database.prepare(
+    `INSERT INTO build_reviews (build_id, outcome, summary, created_at)
+     VALUES (@buildId, @outcome, @summary, @createdAt)`,
+  );
+  const getBuildReviewStmt = database.prepare(`SELECT * FROM build_reviews WHERE id = ?`);
+  const listBuildReviewsStmt = database.prepare(`SELECT * FROM build_reviews WHERE build_id = ? ORDER BY id ASC`);
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
     const now = new Date().toISOString();
@@ -686,6 +709,27 @@ export function openRepository(databasePath: string): Repository {
     return reviews.some((review) => review.outcome === "passed");
   };
 
+  const createBuildReview = database.transaction((input: CreateBuildReviewInput): BuildReviewRecord => {
+    const result = createBuildReviewStmt.run({
+      buildId: input.build_id,
+      outcome: input.outcome,
+      summary: input.summary,
+      createdAt: new Date().toISOString(),
+    });
+    return getBuildReviewStmt.get(result.lastInsertRowid) as BuildReviewRecord;
+  });
+
+  const listBuildReviews = (buildId: string): BuildReviewRecord[] => {
+    return listBuildReviewsStmt.all(buildId) as BuildReviewRecord[];
+  };
+
+  const hasPassedBuildReview = (buildId: string): boolean => {
+    const reviews = listBuildReviews(buildId);
+    if (reviews.length === 0) return false;
+    const latestReview = reviews[reviews.length - 1];
+    return latestReview.outcome === "passed";
+  };
+
   const createCloseRecordStmt = database.prepare(
     `INSERT OR REPLACE INTO close_records (run_id, commit_hash, closed_at)
      VALUES (@runId, @commitHash, @closedAt)`,
@@ -771,6 +815,9 @@ export function openRepository(databasePath: string): Repository {
     createReview,
     listReviews,
     hasPassedReview,
+    createBuildReview,
+    listBuildReviews,
+    hasPassedBuildReview,
     createCloseRecord,
     getCloseRecord,
     getCurrentRunId(): string | null {
