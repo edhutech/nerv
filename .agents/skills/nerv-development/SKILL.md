@@ -55,10 +55,30 @@ When a request targets Nerv development:
 
 1. Read `AGENTS.md` for repository commands and architecture constraints.
 2. Inspect Git status, current Run, and relevant `.nerv/` state.
-3. If the request is ambiguous or large, use Intake to capture intent before materializing work.
-4. If the request is bounded, create or update a Task with explicit scope and acceptance criteria.
-5. Start a Run, generate agent entrypoints, and follow the lifecycle.
-6. Use `pnpm validate` as the complete verification gate.
+3. **Classify the request** using the mandatory-Intake conditions below.
+4. If any mandatory-Intake condition applies, **stop before editing implementation files** and use Intake to capture intent, create a Proposal, and wait for explicit human approval.
+5. If no mandatory-Intake condition applies and the request is genuinely bounded, create or update a Task with explicit scope and acceptance criteria.
+6. Start a Run, generate agent entrypoints, and follow the lifecycle.
+7. Use `pnpm validate` as the complete verification gate.
+
+### Mandatory Intake Conditions
+
+Use Intake and stop before implementation when the request introduces or changes any of:
+
+- **Durable SQLite schema or migrations** — new tables, columns, foreign keys, or migration logic
+- **CLI command surfaces** — new commands, subcommands, or significant option changes
+- **Lifecycle states, transitions, gates, review, or close behavior** — changes to how Builds, Tasks, Runs, or Reviews transition between states
+- **Coordination across multiple Nerv subsystems** — changes that touch schema, CLI, lifecycle, and generated artifacts together
+- **Large or ambiguous repository-level features** — work that spans multiple files, subsystems, or requires planning beyond a single bounded Task
+
+For these conditions, the agent must:
+
+- Stop before editing implementation files
+- Create an Intake and Proposal
+- Stop before human approval
+- Materialize work only after explicit approval via `nerv intake apply`
+
+Use a direct Task only when the request is genuinely bounded and does not meet any mandatory-Intake condition. Examples of bounded work: fixing a typo in documentation, correcting a single function's logic, updating a smoke test assertion.
 
 ## When Not to Use
 

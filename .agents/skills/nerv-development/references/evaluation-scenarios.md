@@ -229,6 +229,91 @@ These scenarios verify English-only compliance for new agent-facing content.
 
 ---
 
+## Mandatory Intake Regression Scenarios
+
+These scenarios verify that the skill correctly routes lifecycle-level requests through Intake instead of implementing them directly.
+
+### Scenario 16: Build review workflow request (regression)
+
+**Prompt:** "Add a formal review workflow for Builds in Nerv, so a Build can be reviewed as a whole before it is closed. Preserve the current Task-first workflow and existing Task reviews."
+
+**Expected behavior:**
+- Skill activates
+- Agent classifies the request as meeting multiple mandatory-Intake conditions:
+  - Durable SQLite schema (new `build_reviews` table)
+  - CLI command surfaces (new `nerv build review` and `nerv build close` commands)
+  - Lifecycle states and transitions (new Build states: `pending_review`, `reviewed`, `closed`)
+  - Coordination across multiple subsystems (schema, repository, CLI, Markdown, evolution, smoke tests)
+- Agent **stops before editing implementation files**
+- Agent creates an Intake with `nerv intake create`
+- Agent creates a Proposal with `nerv intake propose`
+- Agent stops and waits for explicit human approval
+- Agent does not start a Run or implement changes until the Proposal is approved
+
+**Assertion:** Skill activates and correctly routes the request through Intake, preventing direct implementation. This is a regression test for the real-use evaluation failure where this request was implemented directly without Intake.
+
+---
+
+### Scenario 17: Schema migration request
+
+**Prompt:** "Add a new table to track Build dependencies"
+
+**Expected behavior:**
+- Skill activates
+- Agent classifies the request as meeting mandatory-Intake condition: durable SQLite schema
+- Agent stops before editing `src/database.ts`
+- Agent creates an Intake and Proposal
+- Agent waits for approval before materializing
+
+**Assertion:** Skill activates and correctly requires Intake for schema changes.
+
+---
+
+### Scenario 18: CLI command addition
+
+**Prompt:** "Add a command to list all closed Builds"
+
+**Expected behavior:**
+- Skill activates
+- Agent classifies the request as meeting mandatory-Intake condition: CLI command surface
+- Agent stops before editing `src/index.ts`
+- Agent creates an Intake and Proposal
+- Agent waits for approval before materializing
+
+**Assertion:** Skill activates and correctly requires Intake for new CLI commands.
+
+---
+
+### Scenario 19: Lifecycle gate change
+
+**Prompt:** "Require a passed Build review before closing a Build"
+
+**Expected behavior:**
+- Skill activates
+- Agent classifies the request as meeting mandatory-Intake condition: lifecycle gates and close behavior
+- Agent stops before editing implementation files
+- Agent creates an Intake and Proposal
+- Agent waits for approval before materializing
+
+**Assertion:** Skill activates and correctly requires Intake for lifecycle gate changes.
+
+---
+
+### Scenario 20: Bounded documentation fix
+
+**Prompt:** "Fix the typo in the README where it says 'nerv initt' instead of 'nerv init'"
+
+**Expected behavior:**
+- Skill activates
+- Agent classifies the request as genuinely bounded: no schema, no CLI, no lifecycle changes
+- Agent does not create an Intake or Proposal
+- Agent fixes the typo directly
+- Agent validates with `pnpm validate`
+
+**Assertion:** Skill activates and correctly allows direct Task for genuinely bounded work.
+
+---
+
 ## Summary
 
 - **Positive triggers:** 4 scenarios (SQLite, CLI, Product Context, smoke tests)
@@ -236,5 +321,6 @@ These scenarios verify English-only compliance for new agent-facing content.
 - **Lifecycle:** 3 scenarios (Intake without Run, checkpoint without interruption, approval gate)
 - **Authority:** 3 scenarios (reference vs duplicate, no dist editing, no .nerv/ manipulation)
 - **Language:** 1 scenario (English-only for new content)
+- **Mandatory Intake regression:** 5 scenarios (Build review workflow, schema migration, CLI command, lifecycle gate, bounded fix)
 
 All scenarios use English prompts, fixtures, assertions, and expected results.
