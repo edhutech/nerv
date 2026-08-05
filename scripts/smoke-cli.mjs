@@ -44,10 +44,10 @@ const checks = [
     includes: ["--build <buildId>", "Associate the Task with an existing Build."],
   },
   {
-    name: "build command exposes plan",
+    name: "build command exposes planning and review",
     args: ["build", "--help"],
     exitCode: 0,
-    includes: ["plan <buildId>"],
+    includes: ["plan <buildId>", "review [options] <buildId>", "close <buildId>"],
   },
 ];
 
@@ -754,6 +754,7 @@ function verifySchema(name, databasePath) {
       "runs",
       "checkpoints",
       "reviews",
+      "build_reviews",
       "close_records",
       "decisions",
       "status_history",
@@ -1529,17 +1530,17 @@ function runTaskBuildAssociationChecks() {
     spawnSync("git", ["commit", "-m", "TASK-003 associated task", "--allow-empty"], { cwd: repoRoot, encoding: "utf8" });
 
     runCheck({
-      name: "close linked task closes its build",
+      name: "close linked task leaves its build ready for review",
       args: ["close", "--run", "RUN-001"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Build BUILD-002 also marked closed"],
+      includes: ["Build BUILD-002 has all 1 task(s) complete and is ready for Build review"],
       verify: () => {
         const repository = openRepository(associationDbPath);
         try {
           const build = repository.getBuild("BUILD-002");
-          if (!build || build.status !== "closed") {
-            fail("close linked task closes its build", "linked Build was not closed", "");
+          if (!build || build.status !== "pending_review") {
+            fail("close linked task leaves its build ready for review", "linked Build was not ready for review", "");
           }
         } finally {
           repository.close();
@@ -2410,34 +2411,156 @@ function runCloseChecks() {
       spawnSync("git", ["commit", "-m", "TASK-003 done", "--allow-empty"], { cwd: buildRepoRoot, encoding: "utf8" });
 
       runCheck({
-        name: "close marks build closed when all tasks done",
+        name: "close final task leaves build pending Build review",
         args: ["close", "--run", "RUN-003"],
         cwd: buildRepoRoot,
         exitCode: 0,
-        includes: ["Closed RUN-003", "Build BUILD-001 also marked closed"],
+        includes: ["Closed RUN-003", "Build BUILD-001 has all 3 task(s) complete and is ready for Build review"],
         verify: () => {
           const dbPath = join(buildRepoRoot, ".nerv/nerv.db");
           const repository = openRepository(dbPath);
           try {
             const build = repository.getBuild("BUILD-001");
             if (!build) {
-              fail("close marks build closed when all tasks done", "build not found", "");
+              fail("close final task leaves build pending Build review", "build not found", "");
             }
-            if (build.status !== "closed") {
-              fail("close marks build closed when all tasks done", `build status: ${build.status}`, "");
+            if (build.status !== "pending_review") {
+              fail("close final task leaves build pending Build review", `build status: ${build.status}`, "");
             }
-          if (!build.closed_at) {
-            fail("close marks build closed when all tasks done", "build closed_at not set", "");
-          }
           const markdown = readFileSync(join(buildRepoRoot, ".nerv/agent/builds/BUILD-001.md"), "utf8");
-          if (!markdown.includes("## Status\n\nClosed") || !markdown.includes("## Task Progress\n\n3/3 task(s) closed") || !markdown.includes("## Close summary\n\nClosed at")) {
-            fail("close marks build closed when all tasks done", "Build Markdown was not synchronized", markdown);
+          if (!markdown.includes("## Status\n\nPending review") || !markdown.includes("## Task Progress\n\n3/3 task(s) closed")) {
+            fail("close final task leaves build pending Build review", "Build Markdown was not synchronized", markdown);
           }
           } finally {
             repository.close();
           }
         },
       });
+
+      runCheck({
+        name: "build close requires a passed Build review",
+        args: ["build", "close", "BUILD-001"],
+        cwd: buildRepoRoot,
+        exitCode: 1,
+        includes: ["cannot be closed without a passed Build review"],
+      });
+
+      runCheck({
+        name: "build review records whole Build evidence",
+        args: ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "All tasks integrate correctly", "--validation", "passed", "--evidence", "Full suite passed"],
+        cwd: buildRepoRoot,
+        exitCode: 0,
+        includes: ["Saved Build review 1 for BUILD-001", "Outcome: passed", "Validation: passed"],
+        verify: () => {
+          const dbPath = join(buildRepoRoot, ".nerv/nerv.db");
+          const repository = openRepository(dbPath);
+          try {
+            const build = repository.getBuild("BUILD-001");
+            const reviews = repository.listBuildReviews("BUILD-001");
+            if (!build || build.status !== "reviewed" || reviews.length !== 1 || reviews[0].summary !== "All tasks integrate correctly") {
+              fail("build review records whole Build evidence", "Build review state was not persisted", JSON.stringify({ build, reviews }));
+            }
+          } finally { repository.close(); }
+          const reviewPath = join(buildRepoRoot, ".nerv/agent/builds/BUILD-001/reviews/review-001.md");
+          verifyPath("build review records whole Build evidence", reviewPath, "file");
+          const review = readFileSync(reviewPath, "utf8");
+          if (!review.includes("All tasks integrate correctly") || !review.includes("Full suite passed")) {
+            fail("build review records whole Build evidence", "Build review Markdown is incomplete", review);
+          }
+        },
+      });
+
+      runCheck({
+        name: "build close succeeds after Build review",
+        args: ["build", "close", "BUILD-001"],
+        cwd: buildRepoRoot,
+        exitCode: 0,
+        includes: ["Closed BUILD-001", "Status: closed", "Product evolution updated:"],
+        verify: () => {
+          const dbPath = join(buildRepoRoot, ".nerv/nerv.db");
+          const repository = openRepository(dbPath);
+          try {
+            const build = repository.getBuild("BUILD-001");
+            if (!build || build.status !== "closed" || !build.closed_at) fail("build close succeeds after Build review", "Build was not closed", JSON.stringify(build));
+          } finally { repository.close(); }
+          const markdown = readFileSync(join(buildRepoRoot, ".nerv/agent/builds/BUILD-001.md"), "utf8");
+          if (!markdown.includes("## Status\n\nClosed") || !markdown.includes("## Close summary\n\nClosed at")) fail("build close succeeds after Build review", "Build Markdown was not synchronized", markdown);
+        },
+      });
+
+      const repeatReviewTempRoot = mkdtempSync(join(tmpdir(), "nerv-build-review-repeat-smoke-"));
+      const repeatReviewRepoRoot = join(repeatReviewTempRoot, "repo");
+      mkdirSync(repeatReviewRepoRoot, { recursive: true });
+
+      try {
+        spawnSync("git", ["init", repeatReviewRepoRoot], { encoding: "utf8" });
+        spawnOrFail("init workspace for repeat build review check", ["init"], repeatReviewRepoRoot);
+        spawnOrFail("scaffold product for repeat build review check", ["product"], repeatReviewRepoRoot);
+
+        spawnOrFail("create build for repeat build review check", ["new", "build", "Repeat build review test"], repeatReviewRepoRoot);
+        spawnOrFail("plan build for repeat build review check", ["build", "plan", "BUILD-001"], repeatReviewRepoRoot);
+
+        for (const taskId of ["TASK-001", "TASK-002", "TASK-003"]) {
+          spawnOrFail(`start ${taskId} for repeat build review check`, ["start", taskId], repeatReviewRepoRoot);
+          spawnOrFail(`review ${taskId} for repeat build review check`, ["review", "--outcome", "passed", "--summary", `${taskId} done`, "--validation", "passed"], repeatReviewRepoRoot);
+          spawnSync("git", ["add", "."], { cwd: repeatReviewRepoRoot, encoding: "utf8" });
+          spawnSync("git", ["commit", "-m", `${taskId} done`, "--allow-empty"], { cwd: repeatReviewRepoRoot, encoding: "utf8" });
+          spawnOrFail(`close ${taskId} for repeat build review check`, ["close"], repeatReviewRepoRoot);
+        }
+
+        runCheck({
+          name: "later failed Build review blocks close after earlier pass",
+          args: ["build", "close", "BUILD-001"],
+          cwd: repeatReviewRepoRoot,
+          exitCode: 1,
+          includes: ["cannot be closed without a passed Build review"],
+          setup: () => {
+            spawnOrFail("first Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Initial pass", "--validation", "passed"], repeatReviewRepoRoot);
+            spawnOrFail("second Build review fails", ["build", "review", "BUILD-001", "--outcome", "failed", "--summary", "Later failure", "--validation", "failed"], repeatReviewRepoRoot);
+          },
+          verify: () => {
+            const dbPath = join(repeatReviewRepoRoot, ".nerv/nerv.db");
+            const repository = openRepository(dbPath);
+            try {
+              const reviews = repository.listBuildReviews("BUILD-001");
+              if (reviews.length !== 2 || reviews[0].outcome !== "passed" || reviews[1].outcome !== "failed") {
+                fail("later failed Build review blocks close after earlier pass", "expected two reviews with passed then failed", JSON.stringify(reviews));
+              }
+              const build = repository.getBuild("BUILD-001");
+              if (!build || build.status === "closed") {
+                fail("later failed Build review blocks close after earlier pass", "Build should not be closed", JSON.stringify(build));
+              }
+            } finally { repository.close(); }
+          },
+        });
+
+        runCheck({
+          name: "later passed Build review permits close after earlier failure",
+          args: ["build", "close", "BUILD-001"],
+          cwd: repeatReviewRepoRoot,
+          exitCode: 0,
+          includes: ["Closed BUILD-001", "Status: closed"],
+          setup: () => {
+            spawnOrFail("third Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Final pass", "--validation", "passed"], repeatReviewRepoRoot);
+          },
+          verify: () => {
+            const dbPath = join(repeatReviewRepoRoot, ".nerv/nerv.db");
+            const repository = openRepository(dbPath);
+            try {
+              const reviews = repository.listBuildReviews("BUILD-001");
+              if (reviews.length !== 3 || reviews[2].outcome !== "passed") {
+                fail("later passed Build review permits close after earlier failure", "expected three reviews with final passed", JSON.stringify(reviews));
+              }
+              const build = repository.getBuild("BUILD-001");
+              if (!build || build.status !== "closed" || !build.closed_at) {
+                fail("later passed Build review permits close after earlier failure", "Build should be closed", JSON.stringify(build));
+              }
+            } finally { repository.close(); }
+          },
+        });
+      } finally {
+        rmSync(repeatReviewTempRoot, { recursive: true, force: true });
+      }
     } finally {
       rmSync(buildTempRoot, { recursive: true, force: true });
     }
