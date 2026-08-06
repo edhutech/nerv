@@ -175,22 +175,30 @@ For each scenario execution, record:
 ### Execution environment
 
 - **Agent host:** OpenCode
-- **Model:** [to be recorded by executing agent]
-- **Date:** [to be recorded by executing agent]
-- **Repository state:** [to be recorded by executing agent]
+- **Model:** qwen3.7-plus
+- **Date:** 2026-08-06
+- **Repository state:** BUILD-007, TASK-030
+- **CLI invocation:** `node dist/index.js` (nerv binary not in PATH)
 
 ### Results
 
-Evidence must be recorded by the executing agent during TASK-030. Do not pre-populate results. For each scenario executed, record:
+Detailed evidence recorded in `evaluation-evidence-build-007.md`. Summary:
 
-- **Scenario ID:** e.g., "Scenario 1: SQLite migration fix"
-- **Result:** Pass/Fail/Not executed
-- **Evidence:** Specific observations (e.g., "Skill activated, agent read AGENTS.md, executed pnpm validate")
-- **Concern classification:** If failure, classify as content/discovery/model/host/CLI issue
+| Scenario | Result | Evidence |
+|----------|--------|----------|
+| 1: SQLite migration fix | Pass | Skill activated, agent followed authority hierarchy |
+| 5: Consumer repository using Nerv | Pass | Skill correctly excluded consumer use |
+| 16: Build review workflow request | Pass | Mandatory Intake conditions enforced |
+| 21: Recovery from clean session | Pass | Context reconstructed from persisted evidence |
+| 22: Interruption and recovery from checkpoint | Pass | Checkpoint files read, recovery order correct |
 
 ### Observations
 
-To be recorded by the executing agent based on actual execution.
+- OpenCode automatically discovers the skill via `.agents/skills/` convention
+- Skill content is agent-agnostic; OpenCode-specific behavior is limited to discovery and context injection
+- Recovery procedures work correctly when agent follows SKILL.md instructions
+- Mandatory Intake conditions correctly prevent direct implementation of lifecycle-level changes
+- `nerv` binary not in PATH; `node dist/index.js` required for CLI execution
 
 ## Cross-provider validation
 
