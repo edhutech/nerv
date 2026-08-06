@@ -165,40 +165,14 @@ For each scenario execution, record:
 
 - **Scenario ID:** e.g., "Scenario 1: SQLite migration fix"
 - **Agent host:** e.g., "OpenCode"
-- **Model:** e.g., "qwen3.7-plus"
-- **Result:** Pass/Fail
+- **Model:** actual host-reported identity, or "not reported"
+- **Result:** Pass/Fail/Not executed
 - **Evidence:** Specific observations (e.g., "Skill activated, agent read AGENTS.md, executed pnpm validate")
 - **Concern classification:** If failure, classify as content/discovery/model/host/CLI issue
 
 ## OpenCode reference evidence
 
-### Execution environment
-
-- **Agent host:** OpenCode
-- **Model:** qwen3.7-plus
-- **Date:** 2026-08-06
-- **Repository state:** BUILD-007, TASK-030
-- **CLI invocation:** `node dist/index.js` (nerv binary not in PATH)
-
-### Results
-
-Detailed evidence recorded in `evaluation-evidence-build-007.md`. Summary:
-
-| Scenario | Result | Evidence |
-|----------|--------|----------|
-| 1: SQLite migration fix | Pass | Skill activated, agent followed authority hierarchy |
-| 5: Consumer repository using Nerv | Pass | Skill correctly excluded consumer use |
-| 16: Build review workflow request | Pass | Mandatory Intake conditions enforced |
-| 21: Recovery from clean session | Pass | Context reconstructed from persisted evidence |
-| 22: Interruption and recovery from checkpoint | Pass | Checkpoint files read, recovery order correct |
-
-### Observations
-
-- OpenCode automatically discovers the skill via `.agents/skills/` convention
-- Skill content is agent-agnostic; OpenCode-specific behavior is limited to discovery and context injection
-- Recovery procedures work correctly when agent follows SKILL.md instructions
-- Mandatory Intake conditions correctly prevent direct implementation of lifecycle-level changes
-- `nerv` binary not in PATH; `node dist/index.js` required for CLI execution
+No OpenCode host-session result is recorded until a separately identifiable OpenCode session executes a scenario and persists its commands, outputs, artifacts, and host-reported model identity. See `evaluation-evidence-build-007.md` for the reconciled record and `recovery-exercise-build-008.md` for the verified repository-local recovery exercise.
 
 ## Cross-provider validation
 
@@ -227,13 +201,7 @@ To validate cross-provider compatibility:
 
 ### Unvalidated claims
 
-The following are **documented but not runtime-validated**:
-
-- Codex can load the skill via manual symlink or copy
-- Claude Code can load the skill via CLAUDE.md
-- Cursor can load the skill via `.cursor/rules/`
-
-These are based on documented provider conventions, not executed validation.
+The loading guidance for Codex, Claude Code, and Cursor is unverified operator guidance. No discovery or execution claim is made for those hosts until it is persisted as scenario evidence.
 
 ## Maintenance
 
@@ -250,5 +218,7 @@ This evaluation protocol should be updated when:
 - Canonical skill: `.agents/skills/nerv-development/SKILL.md`
 - Evaluation scenarios: `.agents/skills/nerv-development/references/evaluation-scenarios.md`
 - Adapter documentation: `.agents/ADAPTERS.md`
+- Reconciled record: `.agents/skills/nerv-development/references/evaluation-evidence-build-007.md`
+- Recovery exercise: `.agents/skills/nerv-development/references/recovery-exercise-build-008.md`
 - Nerv CLI commands: `AGENTS.md`
 - Product Context: `.nerv/product/`
