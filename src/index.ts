@@ -665,8 +665,9 @@ buildCommand
       const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence });
       repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
-      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, { outcome, summary, validation, evidence: evidence ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
-      syncBuildMarkdown(status.workspaceRoot, updatedBuild, repository.listTasksByBuild(build.id), review);
+      const tasks = repository.listTasksByBuild(build.id);
+      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
+      syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review);
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
       console.log(`  Outcome: ${outcome}`);
       console.log(`  Validation: ${validation}`);
@@ -1168,7 +1169,7 @@ function writeReviewMarkdown(
     summary: string;
     validation: string;
     evidence?: string;
-    task: { id: string; title: string; acceptance_criteria: string | null; validation: string | null } | null;
+    task: { id: string; title: string; scope: string | null; acceptance_criteria: string | null; validation: string | null; risks: string | null } | null;
     build: { id: string; title: string } | null;
     git: { status: string; diff: string };
   },
@@ -1211,6 +1212,14 @@ ${formatOptionalText(details.evidence)}
 
 ${details.task?.acceptance_criteria || "Not specified."}
 
+## Scope
+
+${details.task?.scope || "Not specified."}
+
+## Risk Escalation
+
+${details.task?.risks || "No task-specific risks recorded."}
+
 ## Expected Validation
 
 ${details.task?.validation || "Not specified."}
@@ -1233,6 +1242,7 @@ function writeBuildReviewMarkdown(
   workspaceRoot: string,
   reviewId: number,
   build: { id: string; title: string; acceptance_criteria: string | null; validation: string | null },
+  tasks: Array<{ id: string; title: string; status: string }>,
   details: { outcome: string; summary: string; validation: string; evidence?: string; git: { status: string; diff: string } },
 ): string {
   const reviewDir = join(workspaceRoot, "agent", "builds", build.id, "reviews");
@@ -1263,6 +1273,16 @@ ${formatOptionalText(details.evidence)}
 ## Acceptance Criteria
 
 ${build.acceptance_criteria || "Not specified."}
+
+## Task Completion
+
+${tasks.filter((task) => task.status === "closed").length}/${tasks.length} task(s) closed.
+
+${tasks.map((task) => `- ${task.id}: ${task.title} (${task.status})`).join("\n") || "No Tasks recorded."}
+
+## Integration Review
+
+Confirm the completed Tasks work together, their interfaces and generated artifacts remain compatible, and the Build outcome matches its scope.
 
 ## Expected Validation
 

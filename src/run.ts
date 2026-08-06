@@ -138,7 +138,7 @@ nerv checkpoint --summary "What changed"
 After validation passes, request review with:
 
 \`\`\`
-nerv review --outcome passed --summary "Review summary" --validation passed --evidence "Evidence details"
+nerv review --outcome passed --summary "Focused Task review passed" --validation passed --evidence "Acceptance criteria, scope, and validation evidence"
 \`\`\`
 
 Or mark as failed:
