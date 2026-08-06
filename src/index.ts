@@ -610,7 +610,7 @@ buildCommand
 buildCommand
   .command("review")
   .argument("<buildId>", "Build ID to review.")
-  .requiredOption("--outcome <outcome>", "Review outcome: passed or failed.")
+  .requiredOption("--outcome <outcome>", "Review outcome: passed, failed, or blocked.")
   .requiredOption("--summary <summary>", "Review summary.")
   .option("--validation <validation>", "Validation status: passed, failed, or not_run.")
   .option("--evidence <evidence>", "Evidence summary.")
@@ -624,8 +624,8 @@ buildCommand
     const outcome = options.outcome.trim().toLowerCase();
     const summary = options.summary.trim();
     const validation = options.validation?.trim().toLowerCase() || "not_run";
-    if (!["passed", "failed"].includes(outcome)) {
-      program.error("Build review outcome must be 'passed' or 'failed'.", { code: "NERV_BUILD_REVIEW_OUTCOME_INVALID", exitCode: 1 });
+    if (!["passed", "failed", "blocked"].includes(outcome)) {
+      program.error("Build review outcome must be 'passed', 'failed', or 'blocked'.", { code: "NERV_BUILD_REVIEW_OUTCOME_INVALID", exitCode: 1 });
       return;
     }
     if (!summary) {
@@ -634,6 +634,15 @@ buildCommand
     }
     if (!["passed", "failed", "not_run"].includes(validation)) {
       program.error("Validation status must be 'passed', 'failed', or 'not_run'.", { code: "NERV_BUILD_REVIEW_VALIDATION_INVALID", exitCode: 1 });
+      return;
+    }
+    const evidence = options.evidence?.trim() || null;
+    if (outcome === "passed" && validation !== "passed") {
+      program.error("A passed Build review requires passed validation.", { code: "NERV_BUILD_REVIEW_PASSED_VALIDATION_REQUIRED", exitCode: 1 });
+      return;
+    }
+    if (outcome === "passed" && !evidence) {
+      program.error("A passed Build review requires evidence.", { code: "NERV_BUILD_REVIEW_PASSED_EVIDENCE_REQUIRED", exitCode: 1 });
       return;
     }
     const repository = openRepository(status.databasePath);
@@ -653,10 +662,10 @@ buildCommand
         program.error(`Build ${build.id} cannot be reviewed until all of its Tasks are closed.`, { code: "NERV_BUILD_TASKS_OPEN", exitCode: 1 });
         return;
       }
-      const review = repository.createBuildReview({ build_id: build.id, outcome, summary });
-      if (outcome === "passed") repository.updateBuild(build.id, { status: "reviewed" });
+      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence });
+      repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
-      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, { outcome, summary, validation, evidence: options.evidence, git: captureGitContext(status.repoRoot ?? process.cwd()) });
+      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, { outcome, summary, validation, evidence: evidence ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
       syncBuildMarkdown(status.workspaceRoot, updatedBuild, repository.listTasksByBuild(build.id), review);
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
       console.log(`  Outcome: ${outcome}`);
@@ -942,7 +951,7 @@ program
 program
   .command("review")
   .option("--run <runId>", "Run ID to review.")
-  .requiredOption("--outcome <outcome>", "Review outcome: passed or failed.")
+  .requiredOption("--outcome <outcome>", "Review outcome: passed, failed, or blocked.")
   .requiredOption("--summary <summary>", "Review summary.")
   .option("--validation <validation>", "Validation status: passed, failed, or not_run.")
   .option("--evidence <evidence>", "Evidence summary.")
@@ -978,8 +987,8 @@ program
     }
 
     const outcome = options.outcome.trim().toLowerCase();
-    if (outcome !== "passed" && outcome !== "failed") {
-      program.error("Review outcome must be 'passed' or 'failed'.", {
+    if (outcome !== "passed" && outcome !== "failed" && outcome !== "blocked") {
+      program.error("Review outcome must be 'passed', 'failed', or 'blocked'.", {
         code: "NERV_REVIEW_OUTCOME_INVALID",
         exitCode: 1,
       });
@@ -1035,17 +1044,38 @@ program
         return;
       }
 
+      const evidence = options.evidence?.trim() || null;
+      if (outcome === "passed" && validation !== "passed") {
+        program.error("A passed review requires passed validation.", {
+          code: "NERV_REVIEW_PASSED_VALIDATION_REQUIRED",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
+      if (outcome === "passed" && !evidence) {
+        program.error("A passed review requires evidence.", {
+          code: "NERV_REVIEW_PASSED_EVIDENCE_REQUIRED",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
       const review = repository.createReview({
         run_id: run.id,
         outcome,
         summary,
+        validation,
+        evidence,
       });
 
       const reviewPath = writeReviewMarkdown(status.workspaceRoot!, review.id, run.id, {
         outcome,
         summary,
         validation,
-        evidence: options.evidence,
+        evidence: evidence ?? undefined,
         task,
         build,
         git: captureGitContext(status.repoRoot!),
@@ -1056,15 +1086,6 @@ program
       console.log(`  Validation: ${validation}`);
       console.log(`  Review file: ${reviewPath}`);
 
-      if (validation === "not_run") {
-        console.log("");
-        console.log("Warning: Validation was not run. Review evidence is incomplete.");
-      }
-
-      if (!options.evidence?.trim()) {
-        console.log("");
-        console.log("Warning: No evidence provided. Review evidence is incomplete.");
-      }
     } finally {
       repository.close();
     }

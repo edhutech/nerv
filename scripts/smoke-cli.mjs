@@ -1526,7 +1526,7 @@ function runTaskBuildAssociationChecks() {
     spawnOrFail("start associated task for close check", ["start", "TASK-003"], repoRoot);
     spawnOrFail(
       "review associated task for close check",
-      ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "Associated task complete", "--validation", "passed"],
+      ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "Associated task complete", "--validation", "passed", "--evidence", "Associated task validation passed"],
       repoRoot,
     );
     spawnSync("git", ["add", "."], { cwd: repoRoot, encoding: "utf8" });
@@ -2339,7 +2339,7 @@ function runReviewChecks() {
       args: ["review", "--outcome", "failed", "--summary", "Missing evidence"],
       cwd: repoRoot,
       exitCode: 0,
-      includes: ["Saved review 2 for RUN-001", "failed", "Warning: Validation was not run"],
+      includes: ["Saved review 2 for RUN-001", "failed"],
       verify: () => {
         const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-002.md");
         verifyPath("review uses current run", reviewFile, "file");
@@ -2367,7 +2367,7 @@ function runReviewChecks() {
       args: ["review", "--run", "RUN-001", "--outcome", "maybe", "--summary", "Invalid outcome"],
       cwd: repoRoot,
       exitCode: 1,
-      includes: ["Review outcome must be 'passed' or 'failed'"],
+      includes: ["Review outcome must be 'passed', 'failed', or 'blocked'"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
@@ -2494,7 +2494,7 @@ function runCloseChecks() {
 
     spawnOrFail(
       "add passed review for second close check",
-      ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second run ready", "--validation", "passed"],
+      ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second run ready", "--validation", "passed", "--evidence", "Second task validation passed"],
       repoRoot,
     );
     spawnOrFail("close second run before starting another", ["close", "--run", "RUN-002"], repoRoot);
@@ -2536,7 +2536,7 @@ function runCloseChecks() {
       spawnOrFail("start first task for build close check", ["start", "TASK-001"], buildRepoRoot);
       spawnOrFail(
         "review first task for build close check",
-        ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "First task done", "--validation", "passed"],
+        ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "First task done", "--validation", "passed", "--evidence", "First task validation passed"],
         buildRepoRoot,
       );
       spawnSync("git", ["add", "."], { cwd: buildRepoRoot, encoding: "utf8" });
@@ -2574,7 +2574,7 @@ function runCloseChecks() {
       spawnOrFail("start second task for build close check", ["start", "TASK-002"], buildRepoRoot);
       spawnOrFail(
         "review second task for build close check",
-        ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second task done", "--validation", "passed"],
+        ["review", "--run", "RUN-002", "--outcome", "passed", "--summary", "Second task done", "--validation", "passed", "--evidence", "Second task validation passed"],
         buildRepoRoot,
       );
       spawnSync("git", ["add", "."], { cwd: buildRepoRoot, encoding: "utf8" });
@@ -2591,7 +2591,7 @@ function runCloseChecks() {
       spawnOrFail("start third task for build close check", ["start", "TASK-003"], buildRepoRoot);
       spawnOrFail(
         "review third task for build close check",
-        ["review", "--run", "RUN-003", "--outcome", "passed", "--summary", "Third task done", "--validation", "passed"],
+        ["review", "--run", "RUN-003", "--outcome", "passed", "--summary", "Third task done", "--validation", "passed", "--evidence", "Third task validation passed"],
         buildRepoRoot,
       );
       spawnSync("git", ["add", "."], { cwd: buildRepoRoot, encoding: "utf8" });
@@ -2689,7 +2689,7 @@ function runCloseChecks() {
 
         for (const taskId of ["TASK-001", "TASK-002", "TASK-003"]) {
           spawnOrFail(`start ${taskId} for repeat build review check`, ["start", taskId], repeatReviewRepoRoot);
-          spawnOrFail(`review ${taskId} for repeat build review check`, ["review", "--outcome", "passed", "--summary", `${taskId} done`, "--validation", "passed"], repeatReviewRepoRoot);
+          spawnOrFail(`review ${taskId} for repeat build review check`, ["review", "--outcome", "passed", "--summary", `${taskId} done`, "--validation", "passed", "--evidence", `${taskId} validation passed`], repeatReviewRepoRoot);
           spawnSync("git", ["add", "."], { cwd: repeatReviewRepoRoot, encoding: "utf8" });
           spawnSync("git", ["commit", "-m", `${taskId} done`, "--allow-empty"], { cwd: repeatReviewRepoRoot, encoding: "utf8" });
           spawnOrFail(`close ${taskId} for repeat build review check`, ["close"], repeatReviewRepoRoot);
@@ -2702,7 +2702,7 @@ function runCloseChecks() {
           exitCode: 1,
           includes: ["cannot be closed without a passed Build review"],
           setup: () => {
-            spawnOrFail("first Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Initial pass", "--validation", "passed"], repeatReviewRepoRoot);
+            spawnOrFail("first Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Initial pass", "--validation", "passed", "--evidence", "Integrated validation passed"], repeatReviewRepoRoot);
             spawnOrFail("second Build review fails", ["build", "review", "BUILD-001", "--outcome", "failed", "--summary", "Later failure", "--validation", "failed"], repeatReviewRepoRoot);
           },
           verify: () => {
@@ -2728,7 +2728,7 @@ function runCloseChecks() {
           exitCode: 0,
           includes: ["Closed BUILD-001", "Status: closed"],
           setup: () => {
-            spawnOrFail("third Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Final pass", "--validation", "passed"], repeatReviewRepoRoot);
+            spawnOrFail("third Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Final pass", "--validation", "passed", "--evidence", "Final integrated validation passed"], repeatReviewRepoRoot);
           },
           verify: () => {
             const dbPath = join(repeatReviewRepoRoot, ".nerv/nerv.db");
@@ -3061,6 +3061,8 @@ function runGitUnavailableChecks() {
         "Reviewed without git",
         "--validation",
         "passed",
+        "--evidence",
+        "Validation completed without Git metadata",
       ],
       cwd: repoRoot,
       exitCode: 0,

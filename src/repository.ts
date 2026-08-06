@@ -74,6 +74,8 @@ export type ReviewRecord = {
   run_id: string;
   outcome: string;
   summary: string;
+  validation: string | null;
+  evidence: string | null;
   created_at: string;
 };
 
@@ -82,6 +84,8 @@ export type BuildReviewRecord = {
   build_id: string;
   outcome: string;
   summary: string;
+  validation: string | null;
+  evidence: string | null;
   created_at: string;
 };
 
@@ -157,12 +161,16 @@ export type CreateReviewInput = {
   run_id: string;
   outcome: string;
   summary: string;
+  validation?: string;
+  evidence?: string | null;
 };
 
 export type CreateBuildReviewInput = {
   build_id: string;
   outcome: string;
   summary: string;
+  validation?: string;
+  evidence?: string | null;
 };
 
 export type CreateCloseInput = {
@@ -343,8 +351,8 @@ export function openRepository(databasePath: string): Repository {
   );
 
   const createReviewStmt = database.prepare(
-    `INSERT INTO reviews (run_id, outcome, summary, created_at)
-     VALUES (@runId, @outcome, @summary, @createdAt)`,
+    `INSERT INTO reviews (run_id, outcome, summary, validation, evidence, created_at)
+      VALUES (@runId, @outcome, @summary, @validation, @evidence, @createdAt)`,
   );
 
   const getReviewStmt = database.prepare(
@@ -355,8 +363,8 @@ export function openRepository(databasePath: string): Repository {
     `SELECT * FROM reviews WHERE run_id = ? ORDER BY id ASC`,
   );
   const createBuildReviewStmt = database.prepare(
-    `INSERT INTO build_reviews (build_id, outcome, summary, created_at)
-     VALUES (@buildId, @outcome, @summary, @createdAt)`,
+    `INSERT INTO build_reviews (build_id, outcome, summary, validation, evidence, created_at)
+      VALUES (@buildId, @outcome, @summary, @validation, @evidence, @createdAt)`,
   );
   const getBuildReviewStmt = database.prepare(`SELECT * FROM build_reviews WHERE id = ?`);
   const listBuildReviewsStmt = database.prepare(`SELECT * FROM build_reviews WHERE build_id = ? ORDER BY id ASC`);
@@ -694,6 +702,8 @@ export function openRepository(databasePath: string): Repository {
       runId: input.run_id,
       outcome: input.outcome,
       summary: input.summary,
+      validation: input.validation ?? "not_run",
+      evidence: input.evidence ?? null,
       createdAt: now,
     });
 
@@ -706,7 +716,8 @@ export function openRepository(databasePath: string): Repository {
 
   const hasPassedReview = (runId: string): boolean => {
     const reviews = listReviews(runId);
-    return reviews.some((review) => review.outcome === "passed");
+    const latestReview = reviews[reviews.length - 1];
+    return latestReview?.outcome === "passed" && latestReview.validation === "passed" && Boolean(latestReview.evidence?.trim());
   };
 
   const createBuildReview = database.transaction((input: CreateBuildReviewInput): BuildReviewRecord => {
@@ -714,6 +725,8 @@ export function openRepository(databasePath: string): Repository {
       buildId: input.build_id,
       outcome: input.outcome,
       summary: input.summary,
+      validation: input.validation ?? "not_run",
+      evidence: input.evidence ?? null,
       createdAt: new Date().toISOString(),
     });
     return getBuildReviewStmt.get(result.lastInsertRowid) as BuildReviewRecord;
@@ -727,7 +740,7 @@ export function openRepository(databasePath: string): Repository {
     const reviews = listBuildReviews(buildId);
     if (reviews.length === 0) return false;
     const latestReview = reviews[reviews.length - 1];
-    return latestReview.outcome === "passed";
+    return latestReview.outcome === "passed" && latestReview.validation === "passed" && Boolean(latestReview.evidence?.trim());
   };
 
   const createCloseRecordStmt = database.prepare(

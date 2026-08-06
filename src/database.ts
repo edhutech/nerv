@@ -58,8 +58,8 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   ],
   runs: ["id", "task_id", "status", "created_at", "updated_at", "closed_at"],
   checkpoints: ["id", "run_id", "summary", "created_at"],
-  reviews: ["id", "run_id", "outcome", "summary", "created_at"],
-  build_reviews: ["id", "build_id", "outcome", "summary", "created_at"],
+  reviews: ["id", "run_id", "outcome", "summary", "validation", "evidence", "created_at"],
+  build_reviews: ["id", "build_id", "outcome", "summary", "validation", "evidence", "created_at"],
   close_records: ["run_id", "commit_hash", "closed_at"],
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
@@ -136,6 +136,8 @@ const SCHEMA_STATEMENTS = [
     run_id TEXT NOT NULL,
     outcome TEXT NOT NULL,
     summary TEXT NOT NULL,
+    validation TEXT NOT NULL DEFAULT 'not_run',
+    evidence TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
   )`,
@@ -144,6 +146,8 @@ const SCHEMA_STATEMENTS = [
     build_id TEXT NOT NULL,
     outcome TEXT NOT NULL,
     summary TEXT NOT NULL,
+    validation TEXT NOT NULL DEFAULT 'not_run',
+    evidence TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (build_id) REFERENCES builds(id)
   )`,
@@ -243,7 +247,7 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "9";
+const SCHEMA_VERSION = "10";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -266,6 +270,8 @@ const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonl
     "risks",
     "generated_markdown_path",
   ],
+  reviews: ["validation", "evidence"],
+  build_reviews: ["validation", "evidence"],
   // Product Context lifecycle columns were introduced after the initial session tables.
   // They are additive so existing local workspaces remain usable.
   product_sessions: ["input_manifest"],
@@ -363,6 +369,8 @@ function migrateSchema(database: Database.Database): void {
       build_id TEXT NOT NULL,
       outcome TEXT NOT NULL,
       summary TEXT NOT NULL,
+      validation TEXT NOT NULL DEFAULT 'not_run',
+      evidence TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (build_id) REFERENCES builds(id)
     )`);
