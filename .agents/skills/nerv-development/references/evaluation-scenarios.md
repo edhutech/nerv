@@ -340,17 +340,18 @@ These scenarios verify that the skill supports recovery from clean sessions and 
 
 **Prompt:** 
 1. Start a Task with an active Run
-2. Interrupt execution (simulate session closure)
-3. Create a checkpoint with `nerv checkpoint --summary "Progress saved"`
-4. Open a new session with no prior conversational history
-5. Ask "Continue the previous work"
+2. Make progress on the Task
+3. Create a checkpoint: `pnpm exec nerv checkpoint --summary "Progress saved"`
+4. Close the agent session (simulate interruption)
+5. Open a new session with no prior conversational history
+6. Ask "Continue the previous work"
 
 **Expected behavior:**
 - Skill activates
-- Agent executes `nerv status` to identify the active Run
+- Agent executes `pnpm exec nerv status` or `node dist/index.js status` to identify the active Run
 - Agent reads the Run's `run.md` for checkpoint instructions
-- Agent executes `nerv checkpoint --run <RUN-ID>` or reads checkpoint files
-- Agent reads the most recent checkpoint to understand what changed, what remains, and next steps
+- Agent lists checkpoint files in `.nerv/agent/runs/RUN-###/checkpoints/` and reads the most recent
+- Agent reads the checkpoint to understand what changed, what remains, and next steps
 - Agent continues execution from the checkpoint state
 - Recovery does not depend on conversational history
 

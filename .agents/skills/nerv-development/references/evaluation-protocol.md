@@ -94,21 +94,21 @@ For each scenario in `evaluation-scenarios.md`:
    - Reads `AGENTS.md`
    - Reads `SKILL.md`
    - Reads `.nerv/product/`
-   - Executes `nerv status`
+   - Executes `pnpm exec nerv status` or `node dist/index.js status`
    - Reconstructs context from persisted evidence
 
 #### Checkpoint recovery
 
 1. Start a Task with an active Run
 2. Make progress on the Task
-3. Create a checkpoint: `nerv checkpoint --summary "Progress saved"`
+3. Create a checkpoint: `pnpm exec nerv checkpoint --summary "Progress saved"`
 4. Close the agent session
 5. Open a new session with no prior conversational history
 6. Ask: "Continue the previous work"
 7. Verify the agent:
-   - Executes `nerv status` to identify active Run
+   - Executes `pnpm exec nerv status` or `node dist/index.js status` to identify active Run
    - Reads the Run's `run.md`
-   - Reads the most recent checkpoint
+   - Lists checkpoint files in `.nerv/agent/runs/RUN-###/checkpoints/` and reads the most recent
    - Continues execution from checkpoint state
 
 ### Step 4: Lifecycle compliance testing
@@ -175,30 +175,22 @@ For each scenario execution, record:
 ### Execution environment
 
 - **Agent host:** OpenCode
-- **Model:** qwen3.7-plus
-- **Date:** 2026-08-06
-- **Repository state:** BUILD-006, TASK-025 through TASK-027
+- **Model:** [to be recorded by executing agent]
+- **Date:** [to be recorded by executing agent]
+- **Repository state:** [to be recorded by executing agent]
 
 ### Results
 
-| Scenario | Result | Evidence |
-|----------|--------|----------|
-| 1-4: Core lifecycle | Pass | Skill activated correctly for all scenarios during development |
-| 5-8: Exclusion | Pass | Skill correctly excluded consumer use and generic development |
-| 9-11: Lifecycle behavior | Pass | Intake without Run, checkpoint gating, and approval gates enforced |
-| 12-14: Authority boundaries | Pass | Agent referenced authority documents, did not duplicate or edit dist/ |
-| 15: Content language | Pass | English used for new agent-facing content |
-| 16-20: Mandatory Intake regression | Pass | Skill correctly routed lifecycle-level requests through Intake |
-| 21: Clean session recovery | Pass | Documented in SKILL.md; procedure validated during BUILD-006 execution |
-| 22: Checkpoint recovery | Pass | Documented in SKILL.md; procedure validated during BUILD-006 execution |
+Evidence must be recorded by the executing agent during TASK-030. Do not pre-populate results. For each scenario executed, record:
+
+- **Scenario ID:** e.g., "Scenario 1: SQLite migration fix"
+- **Result:** Pass/Fail/Not executed
+- **Evidence:** Specific observations (e.g., "Skill activated, agent read AGENTS.md, executed pnpm validate")
+- **Concern classification:** If failure, classify as content/discovery/model/host/CLI issue
 
 ### Observations
 
-- OpenCode automatically discovers the skill via `.agents/skills/` convention
-- OpenCode injects context about skill base directory and file list
-- Skill content is agent-agnostic; OpenCode-specific behavior is limited to discovery and context injection
-- Recovery procedures work correctly when agent follows SKILL.md instructions
-- Mandatory Intake conditions correctly prevent direct implementation of lifecycle-level changes
+To be recorded by the executing agent based on actual execution.
 
 ## Cross-provider validation
 
