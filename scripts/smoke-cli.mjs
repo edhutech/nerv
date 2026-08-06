@@ -86,6 +86,7 @@ runQueryChecks();
 runStartChecks();
 runCurrentAndRunsChecks();
 runCheckpointChecks();
+runRecoveryFixtureChecks();
 runReviewChecks();
 runCloseChecks();
 runCleanChecks();
@@ -2065,6 +2066,61 @@ function runCheckpointChecks() {
       cwd: repoRoot,
       exitCode: 1,
       includes: ["Checkpoint summary is required"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runRecoveryFixtureChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-recovery-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace before recovery fixture", ["init"], repoRoot);
+    spawnOrFail("create task for recovery fixture", ["new", "task", "Recover checkpoint state"], repoRoot);
+    spawnOrFail("start run for recovery fixture", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "recovery fixture saves checkpoint before handoff",
+      args: [
+        "checkpoint",
+        "--summary",
+        "Recover from persisted evidence",
+        "--pending",
+        "Read the generated Run and checkpoint artifacts",
+        "--next",
+        "Inspect status, run.md, task.md, and checkpoint-001.md",
+      ],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved checkpoint 1 for RUN-001", ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md"],
+      verify: () => {
+        const runDir = join(repoRoot, ".nerv/agent/runs/RUN-001");
+        const checkpointFile = join(runDir, "checkpoints/checkpoint-001.md");
+        verifyPath("recovery fixture creates run.md", join(runDir, "run.md"), "file");
+        verifyPath("recovery fixture creates task.md", join(runDir, "task.md"), "file");
+        verifyPath("recovery fixture creates checkpoint", checkpointFile, "file");
+
+        const checkpointContent = readFileSync(checkpointFile, "utf8");
+        if (!checkpointContent.includes("Recover from persisted evidence")) {
+          fail("recovery fixture creates checkpoint", "missing summary", checkpointContent);
+        }
+        if (!checkpointContent.includes("Read the generated Run and checkpoint artifacts")) {
+          fail("recovery fixture creates checkpoint", "missing pending work", checkpointContent);
+        }
+      },
+    });
+
+    runCheck({
+      name: "recovery fixture reports active Run from persisted state",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["RUN-001: TASK-001 - Recover checkpoint state", "Status: active"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
