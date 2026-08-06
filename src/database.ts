@@ -7,6 +7,8 @@ const REQUIRED_TABLES = [
   "checkpoints",
   "reviews",
   "build_reviews",
+  "build_audit_classifications",
+  "build_closure_evidence",
   "close_records",
   "decisions",
   "status_history",
@@ -60,6 +62,8 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   checkpoints: ["id", "run_id", "summary", "created_at"],
   reviews: ["id", "run_id", "outcome", "summary", "validation", "evidence", "created_at"],
   build_reviews: ["id", "build_id", "outcome", "summary", "validation", "evidence", "integration", "residual_risks", "follow_up", "created_at"],
+  build_audit_classifications: ["id", "build_id", "audit_class", "rationale", "created_at"],
+  build_closure_evidence: ["id", "build_id", "review_id", "outcome", "evidence", "created_at"],
   close_records: ["run_id", "commit_hash", "closed_at"],
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
@@ -153,6 +157,26 @@ const SCHEMA_STATEMENTS = [
     evidence TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (build_id) REFERENCES builds(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS build_audit_classifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    build_id TEXT NOT NULL,
+    audit_class TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(build_id),
+    FOREIGN KEY (build_id) REFERENCES builds(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS build_closure_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    build_id TEXT NOT NULL,
+    review_id INTEGER NOT NULL,
+    outcome TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(review_id, outcome),
+    FOREIGN KEY (build_id) REFERENCES builds(id),
+    FOREIGN KEY (review_id) REFERENCES build_reviews(id)
   )`,
   `CREATE TABLE IF NOT EXISTS close_records (
     run_id TEXT PRIMARY KEY,
@@ -250,7 +274,7 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "10";
+const SCHEMA_VERSION = "11";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -388,6 +412,21 @@ function migrateSchema(database: Database.Database): void {
     )`);
   }
 
+  if (!hasTable(database, "build_audit_classifications")) {
+    database.exec(`CREATE TABLE build_audit_classifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, build_id TEXT NOT NULL, audit_class TEXT NOT NULL,
+      rationale TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(build_id),
+      FOREIGN KEY (build_id) REFERENCES builds(id)
+    )`);
+  }
+  if (!hasTable(database, "build_closure_evidence")) {
+    database.exec(`CREATE TABLE build_closure_evidence (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, build_id TEXT NOT NULL, review_id INTEGER NOT NULL,
+      outcome TEXT NOT NULL, evidence TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(review_id, outcome),
+      FOREIGN KEY (build_id) REFERENCES builds(id), FOREIGN KEY (review_id) REFERENCES build_reviews(id)
+    )`);
+  }
+
   if (!hasTable(database, "product_sessions")) {
     database.exec(`CREATE TABLE product_sessions (
       id TEXT PRIMARY KEY,
@@ -465,6 +504,21 @@ function migrateSchema(database: Database.Database): void {
       if (!existingColumnNames.has(columnName)) {
         database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} TEXT`);
       }
+    }
+  }
+
+  if (getColumnNames(database, "builds").has("id")) {
+    const createdAt = new Date().toISOString();
+    const classifications = [
+      ...Array.from({ length: 7 }, (_, index) => [`BUILD-${String(index + 5).padStart(3, "0")}`, "legacy_reviewed", "Reviewed before closure-matrix evidence was required."] as const),
+      ...Array.from({ length: 3 }, (_, index) => [`BUILD-${String(index + 12).padStart(3, "0")}`, "retrospectively_nonconformant", "Closed before the closure-matrix evidence standard was adopted."] as const),
+    ];
+    const insertClassification = database.prepare(
+      `INSERT OR IGNORE INTO build_audit_classifications (build_id, audit_class, rationale, created_at)
+       SELECT @buildId, @auditClass, @rationale, @createdAt WHERE EXISTS (SELECT 1 FROM builds WHERE id = @buildId)`,
+    );
+    for (const [buildId, auditClass, rationale] of classifications) {
+      insertClassification.run({ buildId, auditClass, rationale, createdAt });
     }
   }
 }

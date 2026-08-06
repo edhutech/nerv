@@ -1,7 +1,7 @@
 import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { openRepository, type BuildRecord, type BuildReviewRecord, type TaskRecord } from "./repository.js";
+import { openRepository, type BuildAuditClassificationRecord, type BuildRecord, type BuildReviewRecord, type TaskRecord } from "./repository.js";
 
 export type CreateBuildResult = {
   build: BuildRecord;
@@ -49,7 +49,7 @@ export type PlanBuildResult = {
   skipped: boolean;
 };
 
-export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[], review?: BuildReviewRecord): string {
+export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[], review?: BuildReviewRecord, audit?: BuildAuditClassificationRecord | null): string {
   const markdownPath = build.generated_markdown_path || join(workspaceRoot, "agent", "builds", `${build.id}.md`);
   if (!existsSync(markdownPath)) {
     throw new Error(`Build Markdown for ${build.id} was not found at ${markdownPath}.`);
@@ -60,6 +60,7 @@ export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tas
   content = replaceBuildSection(content, "Status", capitalizeFirst(build.status));
   content = replaceBuildSection(content, "Task Progress", progress, true);
   if (review) content = replaceBuildSection(content, "Review", `${capitalizeFirst(review.outcome)} on ${review.created_at}. ${review.summary}`);
+  if (audit) content = replaceBuildSection(content, "Audit Classification", `${audit.audit_class}\n\n${audit.rationale}`);
   content = replaceBuildSection(content, "Close summary", closeSummary);
   writeFileSync(markdownPath, content, "utf8");
   return markdownPath;

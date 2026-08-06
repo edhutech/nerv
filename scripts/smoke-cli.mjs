@@ -2690,7 +2690,7 @@ function runCloseChecks() {
 
       runCheck({
         name: "build review records whole Build evidence",
-        args: ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "All tasks integrate correctly", "--validation", "passed", "--evidence", "Full suite passed"],
+        args: ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "All tasks integrate correctly", "--validation", "passed", "--evidence", "Full suite passed", "--closure-evidence", "acceptance_criteria=Acceptance criteria verified", "task_reviews=All Task reviews passed", "validation=Full suite passed", "integration=Tasks integrate correctly"],
         cwd: buildRepoRoot,
         exitCode: 0,
         includes: ["Saved Build review 1 for BUILD-001", "Outcome: passed", "Validation: passed"],
@@ -2758,7 +2758,7 @@ function runCloseChecks() {
           exitCode: 1,
           includes: ["cannot be closed without a passed Build review"],
           setup: () => {
-            spawnOrFail("first Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Initial pass", "--validation", "passed", "--evidence", "Integrated validation passed"], repeatReviewRepoRoot);
+            spawnOrFail("first Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Initial pass", "--validation", "passed", "--evidence", "Integrated validation passed", "--closure-evidence", "acceptance_criteria=Acceptance criteria verified", "task_reviews=All Task reviews passed", "validation=Integrated validation passed", "integration=Integration verified"], repeatReviewRepoRoot);
             spawnOrFail("second Build review fails", ["build", "review", "BUILD-001", "--outcome", "failed", "--summary", "Later failure", "--validation", "failed"], repeatReviewRepoRoot);
           },
           verify: () => {
@@ -2784,7 +2784,7 @@ function runCloseChecks() {
           exitCode: 0,
           includes: ["Closed BUILD-001", "Status: closed"],
           setup: () => {
-            spawnOrFail("third Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Final pass", "--validation", "passed", "--evidence", "Final integrated validation passed"], repeatReviewRepoRoot);
+            spawnOrFail("third Build review passes", ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "Final pass", "--validation", "passed", "--evidence", "Final integrated validation passed", "--closure-evidence", "acceptance_criteria=Acceptance criteria verified", "task_reviews=All Task reviews passed", "validation=Final integrated validation passed", "integration=Integration verified"], repeatReviewRepoRoot);
           },
           verify: () => {
             const dbPath = join(repeatReviewRepoRoot, ".nerv/nerv.db");

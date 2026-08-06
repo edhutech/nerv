@@ -92,6 +92,23 @@ export type BuildReviewRecord = {
   created_at: string;
 };
 
+export type BuildAuditClassificationRecord = {
+  id: number;
+  build_id: string;
+  audit_class: string;
+  rationale: string;
+  created_at: string;
+};
+
+export type BuildClosureEvidenceRecord = {
+  id: number;
+  build_id: string;
+  review_id: number;
+  outcome: string;
+  evidence: string;
+  created_at: string;
+};
+
 export type CloseRecord = {
   run_id: string;
   commit_hash: string | null;
@@ -177,6 +194,7 @@ export type CreateBuildReviewInput = {
   integration?: string | null;
   residual_risks?: string | null;
   follow_up?: string | null;
+  closure_evidence?: ReadonlyArray<{ outcome: string; evidence: string }>;
 };
 
 export type CreateCloseInput = {
@@ -217,6 +235,9 @@ export type Repository = {
   createBuildReview(input: CreateBuildReviewInput): BuildReviewRecord;
   listBuildReviews(buildId: string): BuildReviewRecord[];
   hasPassedBuildReview(buildId: string): boolean;
+  getBuildAuditClassification(buildId: string): BuildAuditClassificationRecord | null;
+  listBuildClosureEvidence(buildId: string): BuildClosureEvidenceRecord[];
+  hasCompleteBuildClosureEvidence(buildId: string): boolean;
   createCloseRecord(input: CreateCloseInput): CloseRecord;
   getCloseRecord(runId: string): CloseRecord | null;
   getCurrentRunId(): string | null;
@@ -377,6 +398,17 @@ export function openRepository(databasePath: string): Repository {
   const listBuildReviewsStmt = database.prepare(`SELECT * FROM build_reviews WHERE build_id = ? ORDER BY id ASC`);
   const getLatestTaskReviewStmt = database.prepare(
     `SELECT reviews.* FROM reviews JOIN runs ON runs.id = reviews.run_id WHERE runs.task_id = ? ORDER BY reviews.id DESC LIMIT 1`,
+  );
+  const getBuildAuditClassificationStmt = database.prepare(`SELECT * FROM build_audit_classifications WHERE build_id = ?`);
+  const listBuildClosureEvidenceStmt = database.prepare(`SELECT * FROM build_closure_evidence WHERE build_id = ? ORDER BY id ASC`);
+  const insertBuildClosureEvidenceStmt = database.prepare(
+    `INSERT INTO build_closure_evidence (build_id, review_id, outcome, evidence, created_at)
+     VALUES (@buildId, @reviewId, @outcome, @evidence, @createdAt)`,
+  );
+  const getLatestBuildReviewStmt = database.prepare(`SELECT * FROM build_reviews WHERE build_id = ? ORDER BY id DESC LIMIT 1`);
+  const countLatestClosureEvidenceStmt = database.prepare(
+    `SELECT COUNT(DISTINCT outcome) AS count FROM build_closure_evidence
+     WHERE review_id = ? AND outcome IN ('acceptance_criteria', 'task_reviews', 'validation', 'integration') AND trim(evidence) != ''`,
   );
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
@@ -747,7 +779,11 @@ export function openRepository(databasePath: string): Repository {
       followUp: input.follow_up ?? null,
       createdAt: new Date().toISOString(),
     });
-    return getBuildReviewStmt.get(result.lastInsertRowid) as BuildReviewRecord;
+    const review = getBuildReviewStmt.get(result.lastInsertRowid) as BuildReviewRecord;
+    for (const item of input.closure_evidence ?? []) {
+      insertBuildClosureEvidenceStmt.run({ buildId: input.build_id, reviewId: review.id, outcome: item.outcome, evidence: item.evidence, createdAt: review.created_at });
+    }
+    return review;
   });
 
   const listBuildReviews = (buildId: string): BuildReviewRecord[] => {
@@ -759,6 +795,21 @@ export function openRepository(databasePath: string): Repository {
     if (reviews.length === 0) return false;
     const latestReview = reviews[reviews.length - 1];
     return latestReview.outcome === "passed" && latestReview.validation === "passed" && Boolean(latestReview.evidence?.trim());
+  };
+
+  const getBuildAuditClassification = (buildId: string): BuildAuditClassificationRecord | null => {
+    return (getBuildAuditClassificationStmt.get(buildId) as BuildAuditClassificationRecord | undefined) ?? null;
+  };
+
+  const listBuildClosureEvidence = (buildId: string): BuildClosureEvidenceRecord[] => {
+    return listBuildClosureEvidenceStmt.all(buildId) as BuildClosureEvidenceRecord[];
+  };
+
+  const hasCompleteBuildClosureEvidence = (buildId: string): boolean => {
+    const review = getLatestBuildReviewStmt.get(buildId) as BuildReviewRecord | undefined;
+    if (!review) return false;
+    const row = countLatestClosureEvidenceStmt.get(review.id) as { count: number } | undefined;
+    return row?.count === 4;
   };
 
   const createCloseRecordStmt = database.prepare(
@@ -850,6 +901,9 @@ export function openRepository(databasePath: string): Repository {
     createBuildReview,
     listBuildReviews,
     hasPassedBuildReview,
+    getBuildAuditClassification,
+    listBuildClosureEvidence,
+    hasCompleteBuildClosureEvidence,
     createCloseRecord,
     getCloseRecord,
     getCurrentRunId(): string | null {

@@ -31,6 +31,25 @@ const PRODUCT_CONTEXT_FILES = [
   "evolution.md",
 ] as const;
 
+const REQUIRED_CLOSURE_OUTCOMES = ["acceptance_criteria", "task_reviews", "validation", "integration"] as const;
+
+function parseClosureEvidence(values?: string[]): Array<{ outcome: string; evidence: string }> {
+  const evidenceByOutcome = new Map<string, string>();
+  for (const value of values ?? []) {
+    const separator = value.indexOf("=");
+    if (separator <= 0) continue;
+    const outcome = value.slice(0, separator).trim().toLowerCase();
+    const evidence = value.slice(separator + 1).trim();
+    if (REQUIRED_CLOSURE_OUTCOMES.includes(outcome as (typeof REQUIRED_CLOSURE_OUTCOMES)[number]) && evidence) {
+      evidenceByOutcome.set(outcome, evidence);
+    }
+  }
+  return REQUIRED_CLOSURE_OUTCOMES.flatMap((outcome) => {
+    const evidence = evidenceByOutcome.get(outcome);
+    return evidence ? [{ outcome, evidence }] : [];
+  });
+}
+
 function notImplemented(commandName: string): void {
   program.error(
     `nerv ${commandName} is not implemented yet. This command skeleton was added for BUILD-001/TASK-002.`,
@@ -617,8 +636,9 @@ buildCommand
   .option("--integration <integration>", "Integrated Task compatibility result.")
   .option("--residual-risks <risks>", "Residual risks or none.")
   .option("--follow-up <followUp>", "Required follow-up or none.")
+  .option("--closure-evidence <outcome=evidence...>", "Closure evidence for acceptance_criteria, task_reviews, validation, and integration.")
   .description("Review a completed Build as a whole before closing it.")
-  .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string }) => {
+  .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; closureEvidence?: string[] }) => {
     const status = getInitializedWorkspaceStatus(process.cwd());
     if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
       program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
@@ -640,12 +660,17 @@ buildCommand
       return;
     }
     const evidence = options.evidence?.trim() || null;
+    const closureEvidence = parseClosureEvidence(options.closureEvidence);
     if (outcome === "passed" && validation !== "passed") {
       program.error("A passed Build review requires passed validation.", { code: "NERV_BUILD_REVIEW_PASSED_VALIDATION_REQUIRED", exitCode: 1 });
       return;
     }
     if (outcome === "passed" && !evidence) {
       program.error("A passed Build review requires evidence.", { code: "NERV_BUILD_REVIEW_PASSED_EVIDENCE_REQUIRED", exitCode: 1 });
+      return;
+    }
+    if (outcome === "passed" && closureEvidence.length !== 4) {
+      program.error("A passed Build review requires closure evidence for acceptance_criteria, task_reviews, validation, and integration.", { code: "NERV_BUILD_CLOSURE_EVIDENCE_INCOMPLETE", exitCode: 1 });
       return;
     }
     const repository = openRepository(status.databasePath);
@@ -671,14 +696,15 @@ buildCommand
         program.error(`Build ${build.id} cannot be reviewed until every Task has a current passed review. Missing: ${incompleteReviews.map((task) => task.id).join(", ")}.`, { code: "NERV_BUILD_TASK_REVIEWS_INCOMPLETE", exitCode: 1 });
         return;
       }
-      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence, integration: options.integration?.trim() || null, residual_risks: options.residualRisks?.trim() || null, follow_up: options.followUp?.trim() || null });
+      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence, integration: options.integration?.trim() || null, residual_risks: options.residualRisks?.trim() || null, follow_up: options.followUp?.trim() || null, closure_evidence: closureEvidence });
       repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
       const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, integration: review.integration ?? undefined, residualRisks: review.residual_risks ?? undefined, followUp: review.follow_up ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
-      syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review);
+      syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review, repository.getBuildAuditClassification(build.id));
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
       console.log(`  Outcome: ${outcome}`);
       console.log(`  Validation: ${validation}`);
+      if (closureEvidence.length > 0) console.log(`  Closure matrix: ${closureEvidence.length}/4 outcomes evidenced`);
       console.log(`  Review file: ${reviewPath}`);
     } finally { repository.close(); }
   });
@@ -718,14 +744,45 @@ buildCommand
         program.error(`Build ${build.id} cannot be closed without a passed Build review.\nRun \`nerv build review ${build.id} --outcome passed --summary "..."\` first.`, { code: "NERV_BUILD_NOT_REVIEWED", exitCode: 1 });
         return;
       }
+      if (!repository.hasCompleteBuildClosureEvidence(build.id)) {
+        program.error(`Build ${build.id} cannot be closed without complete closure-matrix evidence.`, { code: "NERV_BUILD_CLOSURE_EVIDENCE_INCOMPLETE", exitCode: 1 });
+        return;
+      }
       const now = new Date().toISOString();
       repository.updateBuild(build.id, { status: "closed", closed_at: now });
       const closedBuild = repository.getBuild(build.id)!;
-      syncBuildMarkdown(status.workspaceRoot, closedBuild, repository.listTasksByBuild(build.id));
+      syncBuildMarkdown(status.workspaceRoot, closedBuild, repository.listTasksByBuild(build.id), undefined, repository.getBuildAuditClassification(build.id));
       const evolutionPath = appendBuildProductEvolution(status.workspaceRoot, { buildId: closedBuild.id, buildTitle: closedBuild.title, closedAt: now });
       console.log(`Closed ${closedBuild.id}.`);
       console.log("  Status: closed");
       if (evolutionPath) console.log(`  Product evolution updated: ${evolutionPath}`);
+    } finally { repository.close(); }
+  });
+
+buildCommand
+  .command("audit")
+  .argument("[buildId]", "Build ID to display.")
+  .description("Display durable Build audit classifications and closure-matrix evidence.")
+  .action((buildId?: string) => {
+    const status = getInitializedWorkspaceStatus(process.cwd());
+    if (!status.initialized || !status.databasePath) {
+      program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
+      return;
+    }
+    const repository = openRepository(status.databasePath);
+    try {
+      const builds = buildId ? [repository.getBuild(buildId.toUpperCase())].filter((build): build is NonNullable<typeof build> => build !== null) : repository.listBuilds();
+      if (buildId && builds.length === 0) {
+        program.error(`Build ${buildId.toUpperCase()} not found.`, { code: "NERV_BUILD_NOT_FOUND", exitCode: 1 });
+        return;
+      }
+      for (const build of builds) {
+        const audit = repository.getBuildAuditClassification(build.id);
+        const matrix = repository.listBuildClosureEvidence(build.id);
+        console.log(`${build.id}: ${audit ? audit.audit_class : "current"}`);
+        if (audit) console.log(`  Rationale: ${audit.rationale}`);
+        console.log(`  Closure matrix: ${repository.hasCompleteBuildClosureEvidence(build.id) ? "complete" : "incomplete"} (${matrix.length} row(s))`);
+      }
     } finally { repository.close(); }
   });
 
@@ -746,7 +803,7 @@ buildCommand
         program.error(`Build ${buildId.toUpperCase()} not found.`, { code: "NERV_BUILD_NOT_FOUND", exitCode: 1 });
         return;
       }
-      const path = syncBuildMarkdown(status.workspaceRoot, build, repository.listTasksByBuild(build.id));
+      const path = syncBuildMarkdown(status.workspaceRoot, build, repository.listTasksByBuild(build.id), undefined, repository.getBuildAuditClassification(build.id));
       console.log(`Synchronized ${build.id} Markdown: ${path}`);
     } finally { repository.close(); }
   });
