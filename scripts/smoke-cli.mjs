@@ -2145,7 +2145,12 @@ function runCleanContextFixtureChecks() {
     spawnOrFail("start run for clean context fixture", ["start", "TASK-001"], repoRoot);
     spawnOrFail(
       "create checkpoint for clean context fixture",
-      ["checkpoint", "--summary", "Fresh evaluator must use persisted authority"],
+      ["checkpoint", "--summary", "Fresh evaluator reads initial checkpoint", "--pending", "Stale pending context", "--next", "Stale next step"],
+      repoRoot,
+    );
+    spawnOrFail(
+      "create latest checkpoint for clean context fixture",
+      ["checkpoint", "--summary", "Fresh evaluator reads latest checkpoint", "--pending", "Resume from the latest persisted checkpoint", "--next", "Review the newest checkpoint before continuing"],
       repoRoot,
     );
     mkdirSync(join(repoRoot, ".agents/skills/nerv-development"), { recursive: true });
@@ -2166,7 +2171,8 @@ function runCleanContextFixtureChecks() {
         verifyPath("clean context fixture creates Repo Context", join(repoRoot, ".nerv/repo/development.md"), "file");
         verifyPath("clean context fixture creates run.md", join(repoRoot, ".nerv/agent/runs/RUN-001/run.md"), "file");
         verifyPath("clean context fixture creates task.md", join(repoRoot, ".nerv/agent/runs/RUN-001/task.md"), "file");
-        verifyPath("clean context fixture creates checkpoint", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md"), "file");
+        verifyPath("clean context fixture creates initial checkpoint", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md"), "file");
+        verifyPath("clean context fixture creates latest checkpoint", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-002.md"), "file");
         verifyPath("clean context fixture exposes canonical skill", join(repoRoot, ".agents/skills/nerv-development/SKILL.md"), "file");
       },
     });
@@ -2195,15 +2201,22 @@ function runCleanContextFixtureChecks() {
       ".nerv/repo/development.md",
       ".nerv/agent/runs/RUN-001/run.md",
       ".nerv/agent/runs/RUN-001/task.md",
-      ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md",
     ]) {
       if (!recovered.paths.includes(path)) {
         fail("fresh local evaluator reconstructs persisted authority", `missing recovered path: ${path}`, evaluatorOutput);
       }
     }
 
-    if (recovered.current !== "RUN-001" || !recovered.status.includes("RUN-001: TASK-001 - Recover authority context")) {
+    if (recovered.current !== "RUN-001" || recovered.recovery.task !== "TASK-001" || !recovered.status.includes("RUN-001: TASK-001 - Recover authority context")) {
       fail("fresh local evaluator reconstructs persisted authority", "did not recover active Run from CLI", evaluatorOutput);
+    }
+
+    if (
+      recovered.recovery.checkpoint !== ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-002.md"
+      || recovered.recovery.pending !== "Resume from the latest persisted checkpoint"
+      || recovered.recovery.next !== "Review the newest checkpoint before continuing"
+    ) {
+      fail("fresh local evaluator reconstructs persisted authority", "did not reconstruct pending and next-step context from the newest checkpoint", evaluatorOutput);
     }
 
     const canonicalSkill = readFileSync(join(root, ".agents/skills/nerv-development/SKILL.md"), "utf8");
