@@ -207,6 +207,7 @@ export type Repository = {
   createReview(input: CreateReviewInput): ReviewRecord;
   listReviews(runId: string): ReviewRecord[];
   hasPassedReview(runId: string): boolean;
+  hasPassedTaskReview(taskId: string): boolean;
   createBuildReview(input: CreateBuildReviewInput): BuildReviewRecord;
   listBuildReviews(buildId: string): BuildReviewRecord[];
   hasPassedBuildReview(buildId: string): boolean;
@@ -368,6 +369,9 @@ export function openRepository(databasePath: string): Repository {
   );
   const getBuildReviewStmt = database.prepare(`SELECT * FROM build_reviews WHERE id = ?`);
   const listBuildReviewsStmt = database.prepare(`SELECT * FROM build_reviews WHERE build_id = ? ORDER BY id ASC`);
+  const getLatestTaskReviewStmt = database.prepare(
+    `SELECT reviews.* FROM reviews JOIN runs ON runs.id = reviews.run_id WHERE runs.task_id = ? ORDER BY reviews.id DESC LIMIT 1`,
+  );
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
     const now = new Date().toISOString();
@@ -720,6 +724,11 @@ export function openRepository(databasePath: string): Repository {
     return latestReview?.outcome === "passed" && latestReview.validation === "passed" && Boolean(latestReview.evidence?.trim());
   };
 
+  const hasPassedTaskReview = (taskId: string): boolean => {
+    const review = getLatestTaskReviewStmt.get(taskId) as ReviewRecord | undefined;
+    return review?.outcome === "passed" && review.validation === "passed" && Boolean(review.evidence?.trim());
+  };
+
   const createBuildReview = database.transaction((input: CreateBuildReviewInput): BuildReviewRecord => {
     const result = createBuildReviewStmt.run({
       buildId: input.build_id,
@@ -828,6 +837,7 @@ export function openRepository(databasePath: string): Repository {
     createReview,
     listReviews,
     hasPassedReview,
+    hasPassedTaskReview,
     createBuildReview,
     listBuildReviews,
     hasPassedBuildReview,

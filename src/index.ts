@@ -662,10 +662,15 @@ buildCommand
         program.error(`Build ${build.id} cannot be reviewed until all of its Tasks are closed.`, { code: "NERV_BUILD_TASKS_OPEN", exitCode: 1 });
         return;
       }
+      const tasks = repository.listTasksByBuild(build.id);
+      const incompleteReviews = tasks.filter((task) => !repository.hasPassedTaskReview(task.id));
+      if (incompleteReviews.length > 0) {
+        program.error(`Build ${build.id} cannot be reviewed until every Task has a current passed review. Missing: ${incompleteReviews.map((task) => task.id).join(", ")}.`, { code: "NERV_BUILD_TASK_REVIEWS_INCOMPLETE", exitCode: 1 });
+        return;
+      }
       const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence });
       repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
-      const tasks = repository.listTasksByBuild(build.id);
       const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
       syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review);
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
@@ -699,6 +704,11 @@ buildCommand
       const totalTasks = repository.getBuildTaskCount(build.id);
       if (totalTasks === 0 || repository.getBuildOpenTaskCount(build.id) > 0) {
         program.error(`Build ${build.id} cannot be closed until all of its Tasks are closed.`, { code: "NERV_BUILD_TASKS_OPEN", exitCode: 1 });
+        return;
+      }
+      const incompleteReviews = repository.listTasksByBuild(build.id).filter((task) => !repository.hasPassedTaskReview(task.id));
+      if (incompleteReviews.length > 0) {
+        program.error(`Build ${build.id} cannot be closed until every Task has a current passed review. Missing: ${incompleteReviews.map((task) => task.id).join(", ")}.`, { code: "NERV_BUILD_TASK_REVIEWS_INCOMPLETE", exitCode: 1 });
         return;
       }
       if (!repository.hasPassedBuildReview(build.id)) {
