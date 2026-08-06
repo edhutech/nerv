@@ -59,7 +59,7 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   runs: ["id", "task_id", "status", "created_at", "updated_at", "closed_at"],
   checkpoints: ["id", "run_id", "summary", "created_at"],
   reviews: ["id", "run_id", "outcome", "summary", "validation", "evidence", "created_at"],
-  build_reviews: ["id", "build_id", "outcome", "summary", "validation", "evidence", "created_at"],
+  build_reviews: ["id", "build_id", "outcome", "summary", "validation", "evidence", "integration", "residual_risks", "follow_up", "created_at"],
   close_records: ["run_id", "commit_hash", "closed_at"],
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
@@ -138,6 +138,9 @@ const SCHEMA_STATEMENTS = [
     summary TEXT NOT NULL,
     validation TEXT NOT NULL DEFAULT 'not_run',
     evidence TEXT,
+    integration TEXT,
+    residual_risks TEXT,
+    follow_up TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
   )`,
@@ -271,7 +274,7 @@ const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonl
     "generated_markdown_path",
   ],
   reviews: ["validation", "evidence"],
-  build_reviews: ["validation", "evidence"],
+  build_reviews: ["validation", "evidence", "integration", "residual_risks", "follow_up"],
   // Product Context lifecycle columns were introduced after the initial session tables.
   // They are additive so existing local workspaces remain usable.
   product_sessions: ["input_manifest"],

@@ -614,8 +614,11 @@ buildCommand
   .requiredOption("--summary <summary>", "Review summary.")
   .option("--validation <validation>", "Validation status: passed, failed, or not_run.")
   .option("--evidence <evidence>", "Evidence summary.")
+  .option("--integration <integration>", "Integrated Task compatibility result.")
+  .option("--residual-risks <risks>", "Residual risks or none.")
+  .option("--follow-up <followUp>", "Required follow-up or none.")
   .description("Review a completed Build as a whole before closing it.")
-  .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string }) => {
+  .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string }) => {
     const status = getInitializedWorkspaceStatus(process.cwd());
     if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
       program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
@@ -668,10 +671,10 @@ buildCommand
         program.error(`Build ${build.id} cannot be reviewed until every Task has a current passed review. Missing: ${incompleteReviews.map((task) => task.id).join(", ")}.`, { code: "NERV_BUILD_TASK_REVIEWS_INCOMPLETE", exitCode: 1 });
         return;
       }
-      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence });
+      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence, integration: options.integration?.trim() || null, residual_risks: options.residualRisks?.trim() || null, follow_up: options.followUp?.trim() || null });
       repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
-      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
+      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, integration: review.integration ?? undefined, residualRisks: review.residual_risks ?? undefined, followUp: review.follow_up ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
       syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review);
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
       console.log(`  Outcome: ${outcome}`);
@@ -1262,7 +1265,7 @@ function writeBuildReviewMarkdown(
   reviewId: number,
   build: { id: string; title: string; acceptance_criteria: string | null; validation: string | null },
   tasks: Array<{ id: string; title: string; status: string }>,
-  details: { outcome: string; summary: string; validation: string; evidence?: string; git: { status: string; diff: string } },
+  details: { outcome: string; summary: string; validation: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; git: { status: string; diff: string } },
 ): string {
   const reviewDir = join(workspaceRoot, "agent", "builds", build.id, "reviews");
   mkdirSync(reviewDir, { recursive: true });
@@ -1301,7 +1304,15 @@ ${tasks.map((task) => `- ${task.id}: ${task.title} (${task.status})`).join("\n")
 
 ## Integration Review
 
-Confirm the completed Tasks work together, their interfaces and generated artifacts remain compatible, and the Build outcome matches its scope.
+${formatOptionalText(details.integration)}
+
+## Residual Risks
+
+${formatOptionalText(details.residualRisks)}
+
+## Follow-up
+
+${formatOptionalText(details.followUp)}
 
 ## Expected Validation
 

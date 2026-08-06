@@ -86,6 +86,9 @@ export type BuildReviewRecord = {
   summary: string;
   validation: string | null;
   evidence: string | null;
+  integration: string | null;
+  residual_risks: string | null;
+  follow_up: string | null;
   created_at: string;
 };
 
@@ -171,6 +174,9 @@ export type CreateBuildReviewInput = {
   summary: string;
   validation?: string;
   evidence?: string | null;
+  integration?: string | null;
+  residual_risks?: string | null;
+  follow_up?: string | null;
 };
 
 export type CreateCloseInput = {
@@ -364,8 +370,8 @@ export function openRepository(databasePath: string): Repository {
     `SELECT * FROM reviews WHERE run_id = ? ORDER BY id ASC`,
   );
   const createBuildReviewStmt = database.prepare(
-    `INSERT INTO build_reviews (build_id, outcome, summary, validation, evidence, created_at)
-      VALUES (@buildId, @outcome, @summary, @validation, @evidence, @createdAt)`,
+    `INSERT INTO build_reviews (build_id, outcome, summary, validation, evidence, integration, residual_risks, follow_up, created_at)
+      VALUES (@buildId, @outcome, @summary, @validation, @evidence, @integration, @residualRisks, @followUp, @createdAt)`,
   );
   const getBuildReviewStmt = database.prepare(`SELECT * FROM build_reviews WHERE id = ?`);
   const listBuildReviewsStmt = database.prepare(`SELECT * FROM build_reviews WHERE build_id = ? ORDER BY id ASC`);
@@ -736,6 +742,9 @@ export function openRepository(databasePath: string): Repository {
       summary: input.summary,
       validation: input.validation ?? "not_run",
       evidence: input.evidence ?? null,
+      integration: input.integration ?? null,
+      residualRisks: input.residual_risks ?? null,
+      followUp: input.follow_up ?? null,
       createdAt: new Date().toISOString(),
     });
     return getBuildReviewStmt.get(result.lastInsertRowid) as BuildReviewRecord;
