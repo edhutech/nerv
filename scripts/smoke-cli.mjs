@@ -2206,6 +2206,11 @@ function runCleanContextFixtureChecks() {
       fail("fresh local evaluator reconstructs persisted authority", "did not recover active Run from CLI", evaluatorOutput);
     }
 
+    const canonicalSkill = readFileSync(join(root, ".agents/skills/nerv-development/SKILL.md"), "utf8");
+    if (!canonicalSkill.includes("node dist/index.js status") || !recovered.commands.includes("node dist/index.js status")) {
+      fail("fresh local evaluator reconstructs persisted authority", "canonical skill status example was not exercised", evaluatorOutput);
+    }
+
     console.log("ok - fresh local evaluator reconstructs persisted authority");
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });

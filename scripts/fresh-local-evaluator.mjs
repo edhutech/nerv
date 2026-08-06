@@ -39,6 +39,7 @@ const status = readCli(["status"]);
 
 console.log(JSON.stringify({
   paths: requiredPaths.map((path) => relative(repoRoot, `${repoRoot}/${path}`)),
+  commands: ["node dist/index.js current", "node dist/index.js status"],
   current: current.match(/RUN-\d+/)?.[0] ?? null,
   status,
 }));
