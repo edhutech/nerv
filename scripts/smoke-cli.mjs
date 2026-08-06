@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -11,6 +11,7 @@ import { openRepository } from "../dist/repository.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = resolve(root, "dist/index.js");
+const freshEvaluator = resolve(root, "scripts/fresh-local-evaluator.mjs");
 
 const checks = [
   {
@@ -2142,6 +2143,16 @@ function runCleanContextFixtureChecks() {
     spawnOrFail("create Repo Context for clean context fixture", ["repo"], repoRoot);
     spawnOrFail("create task for clean context fixture", ["new", "task", "Recover authority context"], repoRoot);
     spawnOrFail("start run for clean context fixture", ["start", "TASK-001"], repoRoot);
+    spawnOrFail(
+      "create checkpoint for clean context fixture",
+      ["checkpoint", "--summary", "Fresh evaluator must use persisted authority"],
+      repoRoot,
+    );
+    mkdirSync(join(repoRoot, ".agents/skills/nerv-development"), { recursive: true });
+    symlinkSync(
+      resolve(root, ".agents/skills/nerv-development/SKILL.md"),
+      join(repoRoot, ".agents/skills/nerv-development/SKILL.md"),
+    );
 
     runCheck({
       name: "clean context fixture exposes authority and active Run artifacts",
@@ -2155,8 +2166,47 @@ function runCleanContextFixtureChecks() {
         verifyPath("clean context fixture creates Repo Context", join(repoRoot, ".nerv/repo/development.md"), "file");
         verifyPath("clean context fixture creates run.md", join(repoRoot, ".nerv/agent/runs/RUN-001/run.md"), "file");
         verifyPath("clean context fixture creates task.md", join(repoRoot, ".nerv/agent/runs/RUN-001/task.md"), "file");
+        verifyPath("clean context fixture creates checkpoint", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md"), "file");
+        verifyPath("clean context fixture exposes canonical skill", join(repoRoot, ".agents/skills/nerv-development/SKILL.md"), "file");
       },
     });
+
+    const evaluator = spawnSync(process.execPath, [freshEvaluator, repoRoot, cli], {
+      cwd: tempRoot,
+      encoding: "utf8",
+    });
+    const evaluatorOutput = `${evaluator.stdout}${evaluator.stderr}`;
+
+    if (evaluator.status !== 0) {
+      fail("fresh local evaluator reconstructs persisted authority", `expected exit 0, got ${evaluator.status}`, evaluatorOutput);
+    }
+
+    let recovered;
+    try {
+      recovered = JSON.parse(evaluator.stdout);
+    } catch {
+      fail("fresh local evaluator reconstructs persisted authority", "expected JSON result from evaluator", evaluatorOutput);
+    }
+
+    for (const path of [
+      "AGENTS.md",
+      ".agents/skills/nerv-development/SKILL.md",
+      ".nerv/product/product.md",
+      ".nerv/repo/development.md",
+      ".nerv/agent/runs/RUN-001/run.md",
+      ".nerv/agent/runs/RUN-001/task.md",
+      ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md",
+    ]) {
+      if (!recovered.paths.includes(path)) {
+        fail("fresh local evaluator reconstructs persisted authority", `missing recovered path: ${path}`, evaluatorOutput);
+      }
+    }
+
+    if (recovered.current !== "RUN-001" || !recovered.status.includes("RUN-001: TASK-001 - Recover authority context")) {
+      fail("fresh local evaluator reconstructs persisted authority", "did not recover active Run from CLI", evaluatorOutput);
+    }
+
+    console.log("ok - fresh local evaluator reconstructs persisted authority");
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
