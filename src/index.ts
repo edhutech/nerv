@@ -8,7 +8,7 @@ import { ensureWorkspace, getInitializedWorkspaceStatus, getWorkspaceStatus } fr
 import { scaffoldProductContext, persistProductMetadata, persistDecisions, appendProductEvolution, appendBuildProductEvolution, startProductSession, discoverProductInputs, createProductInputManifest, generateProductEntrypoint, createProductContextProposal, getProductContextProposal, reviewProductContextProposal, productContextProposalStatus, applyProductContextProposal, getCurrentProductSessionState, reviewCurrentProductSession, closeCurrentProductSession } from "./product.js";
 import { analyzeRepo, generateDevelopmentDoc } from "./repo-context.js";
 import { discoverContext } from "./context.js";
-import { openRepository } from "./repository.js";
+import { openRepository, type BuildOutcomeRecord } from "./repository.js";
 import { createTaskFromIntent, detectLargeIntent, validateTaskBuild } from "./task.js";
 import { createBuildFromIntent, planBuildTasks, syncBuildMarkdown, syncTaskMarkdown } from "./build.js";
 import { startRun } from "./run.js";
@@ -32,6 +32,22 @@ const PRODUCT_CONTEXT_FILES = [
 ] as const;
 
 const REQUIRED_CLOSURE_OUTCOMES = ["acceptance_criteria", "task_reviews", "validation", "integration"] as const;
+
+type OutcomeMatrixInput = { build_outcome_id: number; criterion: string; executed_evidence: string; coverage_classification: string; residual_risk_decision: string; status: string };
+
+function parseOutcomeMatrix(values: string[] | undefined, outcomes: BuildOutcomeRecord[]): OutcomeMatrixInput[] {
+  const byReference = new Map(outcomes.map((outcome) => [outcome.proposal_task_ref, outcome]));
+  const matrix = new Map<number, OutcomeMatrixInput>();
+  for (const value of values ?? []) {
+    const separator = value.indexOf("=");
+    if (separator <= 0) continue;
+    const outcome = byReference.get(value.slice(0, separator).trim());
+    const fields = value.slice(separator + 1).split("|").map((field) => field.trim());
+    if (!outcome || fields.length !== 5 || fields.some((field) => !field)) continue;
+    matrix.set(outcome.id, { build_outcome_id: outcome.id, criterion: fields[0], executed_evidence: fields[1], coverage_classification: fields[2], residual_risk_decision: fields[3], status: fields[4].toLowerCase() });
+  }
+  return [...matrix.values()];
+}
 
 function parseClosureEvidence(values?: string[]): Array<{ outcome: string; evidence: string }> {
   const evidenceByOutcome = new Map<string, string>();
@@ -636,9 +652,10 @@ buildCommand
   .option("--integration <integration>", "Integrated Task compatibility result.")
   .option("--residual-risks <risks>", "Residual risks or none.")
   .option("--follow-up <followUp>", "Required follow-up or none.")
-  .option("--closure-evidence <outcome=evidence...>", "Closure evidence for acceptance_criteria, task_reviews, validation, and integration.")
+   .option("--outcome-matrix <task-ref=criterion|evidence|coverage|risk-decision|status...>", "One review row per approved outcome. Status: passed, failed, or blocked.")
+   .option("--closure-evidence <outcome=evidence...>", "Legacy closure evidence for Builds without approved outcomes.")
   .description("Review a completed Build as a whole before closing it.")
-  .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; closureEvidence?: string[] }) => {
+   .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; closureEvidence?: string[]; outcomeMatrix?: string[] }) => {
     const status = getInitializedWorkspaceStatus(process.cwd());
     if (!status.initialized || !status.databasePath || !status.workspaceRoot) {
       program.error("Nerv is not initialized in this repo. Run `nerv init` first.", { code: "NERV_WORKSPACE_NOT_INITIALIZED", exitCode: 1 });
@@ -669,10 +686,6 @@ buildCommand
       program.error("A passed Build review requires evidence.", { code: "NERV_BUILD_REVIEW_PASSED_EVIDENCE_REQUIRED", exitCode: 1 });
       return;
     }
-    if (outcome === "passed" && closureEvidence.length !== 4) {
-      program.error("A passed Build review requires closure evidence for acceptance_criteria, task_reviews, validation, and integration.", { code: "NERV_BUILD_CLOSURE_EVIDENCE_INCOMPLETE", exitCode: 1 });
-      return;
-    }
     const repository = openRepository(status.databasePath);
     try {
       const build = repository.getBuild(buildId.toUpperCase());
@@ -691,20 +704,33 @@ buildCommand
         return;
       }
       const tasks = repository.listTasksByBuild(build.id);
+      const approvedOutcomes = repository.listBuildOutcomes(build.id);
+      const outcomeMatrix = parseOutcomeMatrix(options.outcomeMatrix, approvedOutcomes);
+      const incompleteMatrix = outcomeMatrix.length !== approvedOutcomes.length || outcomeMatrix.some((item) => !["passed", "failed", "blocked"].includes(item.status) || item.criterion !== approvedOutcomes.find((outcome) => outcome.id === item.build_outcome_id)?.criterion);
+      const nonPassedMatrix = outcomeMatrix.some((item) => item.status !== "passed");
+      if (approvedOutcomes.length > 0 && outcome === "passed" && (incompleteMatrix || nonPassedMatrix)) {
+        program.error("A passed Build review requires a complete passed outcome matrix with criterion, executed evidence, coverage classification, and residual-risk decision for every approved outcome.", { code: "NERV_BUILD_OUTCOME_MATRIX_INCOMPLETE", exitCode: 1 });
+        return;
+      }
+      if (approvedOutcomes.length === 0 && outcome === "passed" && closureEvidence.length !== 4) {
+        program.error("A passed legacy Build review requires closure evidence for acceptance_criteria, task_reviews, validation, and integration.", { code: "NERV_BUILD_CLOSURE_EVIDENCE_INCOMPLETE", exitCode: 1 });
+        return;
+      }
       const incompleteReviews = tasks.filter((task) => !repository.hasPassedTaskReview(task.id));
       if (incompleteReviews.length > 0) {
         program.error(`Build ${build.id} cannot be reviewed until every Task has a current passed review. Missing: ${incompleteReviews.map((task) => task.id).join(", ")}.`, { code: "NERV_BUILD_TASK_REVIEWS_INCOMPLETE", exitCode: 1 });
         return;
       }
-      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence, integration: options.integration?.trim() || null, residual_risks: options.residualRisks?.trim() || null, follow_up: options.followUp?.trim() || null, closure_evidence: closureEvidence });
+      const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence, integration: options.integration?.trim() || null, residual_risks: options.residualRisks?.trim() || null, follow_up: options.followUp?.trim() || null, closure_evidence: closureEvidence, outcome_matrix: outcomeMatrix });
       repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
-      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, integration: review.integration ?? undefined, residualRisks: review.residual_risks ?? undefined, followUp: review.follow_up ?? undefined, git: captureGitContext(status.repoRoot ?? process.cwd()) });
-      syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review, repository.getBuildAuditClassification(build.id));
+      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, integration: review.integration ?? undefined, residualRisks: review.residual_risks ?? undefined, followUp: review.follow_up ?? undefined, outcomeMatrix: repository.listBuildReviewOutcomes(review.id), git: captureGitContext(status.repoRoot ?? process.cwd()) });
+      syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review, repository.getBuildAuditClassification(build.id), approvedOutcomes);
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
       console.log(`  Outcome: ${outcome}`);
       console.log(`  Validation: ${validation}`);
-      if (closureEvidence.length > 0) console.log(`  Closure matrix: ${closureEvidence.length}/4 outcomes evidenced`);
+      if (approvedOutcomes.length > 0) console.log(`  Outcome matrix: ${outcomeMatrix.length}/${approvedOutcomes.length} approved outcomes reviewed`);
+      else if (closureEvidence.length > 0) console.log(`  Closure matrix: ${closureEvidence.length}/4 outcomes evidenced`);
       console.log(`  Review file: ${reviewPath}`);
     } finally { repository.close(); }
   });
@@ -744,14 +770,19 @@ buildCommand
         program.error(`Build ${build.id} cannot be closed without a passed Build review.\nRun \`nerv build review ${build.id} --outcome passed --summary "..."\` first.`, { code: "NERV_BUILD_NOT_REVIEWED", exitCode: 1 });
         return;
       }
-      if (!repository.hasCompleteBuildClosureEvidence(build.id)) {
+      const approvedOutcomes = repository.listBuildOutcomes(build.id);
+      if (approvedOutcomes.length > 0 && !repository.hasCompletePassedBuildOutcomeMatrix(build.id)) {
+        program.error(`Build ${build.id} cannot be closed without a complete passed outcome matrix.`, { code: "NERV_BUILD_OUTCOME_MATRIX_INCOMPLETE", exitCode: 1 });
+        return;
+      }
+      if (approvedOutcomes.length === 0 && !repository.hasCompleteBuildClosureEvidence(build.id)) {
         program.error(`Build ${build.id} cannot be closed without complete closure-matrix evidence.`, { code: "NERV_BUILD_CLOSURE_EVIDENCE_INCOMPLETE", exitCode: 1 });
         return;
       }
       const now = new Date().toISOString();
       repository.updateBuild(build.id, { status: "closed", closed_at: now });
       const closedBuild = repository.getBuild(build.id)!;
-      syncBuildMarkdown(status.workspaceRoot, closedBuild, repository.listTasksByBuild(build.id), undefined, repository.getBuildAuditClassification(build.id));
+      syncBuildMarkdown(status.workspaceRoot, closedBuild, repository.listTasksByBuild(build.id), undefined, repository.getBuildAuditClassification(build.id), approvedOutcomes);
       const evolutionPath = appendBuildProductEvolution(status.workspaceRoot, { buildId: closedBuild.id, buildTitle: closedBuild.title, closedAt: now });
       console.log(`Closed ${closedBuild.id}.`);
       console.log("  Status: closed");
@@ -1322,7 +1353,7 @@ function writeBuildReviewMarkdown(
   reviewId: number,
   build: { id: string; title: string; acceptance_criteria: string | null; validation: string | null },
   tasks: Array<{ id: string; title: string; status: string }>,
-  details: { outcome: string; summary: string; validation: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; git: { status: string; diff: string } },
+  details: { outcome: string; summary: string; validation: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; outcomeMatrix: Array<{ build_outcome_id: number; criterion: string; executed_evidence: string; coverage_classification: string; residual_risk_decision: string; status: string }>; git: { status: string; diff: string } },
 ): string {
   const reviewDir = join(workspaceRoot, "agent", "builds", build.id, "reviews");
   mkdirSync(reviewDir, { recursive: true });
@@ -1352,6 +1383,10 @@ ${formatOptionalText(details.evidence)}
 ## Acceptance Criteria
 
 ${build.acceptance_criteria || "Not specified."}
+
+## Outcome Matrix
+
+${details.outcomeMatrix.length > 0 ? details.outcomeMatrix.map((item) => `### Outcome ${item.build_outcome_id}\n\n- Criterion: ${item.criterion}\n- Executed evidence: ${item.executed_evidence}\n- Coverage: ${item.coverage_classification}\n- Residual-risk decision: ${item.residual_risk_decision}\n- Status: ${item.status}`).join("\n\n") : "No approved outcome matrix was required for this legacy Build."}
 
 ## Task Completion
 

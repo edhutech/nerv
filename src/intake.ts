@@ -146,7 +146,7 @@ export function intakeStatus(databasePath: string, intakeId: string): { intake: 
   const database = new Database(databasePath, { readonly: true }); try { const intake = database.prepare("SELECT * FROM intakes WHERE id = ?").get(intakeId.toUpperCase()) as IntakeRecord | undefined; if (!intake) throw new Error(`Intake ${intakeId.toUpperCase()} not found.`); return { intake, proposals: database.prepare("SELECT * FROM intake_proposals WHERE intake_id = ? ORDER BY version").all(intake.id) as ProposalRecord[], reviews: listReviews(database, intake.id) }; } finally { database.close(); }
 }
 
-type MaterializationPlan = { intake: string; approvedProposal: string; materializationId: string; newBuilds: Array<{ unit: string; id: string; title: string }>; existingBuilds: string[]; tasks: Array<{ unit: string; ref: string; id: string; buildId: string | null; title: string; dependencies: string[]; order: number; risk: string; runSize: string }>; relationships: ProposalRelationship[]; runs: "none" };
+type MaterializationPlan = { intake: string; approvedProposal: string; materializationId: string; newBuilds: Array<{ unit: string; id: string; title: string; outcomes: Array<{ ref: string; outcome: string; criterion: string }> }>; existingBuilds: string[]; tasks: Array<{ unit: string; ref: string; id: string; buildId: string | null; title: string; dependencies: string[]; order: number; risk: string; runSize: string }>; relationships: ProposalRelationship[]; runs: "none" };
 
 function nextNumber(database: Database.Database, table: "builds" | "tasks", prefix: string): number { return (database.prepare(`SELECT id FROM ${table}`).all() as { id: string }[]).reduce((maximum, row) => Math.max(maximum, Number(row.id.slice(prefix.length)) || 0), 0) + 1; }
 function formatId(prefix: string, number: number): string { return `${prefix}${String(number).padStart(3, "0")}`; }
@@ -155,7 +155,7 @@ function createMaterializationPlan(database: Database.Database, record: Proposal
   const newBuilds: MaterializationPlan["newBuilds"] = []; const existingBuilds: string[] = []; const tasks: MaterializationPlan["tasks"] = [];
   for (const unit of proposal.units) {
     let buildId: string | null = null;
-    if (unit.type === "new-build") { buildId = formatId("BUILD-", buildNumber++); newBuilds.push({ unit: unit.id, id: buildId, title: unit.title! }); }
+    if (unit.type === "new-build") { buildId = formatId("BUILD-", buildNumber++); newBuilds.push({ unit: unit.id, id: buildId, title: unit.title!, outcomes: unit.tasks.map((task) => ({ ref: task.id, outcome: task.outcome, criterion: task.outcome })) }); }
     if (unit.type === "existing-build") { buildId = unit.buildId!; if (!database.prepare("SELECT id FROM builds WHERE id = ?").get(buildId)) throw new Error(`Build ${buildId} not found.`); if (!existingBuilds.includes(buildId)) existingBuilds.push(buildId); }
     for (const task of unit.tasks) tasks.push({ unit: unit.id, ref: task.id, id: formatId("TASK-", taskNumber++), buildId, title: task.title, dependencies: task.dependencies, order: task.order, risk: task.risk, runSize: task.runSize });
   }
@@ -166,10 +166,10 @@ function writeMaterializedMarkdown(workspaceRoot: string, plan: MaterializationP
   const taskByRef = new Map(proposal.units.flatMap((unit) => unit.tasks.map((task) => [task.id, task])));
   for (const build of plan.newBuilds) {
     const path = join(workspaceRoot, "agent", "builds", `${build.id}.md`); mkdirSync(join(workspaceRoot, "agent", "builds"), { recursive: true });
-    if (!existsSync(path)) atomicWrite(path, `# ${build.id}: ${build.title}\n\n## Status\n\nProposed\n\n## Build Goal\n\nMaterialized from ${plan.approvedProposal}.\n\n## Materialization\n\n- Intake: ${plan.intake}\n- Proposal: ${plan.approvedProposal}\n- Materialization: ${plan.materializationId}\n\n## Close summary\n\nPending.\n`);
+    if (!existsSync(path)) atomicWrite(path, `# ${build.id}: ${build.title}\n\n## Status\n\nProposed\n\n## Build Goal\n\nMaterialized from ${plan.approvedProposal}.\n\n## Approved Outcomes\n\n${build.outcomes.map((outcome) => `- ${outcome.ref}: ${outcome.outcome}\n  - Criterion: ${outcome.criterion}`).join("\n")}\n\n## Materialization\n\n- Intake: ${plan.intake}\n- Proposal: ${plan.approvedProposal}\n- Materialization: ${plan.materializationId}\n\n## Close summary\n\nPending.\n`);
   }
   for (const item of plan.tasks) { const task = taskByRef.get(item.ref)!; const path = join(workspaceRoot, "agent", "tasks", `${item.id}.md`); mkdirSync(join(workspaceRoot, "agent", "tasks"), { recursive: true }); if (!existsSync(path)) atomicWrite(path, `# ${item.id}: ${task.title}\n\n## Status\n\nProposed\n\n## Parent Build\n\n${item.buildId ?? "None (standalone)"}\n\n## Task Goal\n\n${task.intent}\n\n## Scope\n\n${task.scope}\n\n## Expected Outcome\n\n${task.outcome}\n\n## Planning Metadata\n\n- Intake: ${plan.intake}\n- Proposal: ${plan.approvedProposal}\n- Materialization: ${plan.materializationId}\n- Order: ${task.order}\n- Dependencies: ${task.dependencies.join(", ") || "None"}\n- Risk: ${task.risk}\n- Run size: ${task.runSize}\n`); }
-  const repository = openRepository(join(workspaceRoot, "nerv.db")); try { for (const build of plan.newBuilds) { const record = repository.getBuild(build.id); if (record) syncBuildMarkdown(workspaceRoot, record, repository.listTasksByBuild(build.id)); } } finally { repository.close(); }
+  const repository = openRepository(join(workspaceRoot, "nerv.db")); try { for (const build of plan.newBuilds) { const record = repository.getBuild(build.id); if (record) syncBuildMarkdown(workspaceRoot, record, repository.listTasksByBuild(build.id), undefined, undefined, repository.listBuildOutcomes(build.id)); } } finally { repository.close(); }
 }
 export function applyProposal(databasePath: string, workspaceRoot: string, proposalId: string, dryRun: boolean): string[] {
   const database = new Database(databasePath); database.pragma("foreign_keys = ON");
@@ -179,12 +179,23 @@ export function applyProposal(databasePath: string, workspaceRoot: string, propo
     if (intake.approved_proposal_id !== proposalRecord.id && proposalRecord.status !== "materialized") throw new Error(`Proposal ${proposalRecord.id} is not the approved version for ${intake.id}.`);
     const proposal = parseProposal(proposalRecord.proposal_json);
     let materialization = database.prepare("SELECT * FROM intake_materializations WHERE proposal_id = ?").get(proposalRecord.id) as { id: string; status: string; plan_json: string } | undefined;
-    const plan = materialization ? JSON.parse(materialization.plan_json) as MaterializationPlan : createMaterializationPlan(database, proposalRecord, proposal);
+    const persistedPlan = materialization ? JSON.parse(materialization.plan_json) as MaterializationPlan : null;
+    const plan = persistedPlan ? {
+      ...persistedPlan,
+      newBuilds: persistedPlan.newBuilds.map((build) => ({
+        ...build,
+        outcomes: build.outcomes ?? proposal.units.find((unit) => unit.id === build.unit)?.tasks.map((task) => ({ ref: task.id, outcome: task.outcome, criterion: task.outcome })) ?? [],
+      })),
+    } : createMaterializationPlan(database, proposalRecord, proposal);
     if (dryRun) return materializationSummary(plan);
     if (!materialization) {
       const now = new Date().toISOString();
       database.transaction(() => {
-        for (const build of plan.newBuilds) database.prepare("INSERT INTO builds (id,title,status,created_at,updated_at,closed_at,intent,goal,user_value,scope,out_of_scope,acceptance_criteria,validation,risks,generated_markdown_path) VALUES (?,?, 'proposed', ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(build.id, build.title, now, now, `Materialized from ${proposalRecord.id}.`, `Deliver ${build.title}.`, "Derived from approved Proposal.", "Materialized approved planning unit.", "Outside the approved Proposal.", "- Approved Proposal is materialized.", "- pnpm validate", "- Follow approved Proposal risk data.", join(workspaceRoot, "agent", "builds", `${build.id}.md`));
+        for (const build of plan.newBuilds) {
+          const criteria = build.outcomes.map((outcome) => `- ${outcome.criterion}`).join("\n");
+          database.prepare("INSERT INTO builds (id,title,status,created_at,updated_at,closed_at,intent,goal,user_value,scope,out_of_scope,acceptance_criteria,validation,risks,generated_markdown_path) VALUES (?,?, 'proposed', ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(build.id, build.title, now, now, `Materialized from ${proposalRecord.id}.`, `Deliver ${build.title}.`, "Derived from approved Proposal.", "Materialized approved planning unit.", "Outside the approved Proposal.", criteria, "- pnpm validate", "- Follow approved Proposal risk data.", join(workspaceRoot, "agent", "builds", `${build.id}.md`));
+          for (const outcome of build.outcomes) database.prepare("INSERT INTO build_outcomes (build_id,proposal_task_ref,outcome,criterion,created_at) VALUES (?,?,?,?,?)").run(build.id, outcome.ref, outcome.outcome, outcome.criterion, now);
+        }
         for (const item of plan.tasks) { const task = proposal.units.flatMap((unit) => unit.tasks).find((candidate) => candidate.id === item.ref)!; database.prepare("INSERT INTO tasks (id,build_id,title,status,created_at,updated_at,closed_at,intent,scope,out_of_scope,acceptance_criteria,validation,risks,generated_markdown_path) VALUES (?,?,?,'proposed',?,?,NULL,?,?,?,?,?,?,?)").run(item.id, item.buildId, task.title, now, now, task.intent, task.scope, "Outside the approved Proposal.", `- ${task.outcome}`, "- pnpm validate", `- ${task.risk}; run size: ${task.runSize}`, join(workspaceRoot, "agent", "tasks", `${item.id}.md`)); }
         database.prepare("INSERT INTO intake_materializations (id,intake_id,proposal_id,status,plan_json,created_at,updated_at) VALUES (?, ?, ?, 'pending_markdown', ?, ?, ?)").run(plan.materializationId, intake.id, proposalRecord.id, JSON.stringify(plan), now, now);
         for (const item of plan.tasks) database.prepare("INSERT INTO intake_materialization_items (materialization_id,unit_id,task_ref,build_id,task_id,metadata_json) VALUES (?, ?, ?, ?, ?, ?)").run(plan.materializationId, item.unit, item.ref, item.buildId, item.id, JSON.stringify(item));
@@ -192,6 +203,8 @@ export function applyProposal(databasePath: string, workspaceRoot: string, propo
       })(); materialization = { id: plan.materializationId, status: "pending_markdown", plan_json: JSON.stringify(plan) };
     }
     if (materialization.status !== "complete") { writeMaterializedMarkdown(workspaceRoot, plan, proposal); database.prepare("UPDATE intake_materializations SET status='complete', updated_at=? WHERE id=?").run(new Date().toISOString(), materialization.id); }
+    // Older completed materializations predate durable outcome rows. This is additive and preserves their original records.
+    for (const build of plan.newBuilds) for (const outcome of build.outcomes) database.prepare("INSERT OR IGNORE INTO build_outcomes (build_id,proposal_task_ref,outcome,criterion,created_at) VALUES (?,?,?,?,?)").run(build.id, outcome.ref, outcome.outcome, outcome.criterion, new Date().toISOString());
     return materializationSummary(plan);
   } finally { database.close(); }
 }

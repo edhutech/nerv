@@ -9,6 +9,8 @@ const REQUIRED_TABLES = [
   "build_reviews",
   "build_audit_classifications",
   "build_closure_evidence",
+  "build_outcomes",
+  "build_review_outcomes",
   "close_records",
   "decisions",
   "status_history",
@@ -64,6 +66,8 @@ const REQUIRED_COLUMNS: Record<(typeof REQUIRED_TABLES)[number], readonly string
   build_reviews: ["id", "build_id", "outcome", "summary", "validation", "evidence", "integration", "residual_risks", "follow_up", "created_at"],
   build_audit_classifications: ["id", "build_id", "audit_class", "rationale", "created_at"],
   build_closure_evidence: ["id", "build_id", "review_id", "outcome", "evidence", "created_at"],
+  build_outcomes: ["id", "build_id", "proposal_task_ref", "outcome", "criterion", "created_at"],
+  build_review_outcomes: ["id", "review_id", "build_outcome_id", "criterion", "executed_evidence", "coverage_classification", "residual_risk_decision", "status", "created_at"],
   close_records: ["run_id", "commit_hash", "closed_at"],
   decisions: ["id", "scope_type", "scope_id", "summary", "created_at"],
   status_history: ["id", "entity_type", "entity_id", "status", "created_at"],
@@ -178,6 +182,30 @@ const SCHEMA_STATEMENTS = [
     FOREIGN KEY (build_id) REFERENCES builds(id),
     FOREIGN KEY (review_id) REFERENCES build_reviews(id)
   )`,
+  `CREATE TABLE IF NOT EXISTS build_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    build_id TEXT NOT NULL,
+    proposal_task_ref TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    criterion TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(build_id, proposal_task_ref),
+    FOREIGN KEY (build_id) REFERENCES builds(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS build_review_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id INTEGER NOT NULL,
+    build_outcome_id INTEGER NOT NULL,
+    criterion TEXT NOT NULL,
+    executed_evidence TEXT NOT NULL,
+    coverage_classification TEXT NOT NULL,
+    residual_risk_decision TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(review_id, build_outcome_id),
+    FOREIGN KEY (review_id) REFERENCES build_reviews(id),
+    FOREIGN KEY (build_outcome_id) REFERENCES build_outcomes(id)
+  )`,
   `CREATE TABLE IF NOT EXISTS close_records (
     run_id TEXT PRIMARY KEY,
     commit_hash TEXT,
@@ -274,7 +302,7 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "11";
+const SCHEMA_VERSION = "12";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
@@ -424,6 +452,22 @@ function migrateSchema(database: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT, build_id TEXT NOT NULL, review_id INTEGER NOT NULL,
       outcome TEXT NOT NULL, evidence TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(review_id, outcome),
       FOREIGN KEY (build_id) REFERENCES builds(id), FOREIGN KEY (review_id) REFERENCES build_reviews(id)
+    )`);
+  }
+  if (!hasTable(database, "build_outcomes")) {
+    database.exec(`CREATE TABLE build_outcomes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, build_id TEXT NOT NULL, proposal_task_ref TEXT NOT NULL,
+      outcome TEXT NOT NULL, criterion TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(build_id, proposal_task_ref),
+      FOREIGN KEY (build_id) REFERENCES builds(id)
+    )`);
+  }
+  if (!hasTable(database, "build_review_outcomes")) {
+    database.exec(`CREATE TABLE build_review_outcomes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, review_id INTEGER NOT NULL, build_outcome_id INTEGER NOT NULL,
+      criterion TEXT NOT NULL, executed_evidence TEXT NOT NULL, coverage_classification TEXT NOT NULL,
+      residual_risk_decision TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL,
+      UNIQUE(review_id, build_outcome_id), FOREIGN KEY (review_id) REFERENCES build_reviews(id),
+      FOREIGN KEY (build_outcome_id) REFERENCES build_outcomes(id)
     )`);
   }
 

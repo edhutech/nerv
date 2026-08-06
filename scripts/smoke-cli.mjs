@@ -96,6 +96,7 @@ runEndToEndLifecycleChecks();
 runGitUnavailableChecks();
 runBuild007LifecycleChecks();
 runBuildClosureMatrixGateE2EChecks();
+runApprovedOutcomeMatrixChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -3397,6 +3398,46 @@ function runBuildClosureMatrixGateE2EChecks() {
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+function runApprovedOutcomeMatrixChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-approved-outcome-matrix-"));
+  const repoRoot = join(tempRoot, "repo");
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace for approved outcome matrix", ["init"], repoRoot);
+    spawnOrFail("create build for approved outcome matrix", ["new", "build", "Approved outcome matrix"], repoRoot);
+    spawnOrFail("plan build for approved outcome matrix", ["build", "plan", "BUILD-001"], repoRoot);
+    const databasePath = join(repoRoot, ".nerv/nerv.db");
+    const database = new Database(databasePath);
+    try {
+      for (const [ref, outcome] of [["task-one", "First approved outcome"], ["task-two", "Second approved outcome"], ["task-three", "Third approved outcome"]]) {
+        database.prepare("INSERT INTO build_outcomes (build_id, proposal_task_ref, outcome, criterion, created_at) VALUES (?, ?, ?, ?, ?)").run("BUILD-001", ref, outcome, outcome, new Date().toISOString());
+      }
+      for (const taskId of ["TASK-001", "TASK-002", "TASK-003"]) {
+        database.prepare("UPDATE tasks SET status = 'closed', closed_at = ? WHERE id = ?").run(new Date().toISOString(), taskId);
+        database.prepare("INSERT INTO runs (id, task_id, status, created_at, updated_at, closed_at) VALUES (?, ?, 'closed', ?, ?, ?)").run(`RUN-${taskId.slice(-3)}`, taskId, "now", "now", "now");
+        database.prepare("INSERT INTO reviews (run_id, outcome, summary, validation, evidence, created_at) VALUES (?, 'passed', 'complete', 'passed', 'executed', ?)").run(`RUN-${taskId.slice(-3)}`, new Date().toISOString());
+      }
+    } finally { database.close(); }
+
+    const base = ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "integrated", "--validation", "passed", "--evidence", "pnpm validate passed"];
+    const passed = (ref, criterion, evidence = "executed scenario", status = "passed") => ["--outcome-matrix", `${ref}=${criterion}|${evidence}|covered|accepted|${status}`];
+    runCheck({ name: "approved outcome matrix rejects missing criterion", args: [...base, ...passed("task-one", "generic criterion"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
+    runCheck({ name: "approved outcome matrix rejects missing executed evidence", args: [...base, "--outcome-matrix", "task-one=First approved outcome||covered|accepted|passed", ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
+    runCheck({ name: "approved outcome matrix rejects failed outcome", args: [...base, ...passed("task-one", "First approved outcome", "executed", "failed"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
+    runCheck({ name: "approved outcome matrix rejects blocked outcome", args: [...base, ...passed("task-one", "First approved outcome", "executed", "blocked"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
+    runCheck({ name: "approved outcome matrix complete Build review passes", args: [...base, ...passed("task-one", "First approved outcome"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 0, includes: ["Outcome matrix: 3/3 approved outcomes reviewed"], verify: () => {
+      const matrixDatabase = new Database(databasePath, { readonly: true });
+      try {
+        const rows = matrixDatabase.prepare("SELECT criterion, executed_evidence, coverage_classification, residual_risk_decision, status FROM build_review_outcomes").all();
+        if (rows.length !== 3 || rows.some((row) => !row.criterion || !row.executed_evidence || !row.coverage_classification || !row.residual_risk_decision || row.status !== "passed")) fail("approved outcome matrix complete Build review passes", "expected three complete durable outcome rows", JSON.stringify(rows));
+      } finally { matrixDatabase.close(); }
+    }});
+    runCheck({ name: "approved outcome matrix complete Build close passes", args: ["build", "close", "BUILD-001"], cwd: repoRoot, exitCode: 0, includes: ["Closed BUILD-001"] });
+  } finally { rmSync(tempRoot, { recursive: true, force: true }); }
 }
 
 function fail(name, reason, output) {

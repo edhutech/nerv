@@ -1,7 +1,7 @@
 import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { openRepository, type BuildAuditClassificationRecord, type BuildRecord, type BuildReviewRecord, type TaskRecord } from "./repository.js";
+import { openRepository, type BuildAuditClassificationRecord, type BuildOutcomeRecord, type BuildRecord, type BuildReviewRecord, type TaskRecord } from "./repository.js";
 
 export type CreateBuildResult = {
   build: BuildRecord;
@@ -49,7 +49,7 @@ export type PlanBuildResult = {
   skipped: boolean;
 };
 
-export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[], review?: BuildReviewRecord, audit?: BuildAuditClassificationRecord | null): string {
+export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tasks: TaskRecord[], review?: BuildReviewRecord, audit?: BuildAuditClassificationRecord | null, outcomes: BuildOutcomeRecord[] = []): string {
   const markdownPath = build.generated_markdown_path || join(workspaceRoot, "agent", "builds", `${build.id}.md`);
   if (!existsSync(markdownPath)) {
     throw new Error(`Build Markdown for ${build.id} was not found at ${markdownPath}.`);
@@ -60,6 +60,7 @@ export function syncBuildMarkdown(workspaceRoot: string, build: BuildRecord, tas
   content = replaceBuildSection(content, "Status", capitalizeFirst(build.status));
   content = replaceBuildSection(content, "Task Progress", progress, true);
   if (review) content = replaceBuildSection(content, "Review", `${capitalizeFirst(review.outcome)} on ${review.created_at}. ${review.summary}`);
+  if (outcomes.length > 0) content = replaceBuildSection(content, "Approved Outcomes", outcomes.map((outcome) => `- ${outcome.proposal_task_ref}: ${outcome.outcome}\n  - Criterion: ${outcome.criterion}`).join("\n"));
   if (audit) content = replaceBuildSection(content, "Audit Classification", `${audit.audit_class}\n\n${audit.rationale}`);
   content = replaceBuildSection(content, "Close summary", closeSummary);
   writeFileSync(markdownPath, content, "utf8");

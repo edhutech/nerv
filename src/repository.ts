@@ -109,6 +109,27 @@ export type BuildClosureEvidenceRecord = {
   created_at: string;
 };
 
+export type BuildOutcomeRecord = {
+  id: number;
+  build_id: string;
+  proposal_task_ref: string;
+  outcome: string;
+  criterion: string;
+  created_at: string;
+};
+
+export type BuildReviewOutcomeRecord = {
+  id: number;
+  review_id: number;
+  build_outcome_id: number;
+  criterion: string;
+  executed_evidence: string;
+  coverage_classification: string;
+  residual_risk_decision: string;
+  status: string;
+  created_at: string;
+};
+
 export type CloseRecord = {
   run_id: string;
   commit_hash: string | null;
@@ -195,6 +216,7 @@ export type CreateBuildReviewInput = {
   residual_risks?: string | null;
   follow_up?: string | null;
   closure_evidence?: ReadonlyArray<{ outcome: string; evidence: string }>;
+  outcome_matrix?: ReadonlyArray<Omit<BuildReviewOutcomeRecord, "id" | "review_id" | "created_at">>;
 };
 
 export type CreateCloseInput = {
@@ -238,6 +260,10 @@ export type Repository = {
   getBuildAuditClassification(buildId: string): BuildAuditClassificationRecord | null;
   listBuildClosureEvidence(buildId: string): BuildClosureEvidenceRecord[];
   hasCompleteBuildClosureEvidence(buildId: string): boolean;
+  createBuildOutcome(input: Omit<BuildOutcomeRecord, "id" | "created_at">): BuildOutcomeRecord;
+  listBuildOutcomes(buildId: string): BuildOutcomeRecord[];
+  listBuildReviewOutcomes(reviewId: number): BuildReviewOutcomeRecord[];
+  hasCompletePassedBuildOutcomeMatrix(buildId: string): boolean;
   createCloseRecord(input: CreateCloseInput): CloseRecord;
   getCloseRecord(runId: string): CloseRecord | null;
   getCurrentRunId(): string | null;
@@ -409,6 +435,20 @@ export function openRepository(databasePath: string): Repository {
   const countLatestClosureEvidenceStmt = database.prepare(
     `SELECT COUNT(DISTINCT outcome) AS count FROM build_closure_evidence
      WHERE review_id = ? AND outcome IN ('acceptance_criteria', 'task_reviews', 'validation', 'integration') AND trim(evidence) != ''`,
+  );
+  const createBuildOutcomeStmt = database.prepare(
+    `INSERT OR IGNORE INTO build_outcomes (build_id, proposal_task_ref, outcome, criterion, created_at)
+     VALUES (@buildId, @proposalTaskRef, @outcome, @criterion, @createdAt)`,
+  );
+  const getBuildOutcomeStmt = database.prepare(`SELECT * FROM build_outcomes WHERE build_id = ? AND proposal_task_ref = ?`);
+  const listBuildOutcomesStmt = database.prepare(`SELECT * FROM build_outcomes WHERE build_id = ? ORDER BY id`);
+  const insertBuildReviewOutcomeStmt = database.prepare(
+    `INSERT INTO build_review_outcomes (review_id, build_outcome_id, criterion, executed_evidence, coverage_classification, residual_risk_decision, status, created_at)
+     VALUES (@reviewId, @buildOutcomeId, @criterion, @executedEvidence, @coverageClassification, @residualRiskDecision, @status, @createdAt)`,
+  );
+  const listBuildReviewOutcomesStmt = database.prepare(`SELECT * FROM build_review_outcomes WHERE review_id = ? ORDER BY build_outcome_id`);
+  const countPassedOutcomeMatrixStmt = database.prepare(
+    `SELECT COUNT(*) AS count FROM build_review_outcomes WHERE review_id = ? AND status = 'passed'`,
   );
 
   const createBuild = database.transaction((input: CreateBuildInput): BuildRecord => {
@@ -783,6 +823,18 @@ export function openRepository(databasePath: string): Repository {
     for (const item of input.closure_evidence ?? []) {
       insertBuildClosureEvidenceStmt.run({ buildId: input.build_id, reviewId: review.id, outcome: item.outcome, evidence: item.evidence, createdAt: review.created_at });
     }
+    for (const item of input.outcome_matrix ?? []) {
+      insertBuildReviewOutcomeStmt.run({
+        reviewId: review.id,
+        buildOutcomeId: item.build_outcome_id,
+        criterion: item.criterion,
+        executedEvidence: item.executed_evidence,
+        coverageClassification: item.coverage_classification,
+        residualRiskDecision: item.residual_risk_decision,
+        status: item.status,
+        createdAt: review.created_at,
+      });
+    }
     return review;
   });
 
@@ -810,6 +862,22 @@ export function openRepository(databasePath: string): Repository {
     if (!review) return false;
     const row = countLatestClosureEvidenceStmt.get(review.id) as { count: number } | undefined;
     return row?.count === 4;
+  };
+
+  const createBuildOutcome = database.transaction((input: Omit<BuildOutcomeRecord, "id" | "created_at">): BuildOutcomeRecord => {
+    const createdAt = new Date().toISOString();
+    createBuildOutcomeStmt.run({ buildId: input.build_id, proposalTaskRef: input.proposal_task_ref, outcome: input.outcome, criterion: input.criterion, createdAt });
+    return getBuildOutcomeStmt.get(input.build_id, input.proposal_task_ref) as BuildOutcomeRecord;
+  });
+
+  const listBuildOutcomes = (buildId: string): BuildOutcomeRecord[] => listBuildOutcomesStmt.all(buildId) as BuildOutcomeRecord[];
+  const listBuildReviewOutcomes = (reviewId: number): BuildReviewOutcomeRecord[] => listBuildReviewOutcomesStmt.all(reviewId) as BuildReviewOutcomeRecord[];
+  const hasCompletePassedBuildOutcomeMatrix = (buildId: string): boolean => {
+    const review = getLatestBuildReviewStmt.get(buildId) as BuildReviewRecord | undefined;
+    if (!review) return false;
+    const outcomeCount = listBuildOutcomes(buildId).length;
+    const row = countPassedOutcomeMatrixStmt.get(review.id) as { count: number } | undefined;
+    return outcomeCount > 0 && row?.count === outcomeCount;
   };
 
   const createCloseRecordStmt = database.prepare(
@@ -904,6 +972,10 @@ export function openRepository(databasePath: string): Repository {
     getBuildAuditClassification,
     listBuildClosureEvidence,
     hasCompleteBuildClosureEvidence,
+    createBuildOutcome,
+    listBuildOutcomes,
+    listBuildReviewOutcomes,
+    hasCompletePassedBuildOutcomeMatrix,
     createCloseRecord,
     getCloseRecord,
     getCurrentRunId(): string | null {
