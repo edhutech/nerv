@@ -10,7 +10,7 @@ This is the authoritative, versioned status record for `nerv-development` compat
 - Repository-local baseline: verified by `pnpm validate`, including deterministic recovery and clean-context fixtures.
 - Content assessment: Level 1, based on review of the canonical skill's repository-only requirements.
 - Host and model validation: not executed. No OpenCode, Codex, Claude Code, Cursor, or model result is recorded.
-- External evidence: pending. The required host rows and contribution criteria are in `external-validation-backlog.md`.
+- External evidence: pending. The reviewed, combined prerequisites for each later level are in `external-validation-backlog.md`.
 
 Repository-local validation does not establish automatic skill discovery, a host session, model behavior, or cross-provider compatibility.
 
