@@ -28,15 +28,15 @@ All adapters must respect these boundaries:
 
 ## OpenCode
 
-**Discovery mechanism:** Automatic in this reference environment
+**Discovery mechanism:** Not executed; pending host validation.
 
-OpenCode discovers skills in `.agents/skills/*/SKILL.md` automatically based on the `name` and `description` fields in the YAML frontmatter.
+The canonical skill is available at `.agents/skills/nerv-development/SKILL.md`, but this repository has not recorded OpenCode execution evidence for automatic discovery or loading behavior.
 
-**Evidence:** This repository is configured for OpenCode discovery through `.agents/skills/`. No persisted OpenCode scenario-suite result is recorded; see `.agents/skills/nerv-development/references/external-validation-backlog.md` for the pending host validation.
+**Evidence:** See `.agents/skills/nerv-development/references/compatibility-evidence-status.md` for the authoritative status and `external-validation-backlog.md` for the pending OpenCode validation.
 
-**Manual loading fallback:** Not needed; OpenCode loads the skill automatically.
+**Manual loading fallback:** Not validated. Record host-specific evidence before relying on any fallback or discovery mechanism.
 
-**Adapter requirements:** None. OpenCode natively supports the `.agents/skills/` convention.
+**Adapter requirements:** No OpenCode-specific requirements are established until host validation is recorded.
 
 ## Codex (OpenAI)
 
