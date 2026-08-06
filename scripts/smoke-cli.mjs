@@ -252,6 +252,8 @@ function runTemporaryRepoChecks() {
         verifyPath("git repo initialization succeeds from nested directory", join(repoRoot, ".nerv/agent/builds"), "directory");
         verifyPath("git repo initialization succeeds from nested directory", join(repoRoot, ".nerv/nerv.db"), "file");
         verifySchema("git repo initialization succeeds from nested directory", join(repoRoot, ".nerv/nerv.db"));
+        verifyColumns("git repo initialization succeeds from nested directory", join(repoRoot, ".nerv/nerv.db"), "build_reviews", ["integration", "residual_risks", "follow_up"]);
+        verifyColumnsAbsent("git repo initialization succeeds from nested directory", join(repoRoot, ".nerv/nerv.db"), "reviews", ["integration", "residual_risks", "follow_up"]);
       },
     });
 
@@ -852,6 +854,22 @@ function verifyColumns(name, databasePath, tableName, expectedColumns) {
     for (const columnName of expectedColumns) {
       if (!columnNames.has(columnName)) {
         fail(name, `missing required column ${tableName}.${columnName}`, "");
+      }
+    }
+  } finally {
+    database.close();
+  }
+}
+
+function verifyColumnsAbsent(name, databasePath, tableName, unexpectedColumns) {
+  const database = new Database(databasePath, { readonly: true, fileMustExist: true });
+
+  try {
+    const columnNames = new Set(database.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name));
+
+    for (const columnName of unexpectedColumns) {
+      if (columnNames.has(columnName)) {
+        fail(name, `unexpected column ${tableName}.${columnName}`, "");
       }
     }
   } finally {
@@ -3429,12 +3447,18 @@ function runApprovedOutcomeMatrixChecks() {
     runCheck({ name: "approved outcome matrix rejects missing executed evidence", args: [...base, "--outcome-matrix", "task-one=First approved outcome||covered|accepted|passed", ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
     runCheck({ name: "approved outcome matrix rejects failed outcome", args: [...base, ...passed("task-one", "First approved outcome", "executed", "failed"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
     runCheck({ name: "approved outcome matrix rejects blocked outcome", args: [...base, ...passed("task-one", "First approved outcome", "executed", "blocked"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["complete passed outcome matrix"] });
+    runCheck({ name: "approved outcome matrix rejects uncovered outcome", args: [...base, "--outcome-matrix", "task-one=First approved outcome|executed|uncovered|accepted|passed", ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["coverage classification 'covered'"] });
+    runCheck({ name: "approved outcome matrix rejects unaccepted residual risk", args: [...base, "--outcome-matrix", "task-one=First approved outcome|executed|covered|unaccepted|passed", ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 1, includes: ["residual-risk decision 'accepted'"] });
     runCheck({ name: "approved outcome matrix complete Build review passes", args: [...base, ...passed("task-one", "First approved outcome"), ...passed("task-two", "Second approved outcome"), ...passed("task-three", "Third approved outcome")], cwd: repoRoot, exitCode: 0, includes: ["Outcome matrix: 3/3 approved outcomes reviewed"], verify: () => {
       const matrixDatabase = new Database(databasePath, { readonly: true });
       try {
         const rows = matrixDatabase.prepare("SELECT criterion, executed_evidence, coverage_classification, residual_risk_decision, status FROM build_review_outcomes").all();
         if (rows.length !== 3 || rows.some((row) => !row.criterion || !row.executed_evidence || !row.coverage_classification || !row.residual_risk_decision || row.status !== "passed")) fail("approved outcome matrix complete Build review passes", "expected three complete durable outcome rows", JSON.stringify(rows));
       } finally { matrixDatabase.close(); }
+      const review = readFileSync(join(repoRoot, ".nerv/agent/builds/BUILD-001/reviews/review-001.md"), "utf8");
+      if (!["First approved outcome", "Second approved outcome", "Third approved outcome"].every((criterion) => review.includes(`- ${criterion}`)) || review.includes("Approved outcome matrix is delivered.")) {
+        fail("approved outcome matrix complete Build review passes", "Build review criteria did not use canonical approved outcomes", review);
+      }
     }});
     runCheck({ name: "approved outcome matrix complete Build close passes", args: ["build", "close", "BUILD-001"], cwd: repoRoot, exitCode: 0, includes: ["Closed BUILD-001"] });
   } finally { rmSync(tempRoot, { recursive: true, force: true }); }
