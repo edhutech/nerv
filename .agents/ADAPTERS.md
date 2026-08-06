@@ -98,11 +98,6 @@ Alternatively, instruct Cursor to read `.agents/skills/nerv-development/SKILL.md
 
 **Adapter requirements:** Cursor must be able to read files from the repository and execute shell commands.
 
-## Validation status
+## Validation Status
 
-- **OpenCode:** Reference integration available; scenario-suite execution pending
-- **Codex:** Documented but not runtime-validated
-- **Claude Code:** Documented but not runtime-validated
-- **Cursor:** Documented but not runtime-validated
-
-Runtime validation for hosts other than OpenCode requires execution in those environments, which is outside the scope of this repository's local tooling. Do not claim portability for unvalidated hosts.
+Current compatibility evidence status is authoritative in `.agents/skills/nerv-development/references/compatibility-evidence-status.md`. Runtime validation for hosts requires execution in those environments; do not claim portability for unvalidated hosts.

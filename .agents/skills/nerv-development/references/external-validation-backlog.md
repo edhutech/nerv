@@ -4,12 +4,9 @@
 
 Track compatibility validations that cannot be performed by repository-local smoke coverage. A row is complete only when its required environment executes the listed scenarios and commits or attaches the requested evidence. Do not infer completion from documentation, a symlink, or model behavior in another host.
 
-## Local Baseline
+## Status Authority
 
-- Status: completed
-- Evidence: `pnpm validate` includes deterministic recovery and clean-context fixtures.
-- Scope: Nerv CLI state recovery, generated artifacts, `AGENTS.md`, Product Context, Repo Context, and active Run availability.
-- Limitation: does not validate automatic skill discovery, a host session, or a model.
+Current compatibility status, including the repository-local baseline and its limitations, is recorded only in `compatibility-evidence-status.md`.
 
 ## Pending Validations
 

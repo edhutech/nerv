@@ -2,7 +2,7 @@
 
 ## Status
 
-The earlier BUILD-007 record contained unsupported pass claims. This replacement preserves no such claims.
+This historical BUILD-007 reconciliation record contains no current compatibility status. See `compatibility-evidence-status.md` for the authoritative current status.
 
 ## Not Executed
 
@@ -33,8 +33,6 @@ The clean-context fixture creates `AGENTS.md`, Product Context, Repo Context, an
 
 This exercise does not establish a new OpenCode host session, automatic skill discovery, a model result, or cross-provider portability.
 
-## Compatibility Assessment
+## Historical Boundary
 
-The canonical skill content is assessed as agent-neutral: it requires repository files, terminal commands, Git, the Nerv CLI, and persisted Nerv artifacts rather than proprietary conversational memory.
-
-The evidence supports a content-level Level 1 assessment and deterministic repository-local recovery/context fixtures. It does not support a claim that OpenCode, another model, Codex, Claude Code, or Cursor has executed the suite. Pending external validation is tracked in `external-validation-backlog.md`.
+This record does not establish current compatibility status or host validation. The authoritative status and pending external evidence are tracked in `compatibility-evidence-status.md` and `external-validation-backlog.md`.

@@ -172,13 +172,9 @@ For each scenario execution, record:
 
 ## OpenCode reference evidence
 
-No OpenCode host-session result is recorded until a separately identifiable OpenCode session executes a scenario and persists its commands, outputs, artifacts, and host-reported model identity. See `evaluation-evidence-build-007.md` for the reconciled record and `recovery-exercise-build-008.md` for the verified repository-local recovery exercise.
+See `compatibility-evidence-status.md` for the authoritative current evidence status. `evaluation-evidence-build-007.md` is a historical reconciliation record, and `recovery-exercise-build-008.md` documents a repository-local recovery exercise.
 
 ## Cross-provider validation
-
-### Status
-
-Cross-provider validation for Codex, Claude Code, and Cursor is **not yet executed** in this repository's local environment.
 
 ### Limitations
 
@@ -216,6 +212,8 @@ This evaluation protocol should be updated when:
 ## References
 
 - Canonical skill: `.agents/skills/nerv-development/SKILL.md`
+- Compatibility evidence status: `.agents/skills/nerv-development/references/compatibility-evidence-status.md`
+- External evidence template: `.agents/skills/nerv-development/references/external-evidence-template-v1.md`
 - Evaluation scenarios: `.agents/skills/nerv-development/references/evaluation-scenarios.md`
 - Adapter documentation: `.agents/ADAPTERS.md`
 - Reconciled record: `.agents/skills/nerv-development/references/evaluation-evidence-build-007.md`
