@@ -87,6 +87,7 @@ runStartChecks();
 runCurrentAndRunsChecks();
 runCheckpointChecks();
 runRecoveryFixtureChecks();
+runCleanContextFixtureChecks();
 runReviewChecks();
 runCloseChecks();
 runCleanChecks();
@@ -2121,6 +2122,40 @@ function runRecoveryFixtureChecks() {
       cwd: repoRoot,
       exitCode: 0,
       includes: ["RUN-001: TASK-001 - Recover checkpoint state", "Status: active"],
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runCleanContextFixtureChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-clean-context-smoke-"));
+  const repoRoot = join(tempRoot, "repo");
+
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    writeFileSync(join(repoRoot, "AGENTS.md"), "# Fixture instructions\n\nUse persisted Nerv evidence for recovery.\n", "utf8");
+    spawnOrFail("init workspace before clean context fixture", ["init"], repoRoot);
+    spawnOrFail("create Product Context for clean context fixture", ["product"], repoRoot);
+    spawnOrFail("create Repo Context for clean context fixture", ["repo"], repoRoot);
+    spawnOrFail("create task for clean context fixture", ["new", "task", "Recover authority context"], repoRoot);
+    spawnOrFail("start run for clean context fixture", ["start", "TASK-001"], repoRoot);
+
+    runCheck({
+      name: "clean context fixture exposes authority and active Run artifacts",
+      args: ["status"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Product context: available", "Repo context: available", "RUN-001: TASK-001 - Recover authority context"],
+      verify: () => {
+        verifyPath("clean context fixture creates AGENTS.md", join(repoRoot, "AGENTS.md"), "file");
+        verifyPath("clean context fixture creates Product Context", join(repoRoot, ".nerv/product/product.md"), "file");
+        verifyPath("clean context fixture creates Repo Context", join(repoRoot, ".nerv/repo/development.md"), "file");
+        verifyPath("clean context fixture creates run.md", join(repoRoot, ".nerv/agent/runs/RUN-001/run.md"), "file");
+        verifyPath("clean context fixture creates task.md", join(repoRoot, ".nerv/agent/runs/RUN-001/task.md"), "file");
+      },
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
