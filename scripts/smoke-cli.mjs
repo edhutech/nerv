@@ -2314,6 +2314,9 @@ function runReviewChecks() {
         if (!reviewContent.includes("## Git Diff Summary")) {
           fail("review saves for explicit run", "missing Git Diff Summary section", reviewContent);
         }
+        if (!reviewContent.includes("## Scope") || !reviewContent.includes("## Risk Escalation")) {
+          fail("review saves for explicit run", "missing Task review context", reviewContent);
+        }
 
         const dbPath = join(repoRoot, ".nerv/nerv.db");
         const repository = openRepository(dbPath);
@@ -2327,6 +2330,9 @@ function runReviewChecks() {
           }
           if (reviews[0].summary !== "Implementation complete and validated") {
             fail("review saves for explicit run", `summary mismatch: ${reviews[0].summary}`, "");
+          }
+          if (reviews[0].validation !== "passed" || reviews[0].evidence !== "All tests pass, build succeeds") {
+            fail("review saves for explicit run", "validation or evidence was not persisted", JSON.stringify(reviews[0]));
           }
         } finally {
           repository.close();
@@ -2344,6 +2350,22 @@ function runReviewChecks() {
         const reviewFile = join(repoRoot, ".nerv/agent/runs/RUN-001/reviews/review-002.md");
         verifyPath("review uses current run", reviewFile, "file");
       },
+    });
+
+    runCheck({
+      name: "passed review requires validation",
+      args: ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "Missing validation", "--evidence", "Evidence exists"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["passed review requires passed validation"],
+    });
+
+    runCheck({
+      name: "passed review requires evidence",
+      args: ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "Missing evidence", "--validation", "passed"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["passed review requires evidence"],
     });
 
     runCheck({
@@ -2418,6 +2440,24 @@ function runCloseChecks() {
         "--evidence",
         "All checks pass",
       ],
+      repoRoot,
+    );
+
+    spawnOrFail(
+      "later failed review invalidates passed close check",
+      ["review", "--run", "RUN-001", "--outcome", "failed", "--summary", "Regression found", "--validation", "failed", "--evidence", "Regression reproduction recorded"],
+      repoRoot,
+    );
+    runCheck({
+      name: "close rejects a stale passed review after failure",
+      args: ["close", "--run", "RUN-001"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["cannot be closed without a passed review"],
+    });
+    spawnOrFail(
+      "add final passed review for close check",
+      ["review", "--run", "RUN-001", "--outcome", "passed", "--summary", "Regression resolved", "--validation", "passed", "--evidence", "All checks pass after regression fix"],
       repoRoot,
     );
 
@@ -2651,7 +2691,7 @@ function runCloseChecks() {
           const reviewPath = join(buildRepoRoot, ".nerv/agent/builds/BUILD-001/reviews/review-001.md");
           verifyPath("build review records whole Build evidence", reviewPath, "file");
           const review = readFileSync(reviewPath, "utf8");
-          if (!review.includes("All tasks integrate correctly") || !review.includes("Full suite passed")) {
+          if (!review.includes("All tasks integrate correctly") || !review.includes("Full suite passed") || !review.includes("## Task Completion") || !review.includes("## Integration Review")) {
             fail("build review records whole Build evidence", "Build review Markdown is incomplete", review);
           }
         },
