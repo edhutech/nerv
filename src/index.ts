@@ -32,6 +32,8 @@ const PRODUCT_CONTEXT_FILES = [
 ] as const;
 
 const REQUIRED_CLOSURE_OUTCOMES = ["acceptance_criteria", "task_reviews", "validation", "integration"] as const;
+const PASSED_OUTCOME_COVERAGE = "covered";
+const PASSED_OUTCOME_RESIDUAL_RISK_DECISION = "accepted";
 
 type OutcomeMatrixInput = { build_outcome_id: number; criterion: string; executed_evidence: string; coverage_classification: string; residual_risk_decision: string; status: string };
 
@@ -652,7 +654,7 @@ buildCommand
   .option("--integration <integration>", "Integrated Task compatibility result.")
   .option("--residual-risks <risks>", "Residual risks or none.")
   .option("--follow-up <followUp>", "Required follow-up or none.")
-   .option("--outcome-matrix <task-ref=criterion|evidence|coverage|risk-decision|status...>", "One review row per approved outcome. Status: passed, failed, or blocked.")
+    .option("--outcome-matrix <task-ref=criterion|evidence|coverage|risk-decision|status...>", "One review row per approved outcome. Passed rows require coverage 'covered' and residual-risk decision 'accepted'.")
    .option("--closure-evidence <outcome=evidence...>", "Legacy closure evidence for Builds without approved outcomes.")
   .description("Review a completed Build as a whole before closing it.")
    .action((buildId: string, options: { outcome: string; summary: string; validation?: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; closureEvidence?: string[]; outcomeMatrix?: string[] }) => {
@@ -708,8 +710,9 @@ buildCommand
       const outcomeMatrix = parseOutcomeMatrix(options.outcomeMatrix, approvedOutcomes);
       const incompleteMatrix = outcomeMatrix.length !== approvedOutcomes.length || outcomeMatrix.some((item) => !["passed", "failed", "blocked"].includes(item.status) || item.criterion !== approvedOutcomes.find((outcome) => outcome.id === item.build_outcome_id)?.criterion);
       const nonPassedMatrix = outcomeMatrix.some((item) => item.status !== "passed");
-      if (approvedOutcomes.length > 0 && outcome === "passed" && (incompleteMatrix || nonPassedMatrix)) {
-        program.error("A passed Build review requires a complete passed outcome matrix with criterion, executed evidence, coverage classification, and residual-risk decision for every approved outcome.", { code: "NERV_BUILD_OUTCOME_MATRIX_INCOMPLETE", exitCode: 1 });
+      const invalidPassedOutcomeSemantics = outcomeMatrix.some((item) => item.status === "passed" && (item.coverage_classification.toLowerCase() !== PASSED_OUTCOME_COVERAGE || item.residual_risk_decision.toLowerCase() !== PASSED_OUTCOME_RESIDUAL_RISK_DECISION));
+      if (approvedOutcomes.length > 0 && outcome === "passed" && (incompleteMatrix || nonPassedMatrix || invalidPassedOutcomeSemantics)) {
+        program.error("A passed Build review requires a complete passed outcome matrix. Every approved outcome must use coverage classification 'covered' and residual-risk decision 'accepted'.", { code: "NERV_BUILD_OUTCOME_MATRIX_INCOMPLETE", exitCode: 1 });
         return;
       }
       if (approvedOutcomes.length === 0 && outcome === "passed" && closureEvidence.length !== 4) {
@@ -724,7 +727,7 @@ buildCommand
       const review = repository.createBuildReview({ build_id: build.id, outcome, summary, validation, evidence, integration: options.integration?.trim() || null, residual_risks: options.residualRisks?.trim() || null, follow_up: options.followUp?.trim() || null, closure_evidence: closureEvidence, outcome_matrix: outcomeMatrix });
       repository.updateBuild(build.id, { status: outcome === "passed" ? "reviewed" : "pending_review" });
       const updatedBuild = repository.getBuild(build.id)!;
-      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, { outcome, summary, validation, evidence: evidence ?? undefined, integration: review.integration ?? undefined, residualRisks: review.residual_risks ?? undefined, followUp: review.follow_up ?? undefined, outcomeMatrix: repository.listBuildReviewOutcomes(review.id), git: captureGitContext(status.repoRoot ?? process.cwd()) });
+      const reviewPath = writeBuildReviewMarkdown(status.workspaceRoot, review.id, updatedBuild, tasks, approvedOutcomes, { outcome, summary, validation, evidence: evidence ?? undefined, integration: review.integration ?? undefined, residualRisks: review.residual_risks ?? undefined, followUp: review.follow_up ?? undefined, outcomeMatrix: repository.listBuildReviewOutcomes(review.id), git: captureGitContext(status.repoRoot ?? process.cwd()) });
       syncBuildMarkdown(status.workspaceRoot, updatedBuild, tasks, review, repository.getBuildAuditClassification(build.id), approvedOutcomes);
       console.log(`Saved Build review ${review.id} for ${build.id}.`);
       console.log(`  Outcome: ${outcome}`);
@@ -1355,6 +1358,7 @@ function writeBuildReviewMarkdown(
   reviewId: number,
   build: { id: string; title: string; acceptance_criteria: string | null; validation: string | null },
   tasks: Array<{ id: string; title: string; status: string }>,
+  approvedOutcomes: BuildOutcomeRecord[],
   details: { outcome: string; summary: string; validation: string; evidence?: string; integration?: string; residualRisks?: string; followUp?: string; outcomeMatrix: Array<{ build_outcome_id: number; criterion: string; executed_evidence: string; coverage_classification: string; residual_risk_decision: string; status: string }>; git: { status: string; diff: string } },
 ): string {
   const reviewDir = join(workspaceRoot, "agent", "builds", build.id, "reviews");
@@ -1384,7 +1388,7 @@ ${formatOptionalText(details.evidence)}
 
 ## Acceptance Criteria
 
-${build.acceptance_criteria || "Not specified."}
+${approvedOutcomes.length > 0 ? approvedOutcomes.map((outcome) => `- ${outcome.criterion}`).join("\n") : build.acceptance_criteria || "Not specified."}
 
 ## Outcome Matrix
 

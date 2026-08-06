@@ -146,9 +146,6 @@ const SCHEMA_STATEMENTS = [
     summary TEXT NOT NULL,
     validation TEXT NOT NULL DEFAULT 'not_run',
     evidence TEXT,
-    integration TEXT,
-    residual_risks TEXT,
-    follow_up TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
   )`,
@@ -159,6 +156,9 @@ const SCHEMA_STATEMENTS = [
     summary TEXT NOT NULL,
     validation TEXT NOT NULL DEFAULT 'not_run',
     evidence TEXT,
+    integration TEXT,
+    residual_risks TEXT,
+    follow_up TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (build_id) REFERENCES builds(id)
   )`,
@@ -302,7 +302,7 @@ const SCHEMA_STATEMENTS = [
   )`,
 ] as const;
 
-const SCHEMA_VERSION = "12";
+const SCHEMA_VERSION = "13";
 
 const MIGRATED_COLUMNS: Partial<Record<(typeof REQUIRED_TABLES)[number], readonly string[]>> = {
   builds: [
