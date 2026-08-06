@@ -810,9 +810,11 @@ buildCommand
       for (const build of builds) {
         const audit = repository.getBuildAuditClassification(build.id);
         const matrix = repository.listBuildClosureEvidence(build.id);
+        const outcomes = repository.listBuildOutcomes(build.id);
         console.log(`${build.id}: ${audit ? audit.audit_class : "current"}`);
         if (audit) console.log(`  Rationale: ${audit.rationale}`);
-        console.log(`  Closure matrix: ${repository.hasCompleteBuildClosureEvidence(build.id) ? "complete" : "incomplete"} (${matrix.length} row(s))`);
+        if (outcomes.length > 0) console.log(`  Outcome matrix: ${repository.hasCompletePassedBuildOutcomeMatrix(build.id) ? "complete" : "incomplete"} (${outcomes.length} approved outcome(s))`);
+        else console.log(`  Closure matrix: ${repository.hasCompleteBuildClosureEvidence(build.id) ? "complete" : "incomplete"} (${matrix.length} row(s))`);
       }
     } finally { repository.close(); }
   });
