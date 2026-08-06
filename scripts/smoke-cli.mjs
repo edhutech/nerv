@@ -2153,6 +2153,11 @@ function runCleanContextFixtureChecks() {
       ["checkpoint", "--summary", "Fresh evaluator reads latest checkpoint", "--pending", "Resume from the latest persisted checkpoint", "--next", "Review the newest checkpoint before continuing"],
       repoRoot,
     );
+    writeFileSync(
+      join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-1000.md"),
+      "# Checkpoint 1000\n\n## Pending work\n\nResume from checkpoint 1000\n\n## Next steps\n\nReview the numerically newest checkpoint before continuing\n",
+      "utf8",
+    );
     mkdirSync(join(repoRoot, ".agents/skills/nerv-development"), { recursive: true });
     symlinkSync(
       resolve(root, ".agents/skills/nerv-development/SKILL.md"),
@@ -2173,6 +2178,7 @@ function runCleanContextFixtureChecks() {
         verifyPath("clean context fixture creates task.md", join(repoRoot, ".nerv/agent/runs/RUN-001/task.md"), "file");
         verifyPath("clean context fixture creates initial checkpoint", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-001.md"), "file");
         verifyPath("clean context fixture creates latest checkpoint", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-002.md"), "file");
+        verifyPath("clean context fixture creates checkpoint beyond three digits", join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-1000.md"), "file");
         verifyPath("clean context fixture exposes canonical skill", join(repoRoot, ".agents/skills/nerv-development/SKILL.md"), "file");
       },
     });
@@ -2212,9 +2218,9 @@ function runCleanContextFixtureChecks() {
     }
 
     if (
-      recovered.recovery.checkpoint !== ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-002.md"
-      || recovered.recovery.pending !== "Resume from the latest persisted checkpoint"
-      || recovered.recovery.next !== "Review the newest checkpoint before continuing"
+      recovered.recovery.checkpoint !== ".nerv/agent/runs/RUN-001/checkpoints/checkpoint-1000.md"
+      || recovered.recovery.pending !== "Resume from checkpoint 1000"
+      || recovered.recovery.next !== "Review the numerically newest checkpoint before continuing"
     ) {
       fail("fresh local evaluator reconstructs persisted authority", "did not reconstruct pending and next-step context from the newest checkpoint", evaluatorOutput);
     }

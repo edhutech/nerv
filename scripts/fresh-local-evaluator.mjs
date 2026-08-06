@@ -28,9 +28,10 @@ for (const path of requiredPaths) {
 
 const checkpointDirectory = join(repoRoot, ".nerv/agent/runs/RUN-001/checkpoints");
 const checkpoint = readdirSync(checkpointDirectory)
-  .filter((path) => /^checkpoint-\d+\.md$/.test(path))
-  .sort()
-  .at(-1);
+  .map((path) => ({ path, sequence: Number(/^checkpoint-(\d+)\.md$/.exec(path)?.[1]) }))
+  .filter(({ sequence }) => Number.isInteger(sequence))
+  .sort((left, right) => left.sequence - right.sequence)
+  .at(-1)?.path;
 
 if (!checkpoint) {
   throw new Error("Missing checkpoint artifact");
@@ -49,7 +50,10 @@ function section(content, heading) {
 
 const run = contents.get(".nerv/agent/runs/RUN-001/run.md");
 const task = contents.get(".nerv/agent/runs/RUN-001/task.md");
-if (!run?.includes("# RUN-001") || !task?.includes("# TASK-001")) {
+const activeTaskId = run?.match(/^## Active Task\n\n(TASK-\d+):/m)?.[1];
+const taskId = task?.match(/^# (TASK-\d+):/m)?.[1];
+
+if (!run?.match(/^# RUN-001$/m) || !activeTaskId || !taskId || activeTaskId !== taskId) {
   throw new Error("Run or Task artifact did not match the active Run");
 }
 
@@ -69,7 +73,7 @@ console.log(JSON.stringify({
   commands: [`node ${cli} current`, `node ${cli} status`],
   current: current.match(/RUN-\d+/)?.[0] ?? null,
   recovery: {
-    task: task.match(/# (TASK-\d+)/)?.[1] ?? null,
+    task: activeTaskId,
     checkpoint: checkpointPath,
     pending: section(checkpointContent, "Pending work"),
     next: section(checkpointContent, "Next steps"),
