@@ -1042,6 +1042,15 @@ program
         return;
       }
 
+      if (run.status === "closed") {
+        program.error(`Run ${run.id} is already closed and cannot be reviewed.`, {
+          code: "NERV_RUN_ALREADY_CLOSED",
+          exitCode: 1,
+        });
+
+        return;
+      }
+
       const task = repository.getTask(run.task_id);
       const build = task?.build_id ? repository.getBuild(task.build_id) : null;
 

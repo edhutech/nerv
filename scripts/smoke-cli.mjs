@@ -1213,6 +1213,8 @@ function runWorkItemPersistenceChecks() {
         run_id: "RUN-001",
         outcome: "passed",
         summary: "Implementation complete",
+        validation: "passed",
+        evidence: "Repository review evidence",
       });
       if (review.id !== 1) {
         fail("work item review creation", `expected review id 1, got ${review.id}`, "");
@@ -1238,6 +1240,12 @@ function runWorkItemPersistenceChecks() {
       }
 
       console.log("ok - work item review listing");
+
+      if (!repository.hasPassedTaskReview("TASK-001")) {
+        fail("work item Task review eligibility", "Task's latest valid review was not recognized", "");
+      }
+
+      console.log("ok - work item Task review eligibility");
 
       repository.setCurrentRunId("RUN-001");
       const currentRunId = repository.getCurrentRunId();
@@ -2519,6 +2527,14 @@ function runCloseChecks() {
       cwd: repoRoot,
       exitCode: 1,
       includes: ["already closed"],
+    });
+
+    runCheck({
+      name: "review rejects a closed run",
+      args: ["review", "--run", "RUN-001", "--outcome", "failed", "--summary", "Late finding", "--validation", "failed", "--evidence", "Late evidence"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["already closed and cannot be reviewed"],
     });
 
     spawnOrFail("create second task for close check", ["new", "task", "Add another feature"], repoRoot);
