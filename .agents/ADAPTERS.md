@@ -40,9 +40,9 @@ OpenCode discovers skills in `.agents/skills/*/SKILL.md` automatically based on 
 
 ## Codex (OpenAI)
 
-**Discovery mechanism:** Manual (not verified)
+**Discovery mechanism:** Not verified
 
-Codex does not automatically discover skills in `.agents/skills/`. To use the `nerv-development` skill with Codex, reference the canonical skill explicitly.
+This repository has not verified how Codex discovers repository-local skills. To use the `nerv-development` skill without relying on discovery, explicitly instruct Codex to read the canonical skill.
 
 **Manual loading approach:**
 
@@ -53,15 +53,15 @@ ln -s .agents/skills/nerv-development/SKILL.md CODEX_CONTEXT.md
 
 Alternatively, instruct Codex to read `.agents/skills/nerv-development/SKILL.md` directly in the prompt.
 
-**Evidence:** Not runtime-validated. This approach is based on documented Codex conventions but has not been executed in this repository.
+**Evidence:** Not runtime-validated. The symlink example is unverified operator guidance, not a claim about Codex discovery behavior.
 
 **Adapter requirements:** Codex must be able to read files from the repository and execute shell commands.
 
 ## Claude Code (Anthropic)
 
-**Discovery mechanism:** Manual (not verified)
+**Discovery mechanism:** Not verified
 
-Claude Code does not automatically discover skills in `.agents/skills/`. To use the `nerv-development` skill with Claude Code, reference the canonical skill explicitly.
+This repository has not verified how Claude Code discovers repository-local skills. To use the `nerv-development` skill without relying on discovery, explicitly instruct Claude Code to read the canonical skill.
 
 **Manual loading approach:**
 
@@ -72,15 +72,15 @@ ln -s .agents/skills/nerv-development/SKILL.md CLAUDE.md
 
 Alternatively, instruct Claude Code to read `.agents/skills/nerv-development/SKILL.md` directly in the prompt.
 
-**Evidence:** Not runtime-validated. This approach is based on documented Claude Code conventions but has not been executed in this repository.
+**Evidence:** Not runtime-validated. The symlink example is unverified operator guidance, not a claim about Claude Code discovery behavior.
 
 **Adapter requirements:** Claude Code must be able to read files from the repository and execute shell commands.
 
 ## Cursor
 
-**Discovery mechanism:** Manual (not verified)
+**Discovery mechanism:** Not verified
 
-Cursor does not automatically discover skills in `.agents/skills/`. To use the `nerv-development` skill with Cursor, reference the canonical skill explicitly.
+This repository has not verified how Cursor discovers repository-local skills. To use the `nerv-development` skill without relying on discovery, explicitly instruct Cursor to read the canonical skill.
 
 **Manual loading approach:**
 
@@ -94,7 +94,7 @@ ln -s ../../.agents/skills/nerv-development/SKILL.md .cursor/rules/nerv-developm
 
 Alternatively, instruct Cursor to read `.agents/skills/nerv-development/SKILL.md` directly in the prompt.
 
-**Evidence:** Not runtime-validated. This approach is based on documented Cursor conventions but has not been executed in this repository.
+**Evidence:** Not runtime-validated. The symlink example is unverified operator guidance, not a claim about Cursor discovery behavior.
 
 **Adapter requirements:** Cursor must be able to read files from the repository and execute shell commands.
 

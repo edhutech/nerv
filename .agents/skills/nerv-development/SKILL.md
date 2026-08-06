@@ -61,7 +61,7 @@ The agent must be able to:
 - Create and modify files in the repository
 - Execute shell commands (`pnpm`, `git`, `node`)
 - Query Git state (`git status`, `git log`, `git diff`, `git add`, `git commit`)
-- Execute the Nerv CLI via `pnpm exec nerv *` or `node dist/index.js *` (the `nerv` binary may not be in PATH)
+- Execute the Nerv CLI via `node dist/index.js *` after `pnpm build`
 - Reconstruct context from persisted evidence (SQLite, Markdown, Git) without relying on conversational history
 - Follow references from this skill to authoritative documents
 - Interpret instructions in natural language
@@ -101,7 +101,7 @@ When starting a new session without prior conversational context:
 2. Read this `SKILL.md` for lifecycle and workflow guidance
 3. Read `.nerv/product/` for product scope, decisions, architecture, and evolution
 4. Read `.nerv/repo/development.md` if available for repository context
-5. Execute `pnpm exec nerv status` or `node dist/index.js status` to inspect current state (active Run, Build progress, Task status)
+5. Run `pnpm build` if `dist/index.js` is unavailable, then execute `node dist/index.js status` to inspect current state (active Run, Build progress, Task status)
 6. If a Run is active, read its `run.md` and `task.md` from `.nerv/agent/runs/RUN-###/`
 7. Continue execution from the recovered context
 
@@ -109,7 +109,7 @@ When starting a new session without prior conversational context:
 
 When resuming an interrupted Run:
 
-1. Execute `pnpm exec nerv status` or `node dist/index.js status` to identify the active Run
+1. Run `pnpm build` if `dist/index.js` is unavailable, then execute `node dist/index.js status` to identify the active Run
 2. Read the Run's `run.md` for checkpoint instructions
 3. List checkpoint files in `.nerv/agent/runs/RUN-###/checkpoints/` and read the most recent checkpoint
 4. The checkpoint contains: summary, files touched, decisions, pending work, and next steps

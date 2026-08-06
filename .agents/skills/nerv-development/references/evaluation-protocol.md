@@ -94,19 +94,19 @@ For each scenario in `evaluation-scenarios.md`:
    - Reads `AGENTS.md`
    - Reads `SKILL.md`
    - Reads `.nerv/product/`
-   - Executes `pnpm exec nerv status` or `node dist/index.js status`
+   - Executes `node dist/index.js status`
    - Reconstructs context from persisted evidence
 
 #### Checkpoint recovery
 
 1. Start a Task with an active Run
 2. Make progress on the Task
-3. Create a checkpoint: `pnpm exec nerv checkpoint --summary "Progress saved"`
+3. Create a checkpoint: `node dist/index.js checkpoint --summary "Progress saved"`
 4. Close the agent session
 5. Open a new session with no prior conversational history
 6. Ask: "Continue the previous work"
 7. Verify the agent:
-   - Executes `pnpm exec nerv status` or `node dist/index.js status` to identify active Run
+   - Executes `node dist/index.js status` to identify active Run
    - Reads the Run's `run.md`
    - Lists checkpoint files in `.nerv/agent/runs/RUN-###/checkpoints/` and reads the most recent
    - Continues execution from checkpoint state
