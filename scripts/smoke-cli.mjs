@@ -2207,8 +2207,8 @@ function runCleanContextFixtureChecks() {
     }
 
     const canonicalSkill = readFileSync(join(root, ".agents/skills/nerv-development/SKILL.md"), "utf8");
-    if (!canonicalSkill.includes("node dist/index.js status") || !recovered.commands.includes("node dist/index.js status")) {
-      fail("fresh local evaluator reconstructs persisted authority", "canonical skill status example was not exercised", evaluatorOutput);
+    if (!canonicalSkill.includes("node dist/index.js status") || !recovered.commands.includes(`node ${cli} status`)) {
+      fail("fresh local evaluator reconstructs persisted authority", "canonical skill status example was not exercised from the source checkout", evaluatorOutput);
     }
 
     console.log("ok - fresh local evaluator reconstructs persisted authority");
