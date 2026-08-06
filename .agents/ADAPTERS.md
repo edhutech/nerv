@@ -28,11 +28,11 @@ All adapters must respect these boundaries:
 
 ## OpenCode
 
-**Discovery mechanism:** Automatic (verified)
+**Discovery mechanism:** Automatic in this reference environment
 
 OpenCode discovers skills in `.agents/skills/*/SKILL.md` automatically based on the `name` and `description` fields in the YAML frontmatter.
 
-**Evidence:** OpenCode loads the skill automatically when the request matches the description. Verified during BUILD-006 and BUILD-007 execution.
+**Evidence:** This repository is configured for OpenCode discovery through `.agents/skills/`. No persisted OpenCode scenario-suite result is recorded; see `.agents/skills/nerv-development/references/external-validation-backlog.md` for the pending host validation.
 
 **Manual loading fallback:** Not needed; OpenCode loads the skill automatically.
 
@@ -100,7 +100,7 @@ Alternatively, instruct Cursor to read `.agents/skills/nerv-development/SKILL.md
 
 ## Validation status
 
-- **OpenCode:** Verified as the reference integration
+- **OpenCode:** Reference integration available; scenario-suite execution pending
 - **Codex:** Documented but not runtime-validated
 - **Claude Code:** Documented but not runtime-validated
 - **Cursor:** Documented but not runtime-validated

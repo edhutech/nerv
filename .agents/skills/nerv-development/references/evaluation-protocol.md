@@ -220,5 +220,6 @@ This evaluation protocol should be updated when:
 - Adapter documentation: `.agents/ADAPTERS.md`
 - Reconciled record: `.agents/skills/nerv-development/references/evaluation-evidence-build-007.md`
 - Recovery exercise: `.agents/skills/nerv-development/references/recovery-exercise-build-008.md`
+- External validation backlog: `.agents/skills/nerv-development/references/external-validation-backlog.md`
 - Nerv CLI commands: `AGENTS.md`
 - Product Context: `.nerv/product/`
