@@ -2231,6 +2231,28 @@ function runCleanContextFixtureChecks() {
     }
 
     console.log("ok - fresh local evaluator reconstructs persisted authority");
+
+    const taskPath = join(repoRoot, ".nerv/agent/runs/RUN-001/task.md");
+    writeFileSync(
+      taskPath,
+      readFileSync(taskPath, "utf8").replace("# TASK-001:", "# TASK-999:"),
+      "utf8",
+    );
+
+    const mismatchedEvaluator = spawnSync(process.execPath, [freshEvaluator, repoRoot, cli], {
+      cwd: tempRoot,
+      encoding: "utf8",
+    });
+    const mismatchedEvaluatorOutput = `${mismatchedEvaluator.stdout}${mismatchedEvaluator.stderr}`;
+
+    if (mismatchedEvaluator.status === 0) {
+      fail("fresh local evaluator rejects mismatched active Task", "expected a non-zero exit", mismatchedEvaluatorOutput);
+    }
+    if (!mismatchedEvaluatorOutput.includes("Run or Task artifact did not match the active Run")) {
+      fail("fresh local evaluator rejects mismatched active Task", "missing mismatch rejection", mismatchedEvaluatorOutput);
+    }
+
+    console.log("ok - fresh local evaluator rejects mismatched active Task");
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
