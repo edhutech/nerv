@@ -49,6 +49,74 @@ Checkpoints are memory for interrupted Runs, not routine progress markers.
 - Do not create checkpoints unless execution must genuinely be interrupted.
 - Do not start a Run during Intake planning; Intake does not create Runs.
 
+## Agent Contract
+
+This skill is agent-agnostic. Any coding agent that meets the following contract can execute Nerv development work.
+
+### Mandatory capabilities
+
+The agent must be able to:
+
+- Read files from the repository (`AGENTS.md`, `SKILL.md`, `.nerv/product/`, `.nerv/repo/`, `src/`, etc.)
+- Create and modify files in the repository
+- Execute shell commands (`pnpm`, `git`, `node`, `nerv`)
+- Query Git state (`git status`, `git log`, `git diff`, `git add`, `git commit`)
+- Execute the Nerv CLI (`nerv *` commands)
+- Maintain context across multiple steps and tasks within a session
+- Pause and wait for explicit human input when approval is required
+- Reconstruct context from persisted evidence (SQLite, Markdown, Git) without relying on conversational history
+- Follow references from this skill to authoritative documents
+- Interpret instructions in natural language
+
+### Optional capabilities
+
+The agent may optionally:
+
+- Discover this skill automatically through host-specific mechanisms (e.g., `.agents/skills/` for OpenCode)
+- Parse YAML frontmatter for metadata
+- Inject additional context from the host runtime
+
+### Prohibited proprietary dependencies
+
+This skill must not require:
+
+- Persistent conversational memory from the agent
+- Host-specific search or navigation APIs
+- Cloud services or external APIs
+- A specific model or provider
+- A specific output format for agent communication
+- Virtual file systems or sandboxing
+
+The Nerv lifecycle (Intake, Build, Task, Run, Checkpoint, Review, Close) is defined by this skill and the Nerv CLI, not by the agent. Agent adapters may provide discovery and context wiring, but must not redefine these lifecycle concepts.
+
+## Recovery
+
+This skill supports recovery from clean sessions and interrupted Runs without relying on conversational history.
+
+### Recovery from clean session
+
+When starting a new session without prior conversational context:
+
+1. Read `AGENTS.md` for repository commands and architecture constraints
+2. Read this `SKILL.md` for lifecycle and workflow guidance
+3. Read `.nerv/product/` for product scope, decisions, architecture, and evolution
+4. Read `.nerv/repo/development.md` if available for repository context
+5. Execute `nerv status` to inspect current state (active Run, Build progress, Task status)
+6. If a Run is active, read its `run.md` and `task.md` from `.nerv/agent/runs/RUN-###/`
+7. Continue execution from the recovered context
+
+### Recovery from checkpoint
+
+When resuming an interrupted Run:
+
+1. Execute `nerv status` to identify the active Run
+2. Read the Run's `run.md` for checkpoint instructions
+3. Execute `nerv checkpoint --run <RUN-ID>` or read checkpoint files from `.nerv/agent/runs/RUN-###/checkpoints/`
+4. Read the most recent checkpoint to understand what changed, what remains, and next steps
+5. Continue execution from the checkpoint state
+
+Checkpoints are durable evidence stored in SQLite and Markdown. They do not depend on conversational memory.
+
 ## Workflow
 
 When a request targets Nerv development:
@@ -88,7 +156,7 @@ Use a direct Task only when the request is genuinely bounded and does not meet a
 
 ## Evaluation
 
-When validating this skill's activation, use English prompts with both positive and negative cases:
+When validating this skill's activation, use prompts in any language. English prompts are a consistency convention for evaluation documentation, not a lifecycle requirement. Use both positive and negative cases:
 
 **Should trigger:**
 - "Fix the SQLite migration in database.ts"

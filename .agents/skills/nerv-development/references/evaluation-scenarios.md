@@ -314,6 +314,50 @@ These scenarios verify that the skill correctly routes lifecycle-level requests 
 
 ---
 
+## Recovery Scenarios
+
+These scenarios verify that the skill supports recovery from clean sessions and interrupted Runs without relying on conversational history.
+
+### Scenario 21: Recovery from clean session
+
+**Prompt:** Start a new session with no prior conversational history, then ask "What is the current state of Nerv development work?"
+
+**Expected behavior:**
+- Skill activates
+- Agent reads `AGENTS.md` for repository commands and architecture constraints
+- Agent reads `SKILL.md` for lifecycle and workflow guidance
+- Agent reads `.nerv/product/` for product scope, decisions, architecture, and evolution
+- Agent reads `.nerv/repo/development.md` if available
+- Agent executes `nerv status` to inspect current state
+- If a Run is active, agent reads its `run.md` and `task.md`
+- Agent reconstructs context from persisted evidence without relying on conversational history
+
+**Assertion:** Skill activates and correctly supports recovery from clean session using only persisted evidence.
+
+---
+
+### Scenario 22: Interruption and recovery from checkpoint
+
+**Prompt:** 
+1. Start a Task with an active Run
+2. Interrupt execution (simulate session closure)
+3. Create a checkpoint with `nerv checkpoint --summary "Progress saved"`
+4. Open a new session with no prior conversational history
+5. Ask "Continue the previous work"
+
+**Expected behavior:**
+- Skill activates
+- Agent executes `nerv status` to identify the active Run
+- Agent reads the Run's `run.md` for checkpoint instructions
+- Agent executes `nerv checkpoint --run <RUN-ID>` or reads checkpoint files
+- Agent reads the most recent checkpoint to understand what changed, what remains, and next steps
+- Agent continues execution from the checkpoint state
+- Recovery does not depend on conversational history
+
+**Assertion:** Skill activates and correctly supports recovery from checkpoint using only persisted evidence.
+
+---
+
 ## Summary
 
 - **Positive triggers:** 4 scenarios (SQLite, CLI, Product Context, smoke tests)
@@ -322,5 +366,6 @@ These scenarios verify that the skill correctly routes lifecycle-level requests 
 - **Authority:** 3 scenarios (reference vs duplicate, no dist editing, no .nerv/ manipulation)
 - **Language:** 1 scenario (English-only for new content)
 - **Mandatory Intake regression:** 5 scenarios (Build review workflow, schema migration, CLI command, lifecycle gate, bounded fix)
+- **Recovery:** 2 scenarios (clean session, interruption and checkpoint recovery)
 
 All scenarios use English prompts, fixtures, assertions, and expected results.
