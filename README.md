@@ -106,8 +106,8 @@ nerv start login
 # 7. Save progress
 nerv checkpoint --summary "Implemented OAuth flow" --files "src/auth/google.ts"
 
-# 8. Review work
-nerv review --outcome passed --summary "All criteria met" --validation passed
+# 8. Review the focused Task
+nerv review --outcome passed --summary "All criteria met" --validation passed --evidence "Acceptance criteria and pnpm validate passed"
 
 # 9. Commit and close
 git add .

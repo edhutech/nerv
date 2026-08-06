@@ -77,13 +77,15 @@ After meaningful progress, update the Task checkpoint log with:
 
 ### 7. Review
 
-Before closing, verify:
+#### Task review
 
-- Acceptance criteria
-- Tests, lint or build
-- Scope
-- Evidence
-- Git diff
+Before committing and closing each Task, verify its acceptance criteria, scope, relevant diff, validation, and concise evidence. A Task passes only when validation passed and evidence is recorded; otherwise record `failed` or `blocked` and do not close it.
+
+#### Build review
+
+After every Task is closed and before closing the Build, verify the Build acceptance criteria against the integrated result. Confirm final validation, cross-Task compatibility, generated artifacts, documentation, and residual risks. Do not repeat every Task diff unless integration evidence identifies a problem.
+
+Increase review depth only when the Task or Build affects migrations or durable data, CLI contracts, security or dependencies, concurrency, or user-facing interfaces.
 
 ### 8. Commit
 

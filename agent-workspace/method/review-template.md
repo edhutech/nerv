@@ -1,6 +1,6 @@
-# Review Template
+# Task Review Template
 
-Use this before closing a task.
+Use this before committing and closing a Task. A passed review requires passed validation and concrete evidence.
 
 ## Related Task
 
@@ -21,16 +21,12 @@ Confirm that the work stayed within task scope.
 Commands or checks performed:
 
 ```bash
-pnpm lint
-pnpm test
-pnpm build
+pnpm validate
 ```
 
 Results:
 
-- Lint:
-- Test:
-- Build:
+- `pnpm validate`:
 
 ## Git diff check
 
@@ -46,6 +42,16 @@ Remaining risks:
 
 - Risk 1
 - Risk 2
+
+## Escalation check
+
+Only complete the applicable checks:
+
+- [ ] Migration or durable state: compatibility and recovery.
+- [ ] CLI or generated artifacts: command/output compatibility.
+- [ ] Security or dependency: source, permissions, and impact.
+- [ ] Concurrency: state transitions and recovery.
+- [ ] User-facing behavior: observable end-to-end result.
 
 ## Evidence
 
