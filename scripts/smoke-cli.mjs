@@ -95,6 +95,7 @@ runCleanChecks();
 runEndToEndLifecycleChecks();
 runGitUnavailableChecks();
 runBuild007LifecycleChecks();
+runBuildClosureMatrixGateE2EChecks();
 
 function runRepositoryChecks() {
   const tempRoot = mkdtempSync(join(tmpdir(), "nerv-repo-smoke-"));
@@ -3298,6 +3299,100 @@ function runBuild007LifecycleChecks() {
           fail("clean after close is safe", "evolution file was deleted", "");
         }
       },
+    });
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+function runBuildClosureMatrixGateE2EChecks() {
+  const tempRoot = mkdtempSync(join(tmpdir(), "nerv-build-closure-matrix-e2e-"));
+  const repoRoot = join(tempRoot, "repo");
+  mkdirSync(repoRoot, { recursive: true });
+
+  try {
+    spawnSync("git", ["init", repoRoot], { encoding: "utf8" });
+    spawnOrFail("init workspace for Build closure matrix E2E", ["init"], repoRoot);
+    spawnOrFail("scaffold product for Build closure matrix E2E", ["product"], repoRoot);
+    spawnOrFail("create build for Build closure matrix E2E", ["new", "build", "Build closure matrix E2E"], repoRoot);
+    spawnOrFail("plan build for Build closure matrix E2E", ["build", "plan", "BUILD-001"], repoRoot);
+
+    for (const taskId of ["TASK-001", "TASK-002", "TASK-003"]) {
+      spawnOrFail(`start ${taskId} for Build closure matrix E2E`, ["start", taskId], repoRoot);
+      spawnOrFail(`review ${taskId} for Build closure matrix E2E`, ["review", "--outcome", "passed", "--summary", `${taskId} complete`, "--validation", "passed", "--evidence", `${taskId} validation passed`], repoRoot);
+      spawnSync("git", ["commit", "-m", `${taskId} complete`, "--allow-empty"], { cwd: repoRoot, encoding: "utf8" });
+      spawnOrFail(`close ${taskId} for Build closure matrix E2E`, ["close"], repoRoot);
+    }
+
+    const databasePath = join(repoRoot, ".nerv/nerv.db");
+    const database = new Database(databasePath);
+    try {
+      // Model a historical closed Task whose review record is no longer valid.
+      database.prepare("DELETE FROM reviews WHERE run_id = ?").run("RUN-001");
+    } finally {
+      database.close();
+    }
+
+    const reviewArgs = ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "All tasks integrate", "--validation", "passed", "--evidence", "Full suite passed", "--closure-evidence", "acceptance_criteria=Acceptance criteria verified", "task_reviews=Task reviews verified", "validation=Full suite passed", "integration=Integration verified"];
+
+    runCheck({
+      name: "Build review rejects closed child without valid passed review",
+      args: reviewArgs,
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["cannot be reviewed until every Task has a current passed review", "TASK-001"],
+    });
+
+    runCheck({
+      name: "Build close rejects closed child without valid passed review",
+      args: ["build", "close", "BUILD-001"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["cannot be closed until every Task has a current passed review", "TASK-001"],
+    });
+
+    const restoredDatabase = new Database(databasePath);
+    try {
+      restoredDatabase
+        .prepare("INSERT INTO reviews (run_id, outcome, summary, validation, evidence, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .run("RUN-001", "passed", "Restored valid review", "passed", "TASK-001 validation passed", new Date().toISOString());
+    } finally {
+      restoredDatabase.close();
+    }
+
+    runCheck({
+      name: "Build review rejects incomplete closure matrix",
+      args: ["build", "review", "BUILD-001", "--outcome", "passed", "--summary", "All tasks integrate", "--validation", "passed", "--evidence", "Full suite passed"],
+      cwd: repoRoot,
+      exitCode: 1,
+      includes: ["requires closure evidence for acceptance_criteria, task_reviews, validation, and integration"],
+    });
+
+    runCheck({
+      name: "Build closure matrix complete path passes",
+      args: reviewArgs,
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Saved Build review 1 for BUILD-001", "Closure matrix: 4/4 outcomes evidenced"],
+      verify: () => {
+        const matrixDatabase = new Database(databasePath, { readonly: true });
+        try {
+          const rows = matrixDatabase.prepare("SELECT outcome, evidence FROM build_closure_evidence WHERE build_id = ? ORDER BY outcome").all("BUILD-001");
+          if (rows.length !== 4 || rows.some((row) => !row.evidence)) {
+            fail("Build closure matrix complete path passes", "expected four persisted closure-evidence rows", JSON.stringify(rows));
+          }
+        } finally {
+          matrixDatabase.close();
+        }
+      },
+    });
+
+    runCheck({
+      name: "Build close passes with complete closure matrix",
+      args: ["build", "close", "BUILD-001"],
+      cwd: repoRoot,
+      exitCode: 0,
+      includes: ["Closed BUILD-001", "Status: closed"],
     });
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
