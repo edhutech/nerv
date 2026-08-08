@@ -35,6 +35,7 @@ node ~/tools/nerv/dist/index.js repo
 
 # Materialize and operate on approved Work Item data.
 nerv work create "Durable knowledge storage" --intent "..." --goal "..." --scope "..." --acceptance-criteria "..." --validation "..."
+nerv work list
 nerv work add-task WORK-001 "Add storage" --scope "..." --acceptance-criteria "..." --validation "..."
 nerv work activate WORK-001
 nerv task start TASK-001
@@ -43,7 +44,7 @@ nerv review WORK-001 --outcome PASS --summary "..." --validation-evidence "..."
 nerv close WORK-001 --message "Add durable knowledge storage"
 ```
 
-Other primitives include `nerv work status`, `nerv task block`, `nerv checkpoint`, and `nerv knowledge add|search|show`. Use `nerv --help` for exact arguments.
+`nerv work list` provides a read-only overview of every Work Item, including its ID, title, and current state. Other primitives include `nerv work status`, `nerv task block`, `nerv checkpoint`, and `nerv knowledge add|search|show`. Use `nerv --help` for exact arguments.
 
 Close is deliberately Git-safe: it requires a passing Work Review and validation evidence, stages only attributable Work Item changes, and blocks rather than guessing when unrelated changes cannot be separated safely.
 
