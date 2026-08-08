@@ -1,213 +1,65 @@
 # Nerv
 
-Local-first Agent Work Harness for developers who work with coding agents.
+Local-first Agent Work Harness for developers who build software with coding agents.
 
-Nerv does not replace coding agents. It works **with** agents (Codex, Claude Code, OpenCode, Cursor, etc.) by preparing the right context, scope, decisions, and execution path for each unit of work.
+Nerv persists the minimum useful context and work state needed to make agent-assisted work recoverable and reviewable. It does not launch, control, or require a particular coding agent or model.
 
-**Core idea:** Less context, better chosen.
+**Less context, better chosen.**
 
-## What Nerv Does
+## Model
 
-- Turns vague developer intent into scoped, contextual, verifiable agentic work
-- Creates focused `run.md` files that give agents minimum useful context
-- Tracks runs, checkpoints, reviews, and closes
-- Preserves product evolution and decisions across sessions
-- Reduces repeated explanations between coding sessions
+A Work Item is the governed unit of work. It contains one or more bounded Tasks. Tasks are executed and validated; the integrated Work Item is reviewed and closed as one Git-safe atomic change.
 
-## Prerequisites
+The normal flow is: plan, human approval, materialize, execute Tasks, validate, Work Review, then close. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
 
-- **Node.js** >= 20
-- **pnpm** (package manager)
-- **Git** (Nerv works inside Git repositories)
+SQLite is the durable operational source of truth. Product Context and Repo Context are canonical long-lived context. Generated Markdown is minimal temporary active context, not the lifecycle authority.
 
-## Installation
-
-Nerv is installed once in a local tools folder, but you run it from the project repository where you want Nerv to create and manage `.nerv/`.
+## Install
 
 ```bash
-mkdir -p ~/tools
 git clone https://github.com/edhutech/nerv.git ~/tools/nerv
-cd ~/tools/nerv
-pnpm install
-pnpm build
+pnpm --dir ~/tools/nerv install
+pnpm --dir ~/tools/nerv build
 ```
 
-## Running Nerv
+Nerv requires Node.js 20 or later, pnpm, and a Git repository.
 
-Nerv commands are executed from your project repository, not from the installation folder.
+## Runtime CLI
 
-**Direct execution:**
+Run `nerv` from the target repository. The examples use the installed `nerv` binary; replace it with `node ~/tools/nerv/dist/index.js` when running directly from a local clone. The runtime is agent agnostic and exposes deterministic primitives; it never calls an AI API.
 
 ```bash
-cd your-project
 node ~/tools/nerv/dist/index.js init
 node ~/tools/nerv/dist/index.js product
+node ~/tools/nerv/dist/index.js repo
+
+# Materialize and operate on approved Work Item data.
+nerv work create "Durable knowledge storage" --intent "..." --goal "..." --scope "..." --acceptance-criteria "..." --validation "..."
+nerv work add-task WORK-001 "Add storage" --scope "..." --acceptance-criteria "..." --validation "..."
+nerv work activate WORK-001
+nerv task start TASK-001
+nerv task done TASK-001 --evidence "..." --files src/example.ts
+nerv review WORK-001 --outcome PASS --summary "..." --validation-evidence "..."
+nerv close WORK-001 --message "Add durable knowledge storage"
 ```
 
-Verify:
+Other primitives include `nerv work status`, `nerv task block`, `nerv checkpoint`, and `nerv knowledge add|search|show`. Use `nerv --help` for exact arguments.
 
-```bash
-node ~/tools/nerv/dist/index.js --help
-```
+Close is deliberately Git-safe: it requires a passing Work Review and validation evidence, stages only attributable Work Item changes, and blocks rather than guessing when unrelated changes cannot be separated safely.
 
-**Optional convenience alias:**
+## Agent Workflows
 
-Add to your `~/.bashrc` or `~/.zshrc`:
+Agents may plan and execute work using Nerv, but the runtime makes no assumptions about host, provider, model, or conversational memory. An agent workflow should use strong reasoning for planning, replanning, and Work Review; an execution-focused model can implement approved Tasks and run validation.
 
-```bash
-alias nerv='node ~/tools/nerv/dist/index.js'
-```
-
-Reload your shell:
-
-```bash
-source ~/.bashrc   # or source ~/.zshrc
-```
-
-Verify:
-
-```bash
-nerv --help
-```
-
-## Quick Start
-
-The following examples use `nerv` for readability. If you did not configure the optional alias, replace `nerv` with `node ~/tools/nerv/dist/index.js`.
-
-```bash
-# 1. Initialize Nerv in your project
-cd your-project
-nerv init
-
-# 2. Prepare a portable Product Context session
-nerv product
-# Give the printed .nerv/agent/product/run.md file to any coding agent.
-# Optional temporary source material stays in your repository:
-nerv product --input product-brief.md notes/
-
-# 3. Persist an external agent's proposal, then review it explicitly
-nerv product propose PRODUCT-001 --proposal proposal.json
-nerv product review-proposal PRODUCT-001-PROPOSAL-001 --action approved
-nerv product apply PRODUCT-001-PROPOSAL-001
-nerv product status
-
-# Product Context is SQLite-backed and recoverable after restarting Nerv.
-# Apply never invokes AI or creates Runs or Checkpoints.
-
-# 4. Create an Agentic Task from intent
-nerv new task "Add Google login without breaking email auth"
-
-# 5. Start a Run
-nerv start login
-
-# 6. Give your coding agent this file:
-#    .nerv/agent/runs/RUN-001/run.md
-
-# 7. Save progress
-nerv checkpoint --summary "Implemented OAuth flow" --files "src/auth/google.ts"
-
-# 8. Review the focused Task
-nerv review --outcome passed --summary "All criteria met" --validation passed --evidence "Acceptance criteria and pnpm validate passed"
-
-# 9. Commit and close
-git add .
-git commit -m "TASK-001: Add Google login"
-nerv close
-```
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `nerv init` | Initialize Nerv in the current repo |
-| `nerv product [--input <paths...>]` | Prepare an agent-neutral Product Context session |
-| `nerv product propose <PRODUCT-###> --proposal <file>` | Persist a validated Product Context Proposal without changing canonical documents |
-| `nerv product proposal <PRODUCT-###-PROPOSAL-###>` | Show a Product Context Proposal by ID |
-| `nerv product status` | Show the current session, proposal/apply state, resumable IDs, and SQLite-Markdown checks |
-| `nerv product review` | Validate coherent, applied Product Context before close |
-| `nerv product close` | Close a reviewed, still-coherent Product Session |
-| `nerv repo` | Generate repo development context |
-| `nerv new task "<intent>"` | Create Agentic Task from intent |
-| `nerv new build "<intent>"` | Create Agentic Build from intent |
-| `nerv build plan <BUILD-###>` | Plan tasks for a Build |
-| `nerv start <query>` | Start a Run for a task |
-| `nerv current` | Show current active Run |
-| `nerv checkpoint` | Save progress for a Run |
-| `nerv review` | Review work against acceptance criteria |
-| `nerv close` | Close reviewed work and update evolution |
-| `nerv tasks [query]` | List or search tasks |
-| `nerv builds [query]` | List or search builds |
-| `nerv runs` | List all Runs |
-| `nerv status` | Show workspace status |
-| `nerv clean` | Clean generated artifacts |
-
-## Intent Intake
-
-Intent Intake is a portable, approval-gated planning flow. It captures the
-original Intent exactly as UTF-8 bytes from one direct argument or one
-`--input` file, computes SHA-256 over that exact captured text, and never
-creates Tasks, Builds, Runs, Checkpoints, or Reviews during capture.
-
-```bash
-nerv intake create --input intent.md
-nerv intake context INTAKE-001
-# Give the printed package to any external agent. Nerv calls no AI or API.
-nerv intake propose INTAKE-001 --input proposal.json
-nerv intake review INTAKE-001-PROPOSAL-001 --action changes-requested
-nerv intake propose INTAKE-001 --input revised-proposal.json
-nerv intake review INTAKE-001-PROPOSAL-002 --action approved
-nerv intake apply INTAKE-001-PROPOSAL-002 --dry-run
-nerv intake apply INTAKE-001-PROPOSAL-002
-```
-
-Intake and Proposal versions have separate lifecycles. An Intake is captured,
-planned, changes-requested, approved, rejected, or materialized. A Proposal is
-proposed, changes-requested, approved, rejected, or materialized. Decisions
-are append-only SQLite records and Markdown shows version and review history.
-Only a new version following `changes-requested` is accepted; the original
-Intent and prior Proposal remain unchanged.
-
-The versioned canonical Proposal format, all four planning forms, structured
-dependencies and relationships are documented in
-[`docs/proposal-contract.md`](docs/proposal-contract.md). Apply uses the same
-plan as dry run. SQLite commits an auditable materialization first; a failed
-Markdown phase remains recoverable by repeating apply, and a completed repeat
-is idempotent. Apply never starts Runs or creates Checkpoints. See
-[`docs/materialization.md`](docs/materialization.md) and
-[`docs/intake-lifecycle.md`](docs/intake-lifecycle.md).
-
-## Using with Coding Agents
-
-Product Context is independent of agents and providers. Nerv never opens an agent or calls an AI API. `nerv product` writes `.nerv/agent/product/run.md`; give that file to the agent you choose. The agent returns structured JSON describing its assessment and proposed full-document changes. Persist it with `nerv product propose PRODUCT-### --proposal proposal.json`; it is recoverable through `nerv product proposal` and does not modify `.nerv/product/`. Temporary input paths and SHA-256 hashes are retained only as proposal traceability. Approval and application are deliberately separate steps. A later `nerv product` resumes an active session. Builds and checkpoints remain optional.
-
-When you start a Run with `nerv start <query>`, Nerv generates:
-
-- `.nerv/agent/runs/RUN-###/run.md` — **Agent entrypoint**
-- `.nerv/agent/runs/RUN-###/task.md` — Task details
-
-Give your coding agent the `run.md` file. It contains:
-- Which task is active
-- Scope and acceptance criteria
-- Context files to read
-- Validation commands
-- Checkpoint/review/close instructions
-
-The agent reads `run.md` and works with focused context instead of guessing from the whole repo.
-
-## Update Nerv
-
-```bash
-cd ~/tools/nerv
-git pull
-pnpm install
-pnpm build
-```
+For development of this repository, `.agents/skills/nerv-development/SKILL.md` defines the `nerv-dev` protocol. `nerv-dev` is an agent-facing workflow protocol, not a second engine or a replacement for the agent-agnostic `nerv` runtime CLI.
 
 ## Development
 
 ```bash
-pnpm validate  # Runs build + typecheck + smoke tests
+pnpm validate
 ```
+
+`pnpm validate` runs build, typecheck, and smoke validation.
 
 ## License
 

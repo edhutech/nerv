@@ -1,149 +1,31 @@
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
-
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
-const WORKSPACE_DIRECTORY = ".nerv";
+const DIRS = [".nerv", ".nerv/product", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as const;
+export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 
-const REQUIRED_SUBDIRECTORIES = [
-  WORKSPACE_DIRECTORY,
-  join(WORKSPACE_DIRECTORY, "product"),
-  join(WORKSPACE_DIRECTORY, "repo"),
-  join(WORKSPACE_DIRECTORY, "agent"),
-  join(WORKSPACE_DIRECTORY, "agent", "runs"),
-  join(WORKSPACE_DIRECTORY, "agent", "builds"),
-] as const;
-
-export type WorkspaceStatus = {
-  repoRoot: string | null;
-  workspaceRoot: string | null;
-  databasePath: string | null;
-  initialized: boolean;
-};
-
-export function findRepoRoot(startDirectory: string): string | null {
-  let currentDirectory = resolve(startDirectory);
-
+export function findRepoRoot(start: string): string | null {
+  let current = resolve(start);
   while (true) {
-    if (existsSync(join(currentDirectory, ".git"))) {
-      return currentDirectory;
-    }
-
-    const parentDirectory = dirname(currentDirectory);
-    if (parentDirectory === currentDirectory || currentDirectory === parse(currentDirectory).root) {
-      return null;
-    }
-
-    currentDirectory = parentDirectory;
+    if (existsSync(join(current, ".git"))) return current;
+    const parent = dirname(current);
+    if (parent === current || current === parse(current).root) return null;
+    current = parent;
   }
 }
-
-export function getWorkspaceStatus(startDirectory: string): WorkspaceStatus {
-  const repoRoot = findRepoRoot(startDirectory);
-
-  if (repoRoot === null) {
-    return {
-      repoRoot: null,
-      workspaceRoot: null,
-      databasePath: null,
-      initialized: false,
-    };
-  }
-
-  const workspaceRoot = join(repoRoot, WORKSPACE_DIRECTORY);
+export function getWorkspaceStatus(start: string): WorkspaceStatus {
+  const repoRoot = findRepoRoot(start);
+  if (!repoRoot) return { repoRoot: null, workspaceRoot: null, databasePath: null, initialized: false };
+  const workspaceRoot = join(repoRoot, ".nerv");
   const databasePath = join(workspaceRoot, "nerv.db");
-
-  return {
-    repoRoot,
-    workspaceRoot,
-    databasePath,
-    initialized: isWorkspaceInitialized(repoRoot),
-  };
+  return { repoRoot, workspaceRoot, databasePath, initialized: DIRS.every((dir) => isDirectory(join(repoRoot, dir))) && existsSync(databasePath) && hasRequiredSchema(databasePath) };
 }
-
-export function getInitializedWorkspaceStatus(startDirectory: string): WorkspaceStatus {
-  const gitStatus = getWorkspaceStatus(startDirectory);
-
-  if (gitStatus.repoRoot !== null || gitStatus.initialized) {
-    return gitStatus;
-  }
-
-  const workspaceRepoRoot = findInitializedWorkspaceRoot(startDirectory);
-
-  if (workspaceRepoRoot === null) {
-    return gitStatus;
-  }
-
-  const workspaceRoot = join(workspaceRepoRoot, WORKSPACE_DIRECTORY);
-  const databasePath = join(workspaceRoot, "nerv.db");
-
-  return {
-    repoRoot: workspaceRepoRoot,
-    workspaceRoot,
-    databasePath,
-    initialized: true,
-  };
-}
-
 export function ensureWorkspace(repoRoot: string): WorkspaceStatus {
-  for (const relativeDirectory of REQUIRED_SUBDIRECTORIES) {
-    mkdirSync(join(repoRoot, relativeDirectory), { recursive: true });
-  }
-
-  const workspaceRoot = join(repoRoot, WORKSPACE_DIRECTORY);
-  const databasePath = join(workspaceRoot, "nerv.db");
+  const databasePath = join(repoRoot, ".nerv", "nerv.db");
+  if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db is not a vNext Nerv database; remove generated .nerv state and run `nerv init` again");
+  for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath);
-
-  return {
-    repoRoot,
-    workspaceRoot,
-    databasePath,
-    initialized: true,
-  };
+  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true };
 }
-
-function isWorkspaceInitialized(repoRoot: string): boolean {
-  for (const relativeDirectory of REQUIRED_SUBDIRECTORIES) {
-    const directoryPath = join(repoRoot, relativeDirectory);
-    if (!isDirectory(directoryPath)) {
-      return false;
-    }
-  }
-
-  const databasePath = join(repoRoot, WORKSPACE_DIRECTORY, "nerv.db");
-
-  return isFile(databasePath) && hasRequiredSchema(databasePath);
-}
-
-function findInitializedWorkspaceRoot(startDirectory: string): string | null {
-  let currentDirectory = resolve(startDirectory);
-
-  while (true) {
-    if (isWorkspaceInitialized(currentDirectory)) {
-      return currentDirectory;
-    }
-
-    const parentDirectory = dirname(currentDirectory);
-    if (parentDirectory === currentDirectory || currentDirectory === parse(currentDirectory).root) {
-      return null;
-    }
-
-    currentDirectory = parentDirectory;
-  }
-}
-
-function isDirectory(path: string): boolean {
-  if (!existsSync(path)) {
-    return false;
-  }
-
-  return statSync(path).isDirectory();
-}
-
-function isFile(path: string): boolean {
-  if (!existsSync(path)) {
-    return false;
-  }
-
-  return statSync(path).isFile();
-}
+function isDirectory(path: string): boolean { return existsSync(path) && statSync(path).isDirectory(); }
