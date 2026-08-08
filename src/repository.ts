@@ -7,7 +7,7 @@ export type Task = { id: string; work_item_id: string; title: string; status: Ta
 export type Review = { id: number; work_item_id: string; outcome: "PASS" | "REWORK"; summary: string; findings: string | null; validation_evidence: string; created_at: string };
 export type Checkpoint = { id: number; work_item_id: string; task_id: string | null; summary: string; files: string | null; decisions: string | null; unresolved_issue: string | null; next_step: string | null; created_at: string };
 export type Knowledge = { id: number; type: "decision" | "architecture" | "discovery" | "pattern"; title: string; content: string; work_item_id: string | null; topic_key: string | null; created_at: string; updated_at: string };
-export type Attribution = { paths: Array<{ path: string; state: "present" | "deleted"; hash: string | null }>; ambiguousBaselinePaths?: string[] };
+export type Attribution = { paths: Array<{ path: string; state: "present" | "deleted"; hash: string | null }>; ambiguousBaselinePaths?: string[]; adoptedBaselinePaths?: string[] };
 const now = () => new Date().toISOString();
 
 export function openRepository(path: string): any {
