@@ -52,6 +52,8 @@ Close is deliberately Git-safe: it requires a passing Work Review and validation
 
 Agents may plan and execute work using Nerv, but the runtime makes no assumptions about host, provider, model, or conversational memory. An agent workflow should use strong reasoning for planning, replanning, and Work Review; an execution-focused model can implement approved Tasks and run validation.
 
+For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. It translates normal development requests into the installed runtime's deterministic primitives without creating another lifecycle. The package includes this file for host or developer skill discovery.
+
 For development of this repository, `.agents/skills/nerv-development/SKILL.md` defines the `nerv-dev` protocol. `nerv-dev` is an agent-facing workflow protocol, not a second engine or a replacement for the agent-agnostic `nerv` runtime CLI.
 
 ## Development

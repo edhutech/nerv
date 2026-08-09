@@ -9,7 +9,8 @@
     "nerv": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    ".agents/skills/nerv/SKILL.md"
   ],
   "pnpm": {
     "onlyBuiltDependencies": [
