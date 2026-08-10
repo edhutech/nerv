@@ -1,6 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
+nerv_managed_sha256: "78e896cebcaf41b6ee5fb8996bf06e57b3ef1ad88204ff6dcb538ea7dac3b1eb"
 ---
 
 # Nerv
