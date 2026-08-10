@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
@@ -26,6 +26,27 @@ export function ensureWorkspace(repoRoot: string): WorkspaceStatus {
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db is not a vNext Nerv database; remove generated .nerv state and run `nerv init` again");
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath);
+  ensureGitIgnore(repoRoot);
+  ensurePublicSkill(repoRoot);
   return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true };
+}
+function ensureGitIgnore(repoRoot: string): void {
+  const path = join(repoRoot, ".gitignore");
+  if (!existsSync(path)) {
+    writeFileSync(path, ".nerv/\n");
+    return;
+  }
+  const content = readFileSync(path, "utf8");
+  if (content.split(/\r?\n/).some((line) => [".nerv", ".nerv/", "/.nerv", "/.nerv/"].includes(line.trim()))) return;
+  appendFileSync(path, `${content.endsWith("\n") || content.length === 0 ? "" : "\n"}.nerv/\n`);
+}
+function ensurePublicSkill(repoRoot: string): void {
+  const destination = join(repoRoot, ".agents", "skills", "nerv", "SKILL.md");
+  if (existsSync(destination)) {
+    if (!statSync(destination).isFile()) throw new Error(`cannot install public Nerv skill: ${destination} is not a file`);
+    return;
+  }
+  mkdirSync(dirname(destination), { recursive: true });
+  copyFileSync(new URL("../.agents/skills/nerv/SKILL.md", import.meta.url), destination);
 }
 function isDirectory(path: string): boolean { return existsSync(path) && statSync(path).isDirectory(); }

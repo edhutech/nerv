@@ -9,9 +9,25 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const cli = join(root, "dist/index.js");
 function assert(value, message) { if (!value) throw new Error(message); }
 function run(cwd, args, expected = 0) { const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" }); const output = `${result.stdout}${result.stderr}`; if (result.status !== expected) throw new Error(`${args.join(" ")} expected ${expected}: ${output}`); return output; }
-function setup() { const repo = mkdtempSync(join(tmpdir(), "nerv-vnext-")); spawnSync("git", ["init"], { cwd: repo }); spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: repo }); spawnSync("git", ["config", "user.name", "Test"], { cwd: repo }); writeFileSync(join(repo, "README.md"), "base\n"); spawnSync("git", ["add", "README.md"], { cwd: repo }); spawnSync("git", ["commit", "-m", "initial"], { cwd: repo }); run(repo, ["init"]); return repo; }
+function setup(initialize = true) { const repo = mkdtempSync(join(tmpdir(), "nerv-vnext-")); spawnSync("git", ["init"], { cwd: repo }); spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: repo }); spawnSync("git", ["config", "user.name", "Test"], { cwd: repo }); writeFileSync(join(repo, "README.md"), "base\n"); spawnSync("git", ["add", "README.md"], { cwd: repo }); spawnSync("git", ["commit", "-m", "initial"], { cwd: repo }); if (initialize) run(repo, ["init"]); return repo; }
 function createWork(repo, title = "Smoke work") { run(repo, ["work", "create", title, "--intent", "intent", "--goal", "goal", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "pnpm validate"]); run(repo, ["work", "add-task", "WORK-001", "Implement", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "targeted"]); run(repo, ["work", "activate", "WORK-001"]); }
 function eraseBaselineOrigins(repo) { const db = new Database(join(repo, ".nerv/nerv.db")); try { const row = db.prepare("SELECT git_baseline_json FROM work_items WHERE id='WORK-001'").get(); const baseline = JSON.parse(row.git_baseline_json); baseline.dirty = baseline.dirty.map(({ origin, ...item }) => item); db.prepare("UPDATE work_items SET git_baseline_json=? WHERE id='WORK-001'").run(JSON.stringify(baseline)); } finally { db.close(); } }
+{
+  const repo = setup(false); try {
+    writeFileSync(join(repo, ".gitignore"), "consumer-cache/\n");
+    run(repo, ["init"]);
+    const gitignore = join(repo, ".gitignore");
+    const skill = join(repo, ".agents/skills/nerv/SKILL.md");
+    assert(readFileSync(gitignore, "utf8") === "consumer-cache/\n.nerv/\n", "init did not preserve and append to the consumer .gitignore");
+    assert(spawnSync("git", ["check-ignore", "-q", ".nerv/nerv.db"], { cwd: repo }).status === 0, ".nerv is not ignored by Git");
+    assert(readFileSync(skill, "utf8").includes("# Nerv"), "public Nerv skill was not installed");
+    assert(!existsSync(join(repo, ".agents/skills/nerv-development/SKILL.md")), "internal nerv-development skill was installed in consumer repository");
+    writeFileSync(skill, "consumer skill\n");
+    run(repo, ["init"]);
+    assert(readFileSync(gitignore, "utf8") === "consumer-cache/\n.nerv/\n", "repeated init changed .gitignore");
+    assert(readFileSync(skill, "utf8") === "consumer skill\n", "repeated init overwrote the consumer skill");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
 {
   const repo = setup(); try {
     assert(run(repo, ["init"]).includes("already initialized"), "init is not idempotent");
