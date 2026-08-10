@@ -10,7 +10,7 @@ Nerv persists the minimum useful context and work state needed to make agent-ass
 
 A Work Item is the governed unit of work. It contains one or more bounded Tasks. Tasks are executed and validated; the integrated Work Item is reviewed and closed as one Git-safe atomic change.
 
-The normal flow is: plan, human approval, materialize, execute Tasks, validate, Work Review, then close. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
+The normal flow is: plan preview, human approval, materialize, execute Tasks, validate, Work Review, optional user or external verification, then Git-safe close on request. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
 
 SQLite is the durable operational source of truth. Product Context and Repo Context are canonical long-lived context. Generated Markdown is minimal temporary active context, not the lifecycle authority.
 
@@ -50,7 +50,9 @@ Close is deliberately Git-safe: it requires a passing Work Review and validation
 
 ## Agent Workflows
 
-Agents may plan and execute work using Nerv, but the runtime makes no assumptions about host, provider, model, or conversational memory. An agent workflow should use strong reasoning for planning, replanning, and Work Review; an execution-focused model can implement approved Tasks and run validation.
+Agents may plan and execute work using Nerv, but the runtime makes no assumptions about host, provider, model, or conversational memory. A reasoning model plans, replans, and performs Work Review; an execution model implements approved Tasks and runs deterministic validation. The user may hand off between those roles: planning shows a non-durable structured preview before approval, materialization reports readiness for execution, and separated execution stops at `Ready for Work Review` after validation.
+
+A PASS Review is ready for optional user or external verification and does not close automatically. Verification failures become REWORK evidence on the same Work Item. The user may request Git-safe Close after successful verification, or explicitly opt into auto-close for a Work Item without changing Nerv runtime configuration or state.
 
 For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. It translates normal development requests into the installed runtime's deterministic primitives without creating another lifecycle. The package includes this file for host or developer skill discovery.
 

@@ -36,20 +36,20 @@ nerv-dev checkpoint WORK-###
 
 ## Workflow
 
-1. `plan` uses a strong reasoning model to propose the minimum coherent Work Items. Detail Tasks only for the next Work Item. Show the plan and wait for explicit human approval.
-2. `approve` materializes the approved Work Item and its Tasks. A Work Item is the governed outcome; every Task belongs to one Work Item.
-3. `execute` uses an execution-focused model when appropriate. For each approved Task: make it active, implement it, run targeted validation, and mark it done. Do not re-plan ordinary execution.
-4. Run full Work Item validation, then `review` with a strong reasoning model. Review the integrated result, Git diff, validation evidence, context, regressions, and risks.
-5. A PASS makes the Work Item eligible for `close`. A REWORK returns findings and minimum remediation Tasks, waits for human approval, and adds approved Tasks to the same Work Item.
+1. `plan` uses a reasoning model to propose the minimum coherent Work Items. Before approval, show a Plan Preview with the proposed title, goal, Tasks, acceptance criteria, and validation. Do not assign a durable `WORK-###` ID before approval. Detail Tasks only for the next Work Item when showing multiple Work Items.
+2. `approve` materializes the approved Work Item and its Tasks, activates it, and reports that it is ready for execution. A Work Item is the governed outcome; every Task belongs to one Work Item.
+3. `execute` uses an execution model when appropriate. For each approved Task: make it active, implement it, run targeted validation, and mark it done. Do not re-plan ordinary execution. After full validation, stop at `Ready for Work Review` when the workflow separates model roles.
+4. `review` uses a reasoning model to evaluate the integrated result, Git diff, validation evidence, context, regressions, and risks. A REWORK persists findings and minimum remediation Tasks, waits for human approval, adds approved Tasks to the same Work Item, then returns to execution.
+5. A PASS makes the Work Item ready for optional user or external-tool verification; it does not commit by default. External verification failures are new review evidence: persist REWORK on the same Work Item and follow the remediation path. Close only when the user requests it, unless the user explicitly requested auto-close for this Work Item.
 6. `checkpoint` is exceptional recovery evidence only when execution must genuinely stop before completion.
 
 The canonical Work Item states are `planned`, `active`, `review`, `rework`, and `closed`. Task states are `pending`, `active`, `done`, and `blocked`.
 
 ## Model Roles
 
-- Use a strong reasoning model for planning, replanning after a genuine block, and Work Review.
-- Use an execution-focused model for approved Task implementation and deterministic validation when appropriate.
-- The execution model must stop when a Task is genuinely blocked. It must provide concise evidence rather than inventing a substantial new plan.
+- Use a reasoning model for planning, replanning after a genuine block, and Work Review.
+- Use an execution model for approved Task implementation and deterministic validation when appropriate.
+- The execution model must stop when a Task is genuinely blocked or when full validation is complete and a separate reasoning model will review. It must provide concise evidence rather than inventing a substantial new plan.
 - Nerv must remain independent of model, provider, host, and conversational memory.
 
 ## Guardrails
@@ -58,7 +58,7 @@ The canonical Work Item states are `planned`, `active`, `review`, `rework`, and 
 - Do not materialize a plan or remediation Tasks before explicit human approval.
 - Keep generated Markdown minimal and temporary. Active Work Item context belongs under `.nerv/agent/active/`; operational history belongs in SQLite.
 - Preserve Product Context and Repo Context as canonical long-lived context. Record durable discoveries as small searchable knowledge, not large historical documents.
-- Close only after the latest Work Review passes and required validation succeeds. Stage only Work Item-owned changes; block if unrelated changes cannot be separated safely. Never blindly use `git add -A`.
+- Close only after the latest Work Review passes, required validation succeeds, and the user requests Close unless auto-close was explicitly requested for the Work Item. Stage only Work Item-owned changes; block if unrelated changes cannot be separated safely. Never blindly use `git add -A`.
 
 ## Repository Rules
 

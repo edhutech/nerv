@@ -20,22 +20,43 @@ In a fresh session, reconstruct work from these persisted sources and Git state,
 
 ## Plan And Approve
 
-Plan the minimum coherent Work Item or Work Items needed for the request. A Work Item is the reviewable outcome; Tasks are bounded implementation units within it. For multiple Work Items, propose all outcomes and dependencies, but detail Tasks only for the next one.
+The reasoning model plans the minimum coherent Work Item or Work Items needed for the request. Before changing Nerv work records, always show a concise **Plan Preview**:
 
-Present the plan, acceptance criteria, and validation before changing Nerv work records. Wait for explicit human approval. After approval, materialize the selected Work Item with `nerv work create`, add its approved Tasks with `nerv work add-task`, then use `nerv work activate`.
+```text
+Proposed Work Item: <title>
+Goal: <goal>
+Tasks: <bounded implementation Tasks>
+Acceptance criteria: <criteria>
+Validation: <commands or checks>
+```
+
+Do not assign a durable `WORK-###` ID in the preview. For multiple Work Items, show the high-level roadmap and dependencies, but fully detail Tasks only for the next Work Item.
+
+Wait for explicit human approval. Then materialize the approved Work Item with `nerv work create`, add its approved Tasks with `nerv work add-task`, and use `nerv work activate`. Report that the Work Item is ready for execution. If the workflow uses separate models, stop at this explicit execution handoff.
 
 Never materialize speculative plans, use standalone Task governance, or add Runs, Builds, Intake, Proposal, formal Task Review, or Task Close ceremony.
 
-## Execute And Validate
+## Model Roles And Execution
 
-For each pending approved Task: run `nerv task start TASK-###`, implement only its scope, run its targeted validation, then record evidence and touched paths with `nerv task done TASK-### --evidence "..." --files ...`. Do not stop for approval between ordinary Tasks or re-plan completed approved work.
+Nerv is provider- and host-agnostic. The user may change models between phases. Use only these roles:
 
-After all Tasks are done, run the Work Item's full validation. Perform an integrated review against the request, acceptance criteria, Product and Repo Context, relevant Knowledge, implementation, Git diff, validation evidence, regressions, and risks. Persist it with `nerv review WORK-###` using `PASS` or `REWORK`.
+- The **reasoning model** plans, replans after a genuine block, and performs integrated Work Review.
+- The **execution model** implements approved Tasks and runs deterministic validation.
 
-If execution is genuinely blocked, use `nerv task block TASK-### --reason "..."`, stop execution, and report concise evidence. Replan only when new reasoning or clarification is necessary. Use `nerv checkpoint WORK-###` only for a genuine interruption before work can complete, with the active Task and concise recovery evidence.
+For each pending approved Task, the execution model runs `nerv task start TASK-###`, implements only its scope, runs targeted validation, then records evidence and touched paths with `nerv task done TASK-### --evidence "..." --files ...`. Do not stop for approval between ordinary Tasks or re-plan completed approved work.
 
-## Rework And Close
+If execution is genuinely blocked, use `nerv task block TASK-### --reason "..."`, stop execution, and return concise evidence to the reasoning model. Use `nerv checkpoint WORK-###` only for a genuine interruption before work can complete, with the active Task and concise recovery evidence.
 
-A `REWORK` review must name findings, why they matter, the minimum remediation, and proposed Tasks. Present those Tasks and wait for explicit approval. Add approved remediation with `nerv work add-task` to the same Work Item, reactivate it, execute, validate, and review again. Do not create a new Work Item merely to repair the current one.
+After all Tasks are done, run the Work Item's full validation. When roles are separated, do not perform the reasoning-heavy Review in the execution phase. Report `Ready for Work Review` and hand off to the reasoning model.
 
-Only after the latest review is `PASS` and required validation passed, inspect Git state and use `nerv close WORK-### --message "..."`. Let Nerv selectively stage Work Item-owned changes and block unsafe boundaries. Never use `git add -A` to close governed work. One Work Item produces one reviewed atomic commit by default.
+## Review, Verification, And Close
+
+The reasoning model performs the integrated Work Review against the request, acceptance criteria, Product and Repo Context, relevant Knowledge, implementation, Git diff, validation evidence, regressions, and risks. Persist its outcome with `nerv review WORK-###`.
+
+For `REWORK`, persist the outcome, present findings and minimum remediation Tasks, and wait for human approval. Add approved remediation with `nerv work add-task` to the same Work Item, reactivate it, return to execution, validate, and review again. Do not create a new Work Item merely to repair the current one.
+
+For `PASS`, persist the outcome and report that the Work Item is ready for optional user or external-tool verification. Do not commit by default. If verification finds a problem, treat it as new review evidence: record `REWORK` on the same Work Item, propose minimum remediation Tasks, wait for approval, then execute, validate, and review again.
+
+After a successful verification, the user may request `nerv close WORK-### --message "..."`. Let Nerv selectively stage Work Item-owned changes and block unsafe boundaries. Never use `git add -A` to close governed work. One Work Item produces one reviewed atomic commit by default.
+
+If the user explicitly requests auto-close for the Work Item, a `PASS` may proceed directly to Git-safe Close. This is a workflow preference only; do not add runtime state, configuration, or lifecycle concepts for it.
