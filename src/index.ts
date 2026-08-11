@@ -2,7 +2,7 @@
 import { Command } from "commander";
 import { getWorkspaceStatus, ensureWorkspace } from "./workspace.js";
 import { openRepository, type Attribution, type Task } from "./repository.js";
-import { scaffoldProductContext } from "./product.js";
+import { scaffoldProductContext, writeProductContext } from "./product.js";
 import { generateRepoContext } from "./repo-context.js";
 import { discoverContext } from "./context.js";
 import { activePath, nextOperation, removeActiveContext, syncActiveContext } from "./work.js";
@@ -17,7 +17,9 @@ function sync(status: InitializedWorkspace, id: string) { const repo = openRepos
 function action(handler: () => void) { try { handler(); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { exitCode: 1, code: "NERV_OPERATION_FAILED" }); } }
 
 program.command("init").action(() => action(() => { const status = getWorkspaceStatus(process.cwd()); if (!status.repoRoot) throw new Error("nerv init must be run inside a Git repository."); const existed = status.initialized; const result = ensureWorkspace(status.repoRoot); console.log(existed ? `Nerv is already initialized in ${status.repoRoot}.` : `Initialized Nerv in ${status.repoRoot}.`); if (result.skillSync.message) console.log(result.skillSync.message); }));
-program.command("product").description("Scaffold canonical Product Context documents.").action(() => action(() => { const status = workspace(); const result = scaffoldProductContext(status.workspaceRoot); const repo = openRepository(status.databasePath); try { repo.setMetadata("product_context_updated_at", new Date().toISOString()); } finally { repo.close(); } console.log(`Product Context: ${result.created.length} created, ${result.preserved.length} preserved.`); }));
+const product = program.command("product").description("Scaffold and update canonical Product Context documents.");
+product.action(() => action(() => { const status = workspace(); const result = scaffoldProductContext(status.workspaceRoot); const repo = openRepository(status.databasePath); try { repo.setMetadata("product_context_updated_at", new Date().toISOString()); } finally { repo.close(); } console.log(`Product Context: ${result.created.length} created, ${result.preserved.length} preserved.`); }));
+product.command("write").argument("<document>").requiredOption("--content <content>").action((document: string, options: { content: string }) => action(() => { const status = workspace(); writeProductContext(status.workspaceRoot, document, options.content); const repo = openRepository(status.databasePath); try { repo.setMetadata("product_context_updated_at", new Date().toISOString()); } finally { repo.close(); } console.log(`Updated Product Context: ${document}`); }));
 program.command("repo").description("Generate Repo Context.").action(() => action(() => { const status = workspace(); const path = generateRepoContext(status.repoRoot, status.workspaceRoot); const repo = openRepository(status.databasePath); try { repo.setMetadata("repo_context_updated_at", new Date().toISOString()); } finally { repo.close(); } console.log(`Generated ${path}`); }));
 
 const work = program.command("work").description("Deterministic Work Item persistence primitives.");

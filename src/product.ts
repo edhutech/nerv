@@ -12,6 +12,7 @@ const FILES: Array<[string, string]> = [
   ["architecture.md", "# Architecture\n\n## System overview\n\nRecord durable architecture truth.\n"],
   ["evolution.md", "# Evolution\n\n## Product evolution\n\nRecord meaningful product changes.\n"],
 ];
+const FILE_NAMES = new Set(FILES.map(([name]) => name));
 export function scaffoldProductContext(workspaceRoot: string) {
   const directory = join(workspaceRoot, "product"); mkdirSync(directory, { recursive: true });
   const created: string[] = []; const preserved: string[] = [];
@@ -20,4 +21,10 @@ export function scaffoldProductContext(workspaceRoot: string) {
     if (existsSync(path)) preserved.push(name); else { writeFileSync(path, content, "utf8"); created.push(name); }
   }
   return { created, preserved };
+}
+export function writeProductContext(workspaceRoot: string, name: string, content: string): void {
+  if (!FILE_NAMES.has(name)) throw new Error(`unknown Product Context document: ${name}`);
+  const approved = content.trim();
+  if (!approved) throw new Error("Product Context content must not be empty");
+  writeFileSync(join(workspaceRoot, "product", name), `${approved}\n`, "utf8");
 }

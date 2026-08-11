@@ -10,7 +10,7 @@ Nerv persists the minimum useful context and work state needed to make agent-ass
 
 A Work Item is the governed unit of work. It contains one or more bounded Tasks. Tasks are executed and validated; the integrated Work Item is reviewed and closed as one Git-safe atomic change.
 
-The normal flow is: plan preview, human approval, materialize, execute Tasks, validate, Work Review, optional user or external verification, then Git-safe close on request. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
+The normal flow is: relevant Product Context, plan preview, human approval, materialize, execute Tasks, validate, Work Review, optional user or external verification, then Git-safe close on request. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
 
 SQLite is the durable operational source of truth. Product Context and Repo Context are canonical long-lived context. Generated Markdown is minimal temporary active context, not the lifecycle authority.
 
@@ -31,6 +31,7 @@ Run `nerv` from the target repository. The examples use the installed `nerv` bin
 ```bash
 node ~/tools/nerv/dist/index.js init
 node ~/tools/nerv/dist/index.js product
+node ~/tools/nerv/dist/index.js product write product.md --content "# Product\n\nApproved product description."
 node ~/tools/nerv/dist/index.js repo
 
 # Materialize and operate on approved Work Item data.
@@ -53,6 +54,8 @@ Close is deliberately Git-safe: it requires a passing Work Review and validation
 Agents may plan and execute work using Nerv, but the runtime makes no assumptions about host, provider, model, or conversational memory. A reasoning model plans, replans, and performs Work Review; an execution model implements approved Tasks and runs deterministic validation. The user may hand off between those roles: planning shows a non-durable structured preview before approval, materialization reports readiness for execution, and separated execution stops at `Ready for Work Review` after validation.
 
 A PASS Review is ready for optional user or external verification and does not close automatically. Verification failures become REWORK evidence on the same Work Item. The user may request Git-safe Close after successful verification, or explicitly opt into auto-close for a Work Item without changing Nerv runtime configuration or state.
+
+Before planning product work, read relevant Product Context. When it is absent or only scaffold placeholders, confirm a concise product understanding with the developer, run `nerv product`, and record only approved facts through the restricted `nerv product write <document> --content "..."` primitive. Product Context grounds Work Item goals, scope, Tasks, acceptance criteria, and integrated Review; Repo Context remains separate and is refreshed only when useful.
 
 For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. It translates normal development requests into the installed runtime's deterministic primitives without creating another lifecycle. The package includes this file for host or developer skill discovery.
 

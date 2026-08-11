@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "78e896cebcaf41b6ee5fb8996bf06e57b3ef1ad88204ff6dcb538ea7dac3b1eb"
+nerv_managed_sha256: "801ea1cf32bcbf23196e0f55a0d0cfe16d5f55bf2178fb39d11abed340eea514"
 ---
 
 # Nerv
@@ -13,11 +13,19 @@ Nerv is agent agnostic. Use its deterministic runtime primitives; do not create 
 ## Start And Recover
 
 1. Run `nerv status`. If Nerv is not initialized, run `nerv init` in the Git repository before governing work.
-2. Read available `.nerv/product/` and `.nerv/repo/` files. They are canonical long-lived context. Refresh Repo Context with `nerv repo` when it is missing or stale; use `nerv product` only to scaffold missing Product Context for the developer to maintain.
+2. Inspect relevant `.nerv/product/` files before planning product work. They are canonical long-lived Product Context. Read only files needed for the request; use Repo Context separately when repository structure or constraints are useful, refreshing it with `nerv repo` when missing or stale.
 3. Run `nerv work list`. For relevant open work, use `nerv work status WORK-###` and `nerv work show WORK-###`; read its active context at `.nerv/agent/active/WORK-###.md` when present.
 4. Search focused terms with `nerv knowledge search "..."`, then load only relevant results with `nerv knowledge show <id>`.
 
 In a fresh session, reconstruct work from these persisted sources and Git state, not prior conversation memory. Record small, reusable discoveries with `nerv knowledge add`; promote only stable authoritative facts to Product or Repo Context.
+
+## Product Context Before Planning
+
+For product work, inspect Product Context before proposing a Work Item. If relevant files contain useful context, read only those files and proceed. Treat absent files or scaffold placeholders without approved product facts as effectively empty.
+
+When Product Context is effectively empty, do not materialize a Work Item. Establish only the minimum useful understanding in conversation: what the product is, its intended users, the problem or value, the requested outcome, and relevant boundaries. Present that inferred understanding for the developer to confirm or correct. Keep this lightweight for a demo or small project.
+
+After confirmation, run `nerv product` to scaffold canonical files. Write only confirmed information with `nerv product write <document> --content "..."`; valid documents are the canonical files under `.nerv/product/`. Then read the relevant written files and continue to the normal Plan Preview. This is context preparation, not Intake, Proposal, Product Session, Product Review, or another lifecycle.
 
 ## Plan And Approve
 
@@ -26,12 +34,13 @@ The reasoning model plans the minimum coherent Work Item or Work Items needed fo
 ```text
 Proposed Work Item: <title>
 Goal: <goal>
+Scope: <product-aware boundary>
 Tasks: <bounded implementation Tasks>
 Acceptance criteria: <criteria>
 Validation: <commands or checks>
 ```
 
-Do not assign a durable `WORK-###` ID in the preview. For multiple Work Items, show the high-level roadmap and dependencies, but fully detail Tasks only for the next Work Item.
+Define the goal, scope, Tasks, and acceptance criteria from the relevant Product Context as well as the request. Do not assign a durable `WORK-###` ID in the preview. For multiple Work Items, show the high-level roadmap and dependencies, but fully detail Tasks only for the next Work Item.
 
 Wait for explicit human approval. Then materialize the approved Work Item with `nerv work create`, add its approved Tasks with `nerv work add-task`, and use `nerv work activate`. Report that the Work Item is ready for execution. If the workflow uses separate models, stop at this explicit execution handoff.
 
@@ -52,7 +61,7 @@ After all Tasks are done, run the Work Item's full validation. When roles are se
 
 ## Review, Verification, And Close
 
-The reasoning model performs the integrated Work Review against the request, acceptance criteria, Product and Repo Context, relevant Knowledge, implementation, Git diff, validation evidence, regressions, and risks. Persist its outcome with `nerv review WORK-###`.
+The reasoning model performs the integrated Work Review against the request, relevant Product Context, Repo Context when applicable, acceptance criteria, relevant Knowledge, implementation, Git diff, validation evidence, regressions, and risks. Verify that the result satisfies the relevant product goals and constraints, not only technical validation. Persist its outcome with `nerv review WORK-###`.
 
 For `REWORK`, persist the outcome, present findings and minimum remediation Tasks, and wait for human approval. Add approved remediation with `nerv work add-task` to the same Work Item, reactivate it, return to execution, validate, and review again. Do not create a new Work Item merely to repair the current one.
 
