@@ -37,8 +37,8 @@ The vNext core must:
 6. Remove formal Task Review and Task Close ceremonies.
 7. Remove Intake and Proposal from the normal development lifecycle.
 8. Keep human approval where reasoning produces a plan.
-9. Use strong reasoning models only where reasoning materially improves quality.
-10. Allow cheaper execution models to implement already-defined Tasks.
+9. Keep Planning and Work Review reasoning-heavy without defining model allocation.
+10. Keep Execution implementation-focused once Tasks are approved.
 11. Preserve state across sessions without depending on conversation memory.
 12. Keep SQLite as the durable source of truth.
 13. Minimize generated Markdown.
@@ -157,7 +157,7 @@ The normal lifecycle is:
 ```text
 INTENT
   ↓
-PLAN — strong reasoning model
+PLAN
   ↓
 1..N Work Items proposed on screen
   ↓
@@ -165,7 +165,7 @@ HUMAN APPROVAL
   ↓
 Materialize approved Work Item plan
   ↓
-EXECUTE — execution model
+EXECUTION
   ↓
 Task → implement → targeted validate → done
 Task → implement → targeted validate → done
@@ -173,7 +173,7 @@ Task → implement → targeted validate → done
   ↓
 FULL VALIDATION
   ↓
-WORK REVIEW — reasoning model
+WORK REVIEW
   ↓
 PASS ───────────────→ optional user or external verification
   │                         ↓
@@ -194,11 +194,10 @@ PASS ───────────────→ optional user or external 
      REVIEW again
 ```
 
-The three reasoning-heavy moments are:
+The reasoning-heavy phases are:
 
-1. **Plan**
-2. **Replan when necessary**
-3. **Work Review**
+1. **Planning**, including replanning when necessary
+2. **Work Review**
 
 Execution should not repeatedly re-plan already approved work.
 
@@ -273,7 +272,7 @@ Execution cannot continue safely without new reasoning, clarification, or replan
 
 A blocked Task must stop execution.
 
-The execution model must not invent a substantial new plan to escape a genuine block.
+Execution must not invent a substantial new plan to escape a genuine block.
 
 ---
 
@@ -287,7 +286,7 @@ Canonical agent-facing invocation:
 nerv-dev plan "<intent>"
 ```
 
-Planning is performed by a reasoning model that inspects relevant implementation and context deeply enough to prepare an execution-ready path.
+Planning inspects relevant implementation and context deeply enough to prepare an execution-ready path.
 
 The planner must determine the **minimum necessary number of coherent Work Items**.
 
@@ -312,24 +311,7 @@ If multiple Work Items are required:
 
 The goal is to avoid obsolete future planning.
 
-### 7.2 Planning a Previously Identified Work Item
-
-Canonical invocation:
-
-```text
-nerv-dev plan WORK-018
-```
-
-This operation:
-
-1. loads the high-level durable Work Item,
-2. inspects the current repository state,
-3. considers the actual outcomes of prior Work Items,
-4. retrieves relevant Product Context, Repo Context, and Knowledge,
-5. proposes detailed Tasks for the Work Item,
-6. waits for human approval before materializing the new Task plan.
-
-### 7.3 Planning Persistence
+### 7.2 Planning Persistence
 
 Planning discussion is not persisted as a chain of Intake and Proposal Markdown files.
 
@@ -348,7 +330,7 @@ approved plan
 → materialize durable Work Item + Tasks
 ```
 
-Persist compact approved boundaries and execution guidance in the existing Work Item and Task scope fields so a fresh execution model can recover the approved path from active context.
+Persist compact approved boundaries and execution guidance in the existing Work Item and Task scope fields so a fresh session can recover the approved path from active context.
 
 No normal lifecycle entity named Intake or Proposal is required.
 
@@ -359,10 +341,10 @@ No normal lifecycle entity named Intake or Proposal is required.
 Canonical invocation:
 
 ```text
-nerv-dev approve WORK-017
+nerv-dev approve
 ```
 
-Use the same approval operation for:
+Approval has one meaning: approve the currently proposed pending change. It applies to:
 
 - initial Work Item planning,
 - later detailed planning of a `planned` Work Item,
@@ -382,13 +364,7 @@ Approval must remain conceptually simple.
 
 ## 9. Execution
 
-Canonical invocation:
-
-```text
-nerv-dev execute WORK-017
-```
-
-Execution is intended for a cheaper execution-focused model when appropriate.
+Execution is implementation-focused. The same or different agents may perform Planning, Execution, and Work Review.
 
 Normal behavior:
 
@@ -400,7 +376,7 @@ for each pending Task:
     set done
 
 run full Work Item validation
-→ Ready for Work Review when model roles are separated
+→ Ready for Work Review
 ```
 
 ### Execution rules
@@ -434,11 +410,9 @@ Evidence: ...
 Next: nerv-dev review WORK-017
 ```
 
-A reasoning model can then diagnose the issue and propose a revised path.
+Planning can then diagnose the issue and propose a revised path.
 
-The execution model should execute defined work.
-
-The reasoning model should replan when new reasoning is necessary.
+Execution should implement defined work. Replan only when new reasoning is necessary.
 
 ---
 
@@ -459,7 +433,7 @@ Examples:
 - targeted assertions,
 - CLI execution checks.
 
-Validation may be performed by the execution model.
+Validation may be performed during Execution.
 
 ### Review
 
@@ -484,7 +458,7 @@ Canonical invocation:
 nerv-dev review WORK-017
 ```
 
-A reasoning model performs the review.
+Work Review evaluates the integrated result.
 
 Possible outcomes:
 
@@ -495,7 +469,7 @@ REWORK
 
 ### PASS
 
-Persist PASS and make the Work Item ready for optional user or external verification. Do not commit by default. External verification failures are new review evidence and may produce REWORK on the same Work Item. After successful verification, Close is available on user request; explicit auto-close is a skill-level workflow preference only.
+Persist PASS and make the Work Item ready for optional user or external verification. Do not commit by default. External verification failures are new review evidence and may produce REWORK on the same Work Item. After successful verification, Close is available on user request.
 
 ```text
 Next: optional verification, then nerv-dev close WORK-017 on request
@@ -876,18 +850,16 @@ Do not introduce mandatory worktree complexity before it is needed.
 
 ## 23. Agent-Facing Protocol
 
-The canonical semantics for Nerv development are exact plain-text operations:
+The canonical development protocol mirrors the public workflow:
 
 ```text
 nerv-dev plan "<intent>"
-nerv-dev plan WORK-018
-nerv-dev approve WORK-017
-nerv-dev execute WORK-017
-nerv-dev status WORK-017
+nerv-dev approve
 nerv-dev review WORK-017
 nerv-dev close WORK-017
-nerv-dev checkpoint WORK-017
 ```
+
+`nerv-dev status` is read-only and `nerv-dev checkpoint` is exceptional. Execution is a phase after approval, not another normal operation.
 
 ### Important boundary
 
@@ -903,7 +875,7 @@ It must **not** become:
 
 The runtime core remains Nerv.
 
-The `nerv-development` skill may interpret exact `nerv-dev ...` text and use deterministic Nerv operations underneath.
+The `nerv-development` skill may interpret these operations and use deterministic Nerv primitives underneath.
 
 A thin executable/facade may exist later if useful, but the design must not depend on it.
 
@@ -1194,13 +1166,13 @@ Git already preserves history.
 
 Rewrite `.agents/skills/nerv-development/SKILL.md` after the vNext runtime model is implemented.
 
-The skill should be concise.
+The skill should be concise and inherit the public workflow's Product Context, material-conflict, authority-precedence, external-capability, execution-ready planning, same-Work remediation, and phase-based rules.
 
 It should:
 
 - point to authoritative product/repo context,
 - define the `nerv-dev` protocol,
-- explain model-role separation,
+- explain Planning, Execution, and Work Review phases,
 - explain Work Item / Task / Review,
 - explain exceptional Checkpoint behavior,
 - explain Git-safe Close,
@@ -1297,7 +1269,7 @@ Before the vNext replacement is considered complete, perform all of the followin
 9. knowledge retrieval E2E
 10. Git-safe close E2E
 11. search for legacy runtime concepts
-12. strong-model architectural review
+12. architectural review
 ```
 
 The final repository search should confirm there are no unintended runtime references to:

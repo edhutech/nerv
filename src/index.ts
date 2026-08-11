@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getWorkspaceStatus, ensureWorkspace } from "./workspace.js";
 import { openRepository, type Attribution, type Task, type WorkItem } from "./repository.js";
 import { scaffoldProductContext, writeProductContext } from "./product.js";
 import { generateRepoContext, scaffoldSharedRepoContext } from "./repo-context.js";
-import { discoverContext } from "./context.js";
+import { discoverContext, getSharedKnowledge, searchSharedKnowledge } from "./context.js";
 import { nextOperation, removeActiveContext, syncActiveContext } from "./work.js";
 import { cachedPaths, captureBaseline, changedPaths, commit, fileState, stage, stagedDiff, validatePath } from "./git.js";
 
-const program = new Command().name("nerv").description("Local-first Agent Work Harness.").version("0.3.0");
+const packageVersion = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+const program = new Command().name("nerv").description("Local-first Agent Work Harness.").version(packageVersion);
 type Details = { intent: string; goal: string; scope: string; acceptanceCriteria: string; validation: string };
 type Workspace = { repoRoot: string; workspaceRoot: string; databasePath: string };
 function action(handler: () => void) { try { handler(); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { exitCode: 1, code: "NERV_OPERATION_FAILED" }); } }
@@ -45,8 +47,8 @@ program.command("review").argument("<workRef>").requiredOption("--outcome <PASS|
 program.command("checkpoint").argument("<workRef>").requiredOption("--summary <summary>").option("--task <position>").option("--next-step <step>").action((reference: string, options: { summary: string; task?: string; nextStep?: string }) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); let item: WorkItem; try { item = work(repo, reference); const entry = options.task ? taskAt(repo, item, options.task) : null; repo.createCheckpoint({ work_item_id: item.id, task_id: entry?.id ?? null, summary: options.summary, files: null, decisions: null, unresolved_issue: null, next_step: options.nextStep ?? null }); } finally { repo.close(); } sync(status, item!); console.log(`Checkpoint saved for ${item!.ref}.`); }));
 const knowledge = program.command("knowledge");
 knowledge.command("add").requiredOption("--type <type>").requiredOption("--title <title>").requiredOption("--content <content>").option("--work <workRef>").option("--topic <topic>").action((options: any) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); try { if (!(["decision", "architecture", "discovery", "pattern"] as string[]).includes(options.type)) throw new Error("Knowledge type is invalid."); const item = options.work ? work(repo, options.work) : null; const knowledgeItem = repo.createKnowledge({ type: options.type, title: options.title, content: options.content, work_item_id: item?.id ?? null, topic_key: options.topic ?? null }); console.log(`Knowledge ${knowledgeItem.id} recorded locally.`); } finally { repo.close(); } }));
-knowledge.command("search").argument("<query>").action((query: string) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); try { for (const item of repo.searchKnowledge(query)) console.log(`${item.id}: ${item.title} [${item.type}]`); } finally { repo.close(); } }));
-knowledge.command("show").argument("<id>").action((id: string) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); try { const item = repo.getKnowledge(Number(id)); if (!item) throw new Error(`Knowledge ${id} not found.`); console.log(`${item.id}: ${item.title}\n\n${item.content}`); } finally { repo.close(); } }));
+knowledge.command("search").argument("<query>").action((query: string) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); try { for (const item of repo.searchKnowledge(query)) console.log(`${item.id}: ${item.title} [${item.type}, local]`); for (const item of searchSharedKnowledge(status.repoRoot, query)) console.log(`${item.ref}: ${item.title} [shared]`); } finally { repo.close(); } }));
+knowledge.command("show").argument("<id>").action((id: string) => action(() => { const status = workspace(); if (id.startsWith("shared:")) { const item = getSharedKnowledge(status.repoRoot, id); if (!item) throw new Error(`Knowledge ${id} not found.`); console.log(`${item.ref}: ${item.title}\n\n${item.content}`); return; } const repo = openRepository(status.databasePath); try { const item = repo.getKnowledge(Number(id)); if (!item) throw new Error(`Knowledge ${id} not found.`); console.log(`${item.id}: ${item.title}\n\n${item.content}`); } finally { repo.close(); } }));
 knowledge.command("promote").argument("<id>").action((id: string) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); try { const item = repo.getKnowledge(Number(id)); if (!item) throw new Error(`Knowledge ${id} not found.`); const directory = join(status.repoRoot, ".nerv-context", "knowledge"); mkdirSync(directory, { recursive: true }); const path = join(directory, `${randomUUID()}.md`); writeFileSync(path, `# ${item.title}\n\n${item.content.trim()}\n`, "utf8"); console.log(`Promoted Knowledge ${item.id}: ${path}`); } finally { repo.close(); } }));
 program.command("close").argument("<workRef>").requiredOption("--message <message>").action((reference: string, options: { message: string }) => action(() => closeWork(reference, options.message)));
 program.command("status").action(() => action(() => { const status = getWorkspaceStatus(process.cwd()); console.log(`Nerv status: ${status.initialized ? "initialized" : "not initialized"}`); if (status.initialized && status.repoRoot && status.workspaceRoot && status.databasePath) { const context = discoverContext(status.repoRoot, status.workspaceRoot, status.databasePath); console.log(`Product Context: ${context.product.length ? "available" : "not available"}`); console.log(`Shared Repo Context: ${context.repo ? "available" : "not available"}`); console.log(`Local Repo Observations: ${context.localRepo ? "available" : "not available"}`); } }));

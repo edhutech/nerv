@@ -5,7 +5,6 @@ import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
 const DIRS = [".nerv", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as const;
 const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
-const LEGACY_PUBLIC_SKILL_HASHES = new Set(["638ef1586304c2e803be712bd8b97894b72bcaacba0b9cab1c84e77fb9e50aa8"]);
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 type SkillSync = { status: "installed" | "current" | "updated" | "preserved"; message?: string };
 
@@ -56,7 +55,7 @@ function ensurePublicSkill(repoRoot: string): SkillSync {
   if (!statSync(destination).isFile()) throw new Error(`cannot install public Nerv skill: ${destination} is not a file`);
   const installed = readFileSync(destination, "utf8");
   if (installed === packaged) return { status: "current" };
-  if (isManagedSkill(installed) || LEGACY_PUBLIC_SKILL_HASHES.has(contentHash(installed))) {
+  if (isManagedSkill(installed)) {
     writeFileSync(destination, packaged);
     return { status: "updated" };
   }

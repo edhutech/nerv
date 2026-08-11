@@ -24,44 +24,39 @@ pnpm --dir ~/tools/nerv build
 
 Nerv requires Node.js 20 or later, pnpm, and a Git repository.
 
-## Runtime CLI
+## Workflow
 
-Run `nerv` from the target repository. The examples use the installed `nerv` binary; replace it with `node ~/tools/nerv/dist/index.js` when running directly from a local clone. The runtime is agent agnostic and exposes deterministic primitives; it never calls an AI API.
+Run `nerv` from the target repository. The public workflow is deliberately small:
 
-```bash
-node ~/tools/nerv/dist/index.js init
-node ~/tools/nerv/dist/index.js product
-node ~/tools/nerv/dist/index.js product write product.md --content "# Product\n\nApproved product description."
-node ~/tools/nerv/dist/index.js repo
-
-# Materialize and operate on approved Work Item data.
-nerv work create "Durable knowledge storage" --intent "..." --goal "..." --scope "..." --acceptance-criteria "..." --validation "..."
-nerv work list
-nerv work add-task WORK-001 "Add storage" --scope "..." --acceptance-criteria "..." --validation "..."
-nerv work activate WORK-001
-nerv work task start WORK-001 1
-nerv work task done WORK-001 1 --evidence "..." --files src/example.ts
-nerv review WORK-001 --outcome PASS --summary "..." --validation-evidence "..."
-nerv close WORK-001 --message "Add durable knowledge storage"
+```text
+intent
+  -> nerv plan "<intent>"
+  -> nerv approve
+  -> execution
+  -> nerv review WORK-###
+  -> optional user or external verification
+  -> nerv close WORK-###
 ```
 
-`nerv work list` provides a read-only overview of every Work Item, including its local reference, title, and current state. Other primitives include `nerv work task block WORK-001 1`, `nerv checkpoint`, `nerv knowledge add|search|show|promote`, and `nerv repo scaffold`. Use `nerv --help` for exact arguments.
+`nerv plan` is an agent-facing planning operation: it inspects the relevant Product Context, repository evidence, authoritative project guidance, and focused Knowledge before showing a non-durable execution-ready Plan Preview. `nerv approve` approves the currently proposed change, materializes its Work Item and Tasks, activates it, and leaves it ready for execution. The runtime remains agent agnostic and never calls an AI API; it provides deterministic primitives behind these operations rather than attempting to perform planning itself.
 
-Close is deliberately Git-safe: it requires a passing Work Review and validation evidence, stages only attributable Work Item changes, and blocks rather than guessing when unrelated changes cannot be separated safely.
+Execution implements the approved Tasks, records targeted validation and attributable paths, and stops for Work Review. A material scope or context conflict returns evidence for replanning; incidental implementation differences inside the approved outcome do not create ceremony.
 
-## Agent Workflows
+`nerv review WORK-###` evaluates the integrated result against intent, Product Context, relevant project authority, the approved boundaries, implementation, diff, validation, Knowledge, and supplied external evidence. PASS makes the Work Item ready for optional verification. REWORK proposes the minimum remediation Tasks without materializing them; `nerv approve` adds approved remediation to the same Work Item.
 
-Agents may plan and execute work using Nerv, but the runtime makes no assumptions about host, provider, model, or conversational memory. A reasoning model plans, replans, and performs Work Review; an execution model implements approved Tasks and runs deterministic validation. The user may hand off between those roles: planning shows a non-durable structured preview before approval, materialization reports readiness for execution, and separated execution stops at `Ready for Work Review` after validation.
+`nerv close WORK-###` is Git-safe: it requires PASS and validation evidence, stages only attributable Work Item changes, inspects the staged diff, and blocks rather than guessing when unrelated changes cannot be separated. One Work Item produces one reviewed atomic commit by default.
 
-A PASS Review is ready for optional user or external verification and does not close automatically. Verification failures become REWORK evidence on the same Work Item. The user may request Git-safe Close after successful verification, or explicitly opt into auto-close for a Work Item without changing Nerv runtime configuration or state.
+`nerv status` is a read-only query. `nerv checkpoint` is only for a genuine interruption.
 
-Before planning product work, read relevant tracked `.nerv-context/product/` files. When it is absent or only scaffold placeholders, confirm a concise product understanding with the developer, run `nerv product`, and record only approved facts through the restricted `nerv product write <document> --content "..."` primitive. `nerv repo` produces local observations under `.nerv/repo/`; use `nerv repo scaffold` only when a stable shared repository fact needs a tracked home. Promote a local knowledge observation explicitly to one small tracked `.nerv-context/knowledge/<id>.md` record only when it becomes shared truth.
+## Context Infrastructure
 
-Planning inspects relevant implementation and authoritative project guidance before presenting an execution-ready preview. The developer's current decision takes precedence over Product Context, relevant project/domain guidance, and generic external-tool guidance. Surface only material conflicts; a developer may proceed, align the plan, or update Product Context. An exception changes Product Context only when confirmed as durable product truth, otherwise it is retained as Work evidence or small Knowledge. Relevant external Skills, MCPs, plugins, and tools may assist within approved boundaries but never replace Nerv governance.
+Before planning product work, inspect relevant tracked `.nerv-context/product/` files. If they are absent or only placeholders, establish and record only the minimum confirmed product understanding before materializing work. Product Context governs both planning and review.
 
-For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. It translates normal development requests into the installed runtime's deterministic primitives without creating another lifecycle. The package includes this file for host or developer skill discovery.
+Planning uses this precedence: the developer's current decision, Product Context, relevant authoritative project or domain guidance, then generic external guidance. Surface only material conflicts. Skills, MCPs, plugins, and specialized tools can assist when relevant, but cannot bypass Plan Preview, approval, Work boundaries, Work Review, or Git-safe Close.
 
-For development of this repository, `.agents/skills/nerv-development/SKILL.md` defines the `nerv-dev` protocol. `nerv-dev` is an agent-facing workflow protocol, not a second engine or a replacement for the agent-agnostic `nerv` runtime CLI.
+Shared Product Context, explicit shared Repo Context, and selectively promoted Knowledge are tracked in `.nerv-context/`. SQLite Knowledge and `.nerv/` operational state remain local. The low-level `work`, `product`, `repo`, and `knowledge` commands are deterministic implementation primitives; use `nerv --help` when an agent needs their exact arguments.
+
+For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. For development of Nerv itself, `.agents/skills/nerv-development/SKILL.md` adds repository-specific constraints without creating a second lifecycle.
 
 ## Development
 

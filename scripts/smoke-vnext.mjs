@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -8,6 +8,7 @@ import Database from "better-sqlite3";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const cli = join(root, "dist/index.js");
+const packageVersion = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const assert = (value, message) => { if (!value) throw new Error(message); };
 function run(cwd, args, expected = 0) { const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" }); const output = `${result.stdout}${result.stderr}`; if (result.status !== expected) throw new Error(`${args.join(" ")} expected ${expected}: ${output}`); return output; }
 function managedSkill(content) { const marker = content.match(/^nerv_managed_sha256: "[a-f0-9]{64}"$/m); const normalized = content.replace(marker[0], "nerv_managed_sha256: \"\""); return normalized.replace("nerv_managed_sha256: \"\"", `nerv_managed_sha256: "${createHash("sha256").update(normalized).digest("hex")}"`); }
@@ -18,7 +19,15 @@ function addAndActivate(repo, ref = "WORK-001") { run(repo, ["work", "add-task",
 function finish(repo, ref = "WORK-001", position = "1", file = "feature.txt") { run(repo, ["work", "task", "start", ref, position]); writeFileSync(join(repo, file), "feature\n"); run(repo, ["work", "task", "done", ref, position, "--evidence", "targeted passed", "--files", file]); }
 
 {
+  const readme = readFileSync(join(root, "README.md"), "utf8"); const publicSkill = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8"); const developmentSkill = readFileSync(join(root, ".agents/skills/nerv-development/SKILL.md"), "utf8");
+  assert(readme.includes("nerv plan") && readme.includes("nerv approve") && readme.includes("nerv review") && readme.includes("nerv close"), "README does not expose the simplified public workflow");
+  assert(publicSkill.includes("## Public Workflow") && developmentSkill.includes("Before planning, inspect relevant Product Context") && developmentSkill.includes("Skills, MCPs, plugins"), "public and development skills are not semantically aligned");
+  assert(existsSync(join(root, ".nerv-context/product/product.md")), "Nerv lacks tracked Product Context");
+  assert(!readFileSync(join(root, "src/workspace.ts"), "utf8").includes("LEGACY_PUBLIC_SKILL_HASHES"), "obsolete managed-skill compatibility remains");
+}
+{
   const repo = setup(); try {
+    assert(run(repo, ["--version"]).trim() === packageVersion, "CLI version does not match package metadata");
     assert(run(repo, ["init"]).includes("already initialized"), "initialization is not idempotent");
     const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true });
     const columns = db.prepare("PRAGMA table_info(work_items)").all().map((row) => row.name); const taskColumns = db.prepare("PRAGMA table_info(tasks)").all().map((row) => row.name);
@@ -27,10 +36,11 @@ function finish(repo, ref = "WORK-001", position = "1", file = "feature.txt") { 
     run(repo, ["product"]); run(repo, ["product", "write", "product.md", "--content", "# Product\n\nShared truth."]); run(repo, ["repo"]); run(repo, ["repo", "scaffold"]);
     assert(existsSync(join(repo, ".nerv-context/product/product.md")) && existsSync(join(repo, ".nerv-context/repo/facts.md")) && existsSync(join(repo, ".nerv/repo/development.md")), "shared and local context separation failed");
     const stableId = createWork(repo); createWork(repo, "Future work"); assert(run(repo, ["work", "status", stableId]).includes("WORK-001") && run(repo, ["work", "status", "WORK-002"]).includes("State: planned"), "UUID lookup or local work references failed");
-    run(repo, ["knowledge", "add", "--type", "discovery", "--title", "Searchable fact", "--content", "small durable observation", "--work", "WORK-001"]); assert(run(repo, ["knowledge", "search", "durable"]).includes("Searchable fact") && run(repo, ["knowledge", "show", "1"]).includes("small durable observation"), "local knowledge retrieval failed"); run(repo, ["knowledge", "promote", "1"]); assert(readdirSync(join(repo, ".nerv-context/knowledge")).some((name) => /^[0-9a-f-]{36}\.md$/.test(name)), "explicit knowledge promotion failed");
+    run(repo, ["knowledge", "add", "--type", "discovery", "--title", "Searchable fact", "--content", "small durable observation", "--work", "WORK-001"]); assert(run(repo, ["knowledge", "search", "durable"]).includes("Searchable fact") && run(repo, ["knowledge", "show", "1"]).includes("small durable observation"), "local knowledge retrieval failed"); run(repo, ["knowledge", "promote", "1"]); const sharedName = readdirSync(join(repo, ".nerv-context/knowledge")).find((name) => /^[0-9a-f-]{36}\.md$/.test(name)); assert(sharedName, "explicit knowledge promotion failed");
+    const reconstructed = setup(); try { mkdirSync(join(reconstructed, ".nerv-context/knowledge"), { recursive: true }); writeFileSync(join(reconstructed, ".nerv-context/knowledge", sharedName), readFileSync(join(repo, ".nerv-context/knowledge", sharedName), "utf8")); const sharedRef = `shared:${sharedName.slice(0, -3)}`; assert(run(reconstructed, ["knowledge", "search", "durable"]).includes(sharedRef) && run(reconstructed, ["knowledge", "show", sharedRef]).includes("small durable observation"), "shared promoted Knowledge was not discoverable after reconstruction"); } finally { rmSync(reconstructed, { recursive: true, force: true }); }
     addAndActivate(repo); const active = join(repo, ".nerv/agent/active/WORK-001.md"); assert(readFileSync(active, "utf8").includes("Task 1: Implement"), "active context did not use work-scoped task position");
     finish(repo); run(repo, ["checkpoint", "WORK-001", "--summary", "resume", "--task", "1", "--next-step", "review"]); assert(run(repo, ["work", "status", "WORK-001"]).includes("Next:") && readFileSync(active, "utf8").includes("resume"), "checkpoint recovery state failed");
-    run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "needs remediation", "--validation-evidence", "full", "--findings", "add check"]); assert(run(repo, ["close", "WORK-001", "--message", "no"], 1).includes("not ready"), "latest REWORK did not block close"); run(repo, ["work", "add-task", "WORK-001", "Remediate", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "targeted"]); run(repo, ["work", "activate", "WORK-001"]); finish(repo, "WORK-001", "2", "fix.txt"); run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "complete", "--validation-evidence", "full"]); run(repo, ["close", "WORK-001", "--message", "complete smoke work"]);
+    run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "needs remediation", "--validation-evidence", "full", "--findings", "add check"]); assert(run(repo, ["close", "WORK-001", "--message", "no"], 1).includes("not ready"), "latest REWORK did not block close"); run(repo, ["work", "add-task", "WORK-001", "Remediate", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "targeted"]); run(repo, ["work", "activate", "WORK-001"]); finish(repo, "WORK-001", "2", "fix.txt"); run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "complete", "--validation-evidence", "full"]); assert(run(repo, ["work", "status", "WORK-001"]).includes("optional user or external verification"), "PASS next guidance implies immediate close"); run(repo, ["close", "WORK-001", "--message", "complete smoke work"]);
     assert(!existsSync(active), "active context remained after close"); const trailers = git(repo, ["log", "-1", "--format=%B"]).stdout; assert(trailers.includes(`Nerv-Work: ${stableId}`) && trailers.includes("Nerv-Work-Ref: WORK-001"), "canonical stable and friendly Git trailers were not written");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 }

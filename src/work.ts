@@ -20,7 +20,7 @@ export function nextOperation(work: WorkItem, tasks: Task[], review: Review | nu
   if (work.status === "active" && tasks.some((task) => task.status === "pending")) return "Start the next pending Task.";
   if (work.status === "active" && tasks.some((task) => task.status === "active")) return "Complete or block the active Task.";
   if (work.status === "active") return "Record full validation evidence and move the Work Item to review.";
-  if (work.status === "review" && review?.outcome === "PASS") return "Close the Work Item.";
+  if (work.status === "review" && review?.outcome === "PASS") return "Ready for optional user or external verification; close on request.";
   if (work.status === "rework") return "Use the external planning workflow to approve remediation Tasks.";
   return "Record a Work Review.";
 }

@@ -9,48 +9,45 @@ Use this skill to develop Nerv itself. It defines the `nerv-dev` agent workflow 
 
 ## Authority
 
-Read authoritative context in this order:
+Read only the authority relevant to the request, in this order:
 
-1. `NERV_VNEXT_DESIGN.md` for the approved vNext model.
-2. `AGENTS.md` for repository constraints and validation.
-3. `.nerv-context/product/` and `.nerv-context/repo/` when available for tracked canonical product and repository context; `.nerv/repo/` contains only generated local observations.
+1. The developer's current decision.
+2. `.nerv-context/product/` for canonical product direction.
+3. `NERV_VNEXT_DESIGN.md`, `AGENTS.md`, and other applicable authoritative repository guidance.
+4. Generic external guidance.
 
-SQLite is the durable operational source of truth. Do not edit generated `.nerv/` state or `dist/` directly.
+SQLite is the durable operational source of truth. `.nerv/repo/` contains generated local observations; do not edit `.nerv/` state or `dist/` directly.
 
 ## Protocol
 
-The exact agent-facing operations are:
+Use the same public workflow:
 
 ```text
 nerv-dev plan "<intent>"
-nerv-dev plan WORK-###
-nerv-dev approve WORK-###
-nerv-dev execute WORK-###
-nerv-dev status WORK-###
+nerv-dev approve
 nerv-dev review WORK-###
 nerv-dev close WORK-###
-nerv-dev checkpoint WORK-###
 ```
 
-`nerv-dev` is a protocol, not a required executable, second database, second engine, host-specific orchestrator, or agent controller. Interpret these operations through the deterministic `nerv` CLI and repository evidence.
+`nerv-dev status` is read-only and `nerv-dev checkpoint` is exceptional. Execution is a phase after approval, not another normal public operation. `nerv-dev` is a protocol, not a required executable, second database, second engine, host-specific orchestrator, or agent controller. Interpret it through deterministic `nerv` primitives and repository evidence.
 
-## Workflow
+## Planning And Approval
 
-1. `plan` uses a reasoning model to inspect relevant implementation and propose the minimum coherent Work Items. Before approval, show a Plan Preview with the proposed title, goal, scope, meaningful expected touchpoints and out-of-scope boundaries, execution-ready Tasks, acceptance criteria, and validation. Do not assign a durable `WORK-###` ID before approval. Detail Tasks only for the next Work Item when showing multiple Work Items.
-2. `approve` materializes the approved Work Item and its Tasks, activates it, and reports that it is ready for execution. A Work Item is the governed outcome; every Task belongs to one Work Item.
-3. `execute` uses an execution model when appropriate. For each approved Task: use the compact active context, make it active, implement it, run targeted validation, and mark it done. Do not re-plan ordinary execution or expand material scope without returning evidence for reasoning. After full validation, stop at `Ready for Work Review` when the workflow separates model roles.
-4. `review` uses a reasoning model to evaluate the integrated result, Git diff, validation evidence, context, regressions, and risks. A REWORK persists findings and minimum remediation Tasks, waits for human approval, adds approved Tasks to the same Work Item, then returns to execution.
-5. A PASS makes the Work Item ready for optional user or external-tool verification; it does not commit by default. External verification failures are new review evidence: persist REWORK on the same Work Item and follow the remediation path. Close only when the user requests it, unless the user explicitly requested auto-close for this Work Item.
-6. `checkpoint` is exceptional recovery evidence only when execution must genuinely stop before completion.
+Before planning, inspect relevant Product Context. If it is missing or scaffold-only, establish the minimum confirmed product understanding with the developer before materializing work; record only confirmed facts. Inspect relevant implementation, `NERV_VNEXT_DESIGN.md`, `AGENTS.md`, and focused local or shared Knowledge.
 
-The canonical Work Item states are `planned`, `active`, `review`, `rework`, and `closed`. Task states are `pending`, `active`, `done`, and `blocked`.
+Surface a concise non-blocking warning only when the intended direction materially conflicts with Product Context or relevant authority and has no safe interpretation. The developer may proceed, adjust the implementation, or update Product Context; do not rewrite canonical context without confirmation.
 
-## Model Roles
+Relevant Skills, MCPs, plugins, and specialized tools may provide guidance, assistance, or evidence. They remain subordinate to Product Context, the Plan Preview, approval, Work boundaries, Work Review, and Git-safe Close.
 
-- Use a reasoning model for planning, replanning after a genuine block, and Work Review.
-- Use an execution model for approved Task implementation and deterministic validation when appropriate.
-- The execution model must stop when a Task is genuinely blocked or when full validation is complete and a separate reasoning model will review. It must provide concise evidence rather than inventing a substantial new plan.
-- Nerv must remain independent of model, provider, host, and conversational memory.
+Before approval, show a concise Plan Preview with a proposed Work Item, goal, scope, expected touchpoints, meaningful out-of-scope boundaries, acceptance criteria, full validation, and execution-ready Tasks. Each Task needs a bounded objective, intended approach based on repository evidence, touchpoints when useful, task acceptance criteria, and targeted validation. Do not assign a durable Work reference or persist speculative plans.
+
+`nerv-dev approve` materializes approved Work and Tasks, activates the Work Item, and persists compact execution handoff context. It does not implement code.
+
+## Execution And Review
+
+Execution uses the active Work context to implement approved Tasks, run targeted validation, persist evidence and attribution, and mark Tasks done. Do not replan ordinary execution. Stop with evidence for a material scope expansion, architecture change, Product Context or authoritative-context conflict, or genuine block. After full validation, the Work Item is ready for Work Review.
+
+`nerv-dev review` evaluates the integrated implementation, diff, validation evidence, context, Knowledge, external evidence, regressions, and risks. PASS is ready for optional user or external verification, then Close on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. `nerv-dev approve` adds approved remediation to the same Work Item and reactivates it.
 
 ## Guardrails
 
@@ -58,7 +55,7 @@ The canonical Work Item states are `planned`, `active`, `review`, `rework`, and 
 - Do not materialize a plan or remediation Tasks before explicit human approval.
 - Keep generated Markdown minimal and temporary. Active Work Item context belongs under `.nerv/agent/active/`; operational history belongs in SQLite.
 - Preserve Product Context and Repo Context as canonical long-lived context. Record durable discoveries as small searchable knowledge, not large historical documents.
-- Close only after the latest Work Review passes, required validation succeeds, and the user requests Close unless auto-close was explicitly requested for the Work Item. Stage only Work Item-owned changes; block if unrelated changes cannot be separated safely. Never blindly use `git add -A`.
+- Close only after the latest Work Review passes, required validation succeeds, and the user requests Close. Stage only Work Item-owned changes; block if unrelated changes cannot be separated safely. Never blindly use `git add -A`.
 
 ## Repository Rules
 
