@@ -31,6 +31,8 @@ nerv-dev close WORK-###
 
 `nerv-dev status` is read-only and `nerv-dev checkpoint` is exceptional. Execution is a phase after approval, not another normal public operation. `nerv-dev` is a protocol, not a required executable, second database, second engine, host-specific orchestrator, or agent controller. Interpret it through deterministic `nerv` primitives and repository evidence.
 
+End every governed interaction with one concise **Recommended next operation**. Mirror the public workflow: recommend `nerv-dev approve` after planning or remediation proposals, `nerv-dev review WORK-###` after full validation, and `nerv-dev close WORK-###` after optional verification. During Execution, recommend phase-level continuation such as `Continue with Task 2.`; do not present task primitives as the normal journey. After Close, state that no further Nerv lifecycle operation is required.
+
 ## Planning And Approval
 
 Before planning, inspect relevant Product Context. If it is missing or scaffold-only, establish the minimum confirmed product understanding with the developer before materializing work; record only confirmed facts. Inspect relevant implementation, `NERV_VNEXT_DESIGN.md`, `AGENTS.md`, and focused local or shared Knowledge.

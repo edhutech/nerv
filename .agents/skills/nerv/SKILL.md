@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "d523c2bd2f514ad09ebdde60c267336052b307461a3d7d16946fb10a81aee8c1"
+nerv_managed_sha256: "89622ad2a1e705358ff98a2e67c175cde66d757788553d395783089973ab2426"
 ---
 
 # Nerv
@@ -13,6 +13,8 @@ Nerv is agent agnostic. Use its deterministic runtime primitives; do not create 
 ## Public Workflow
 
 The normal operations are `nerv plan`, `nerv approve`, `nerv review`, and `nerv close`. `nerv status` is read-only; `nerv checkpoint` is exceptional recovery evidence. The runtime is agent and provider agnostic: these agent-facing operations use its deterministic primitives and never require the runtime to call an AI API.
+
+End every governed interaction with one concise **Recommended next operation**. Prefer `nerv approve` after a Plan Preview or REWORK remediation proposal, `nerv review WORK-###` after approved execution and full validation, and `nerv close WORK-###` after explaining optional verification on PASS. During Execution, use phase-level continuation such as `Continue with Task 2.` rather than exposing persistence primitives. After Close, state that no further Nerv lifecycle operation is required.
 
 ### Plan
 

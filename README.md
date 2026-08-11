@@ -58,6 +58,12 @@ Shared Product Context, explicit shared Repo Context, and selectively promoted K
 
 For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. For development of Nerv itself, `.agents/skills/nerv-development/SKILL.md` adds repository-specific constraints without creating a second lifecycle.
 
+## Releases
+
+`package.json` is the single source of the Nerv version. Nerv follows Semantic Versioning and remains in `0.x.y` during normal pre-1.0 development: PATCH is for compatible fixes, MINOR is for meaningful compatible product or runtime evolution, and `1.0.0` is a deliberate stable public-contract decision. Work Items do not automatically change the product version.
+
+When an actual distribution is made, create an optional Git tag as `v<version>` such as `v0.1.0`; a GitHub Release may then be created from that tag. Pre-release identifiers are available for external testing. Nerv has no release subsystem or release automation.
+
 ## Development
 
 ```bash

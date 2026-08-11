@@ -9,18 +9,19 @@ export function syncActiveContext(workspaceRoot: string, work: WorkItem, tasks: 
   const pendingDetails = tasks.filter((task) => task.status === "pending").map(taskDetails).join("\n\n") || "None";
   const active = tasks.find((task) => task.status === "active");
   const next = nextOperation(work, tasks, review);
-  const content = `# ${work.ref}: ${work.title}\n\n## State\n\n${work.status}\n\n## Goal\n\n${work.goal}\n\n## Scope\n\n${work.scope}\n\n## Acceptance Criteria\n\n${work.acceptance_criteria}\n\n## Full Validation\n\n${work.validation}\n\n## Completed Tasks\n\n${taskList("done")}\n\n## Pending Tasks\n\n${pendingDetails}\n\n## Active Task\n\n${active ? taskDetails(active) : "None"}\n\n## Latest Review\n\n${review ? `${review.outcome}: ${review.summary}\n\n${review.findings ?? "No findings."}` : "None"}\n\n## Latest Checkpoint\n\n${checkpoint ? `${checkpoint.summary}\n\nNext: ${checkpoint.next_step ?? "Not recorded."}` : "None"}\n\n## Next\n\n${next}\n`;
+  const content = `# ${work.ref}: ${work.title}\n\n## State\n\n${work.status}\n\n## Goal\n\n${work.goal}\n\n## Scope\n\n${work.scope}\n\n## Acceptance Criteria\n\n${work.acceptance_criteria}\n\n## Full Validation\n\n${work.validation}\n\n## Completed Tasks\n\n${taskList("done")}\n\n## Pending Tasks\n\n${pendingDetails}\n\n## Active Task\n\n${active ? taskDetails(active) : "None"}\n\n## Latest Review\n\n${review ? `${review.outcome}: ${review.summary}\n\n${review.findings ?? "No findings."}` : "None"}\n\n## Latest Checkpoint\n\n${checkpoint ? `${checkpoint.summary}\n\nCheckpoint next step: ${checkpoint.next_step ?? "Not recorded."}` : "None"}\n\n## Recommended Next Operation\n\n${next}\n`;
   const path = activePath(workspaceRoot, work.ref); writeFileSync(path, content, "utf8"); return path;
 }
 export function removeActiveContext(workspaceRoot: string, workRef: string) { const path = activePath(workspaceRoot, workRef); if (existsSync(path)) rmSync(path); }
 export function nextOperation(work: WorkItem, tasks: Task[], review: Review | null): string {
-  if (work.status === "closed") return "No further lifecycle operation.";
-  if (tasks.some((task) => task.status === "blocked")) return `Resolve blocked work, then materialize approved remediation with the external workflow.`;
-  if (work.status === "planned") return "Use the external planning workflow to approve and materialize Tasks, then activate the Work Item.";
-  if (work.status === "active" && tasks.some((task) => task.status === "pending")) return "Start the next pending Task.";
-  if (work.status === "active" && tasks.some((task) => task.status === "active")) return "Complete or block the active Task.";
-  if (work.status === "active") return "Record full validation evidence and move the Work Item to review.";
-  if (work.status === "review" && review?.outcome === "PASS") return "Ready for optional user or external verification; close on request.";
-  if (work.status === "rework") return "Use the external planning workflow to approve remediation Tasks.";
-  return "Record a Work Review.";
+  if (work.status === "closed") return "No further Nerv lifecycle operation is required.";
+  if (tasks.some((task) => task.status === "blocked")) return "Return the blocking evidence for replanning.";
+  if (work.status === "planned" || work.status === "rework") return "nerv approve";
+  const active = tasks.find((task) => task.status === "active");
+  if (active) return `Continue with Task ${active.position}.`;
+  const pending = tasks.find((task) => task.status === "pending");
+  if (work.status === "active" && pending) return `Continue with Task ${pending.position}.`;
+  if (work.status === "active") return `nerv review ${work.ref}`;
+  if (work.status === "review" && review?.outcome === "PASS") return `Optional user or external verification may happen first; then nerv close ${work.ref}.`;
+  return `nerv review ${work.ref}`;
 }

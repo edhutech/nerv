@@ -407,7 +407,7 @@ Return concise evidence:
 Blocked: Task 3
 Reason: ...
 Evidence: ...
-Next: nerv-dev review WORK-017
+Recommended next operation: nerv-dev review WORK-017
 ```
 
 Planning can then diagnose the issue and propose a revised path.
@@ -472,7 +472,7 @@ REWORK
 Persist PASS and make the Work Item ready for optional user or external verification. Do not commit by default. External verification failures are new review evidence and may produce REWORK on the same Work Item. After successful verification, Close is available on user request.
 
 ```text
-Next: optional verification, then nerv-dev close WORK-017 on request
+Recommended next operation: optional verification may happen first; then nerv-dev close WORK-017
 ```
 
 ### REWORK
@@ -499,7 +499,7 @@ Proposed Tasks:
 
 Waiting for approval.
 
-Next: nerv-dev approve WORK-017
+Recommended next operation: nerv-dev approve
 ```
 
 The proposed remediation Tasks are not durable until approved.
@@ -548,12 +548,12 @@ WORK-017
 State: rework
 Latest review: REWORK
 Pending remediation: awaiting approval
-Next: nerv-dev approve WORK-017
+Recommended next operation: nerv-dev approve
 ```
 
-The state machine must determine the correct next operation deterministically.
+The state machine must determine one correct recommended next operation deterministically.
 
-Commands should also return a deterministic `Next:` suggestion whenever possible.
+End every governed interaction with one concise `Recommended next operation`. Prefer the public workflow where it applies; during Execution, recommend phase-level continuation such as `Continue with Task 2.` rather than task primitives. After Close, state that no further Nerv lifecycle operation is required.
 
 Do not require the LLM to infer lifecycle state from scattered Markdown.
 
@@ -823,6 +823,14 @@ Nerv-Work-Ref: WORK-017
 ```
 
 The exact subject/body style should follow the repository convention.
+
+---
+
+## 21.1 Versioning And Releases
+
+`package.json` is the single source of the Nerv version. Do not add a SQLite version table, VERSION file, or release subsystem. Work Items and releases are separate: closing a Work Item does not automatically increment the product version.
+
+Nerv follows Semantic Versioning. During pre-1.0 development, use `0.x.y`: PATCH for compatible fixes and MINOR for meaningful compatible product or runtime evolution. Reserve `1.0.0` for a deliberate stable public contract. When a distribution is made, use an optional Git tag in the form `v<version>`; a GitHub Release may be created from that tag. Pre-release identifiers may support external testing without adding automation.
 
 ---
 
