@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "a4453a44d597ee42b7bf29a06d605cb0ca7539e21d763c4936b4e76efd77a3dd"
+nerv_managed_sha256: "d2811e36f8554335bba117394ba33b8bf5676adbea7dac4505a91b727aebd754"
 ---
 
 # Nerv
@@ -34,12 +34,35 @@ Goal: <goal>
 Scope: <product-aware boundary>
 Expected touchpoints: <likely files, modules, components, or subsystems when useful>
 Out of scope: <meaningful boundaries when useful>
-Tasks: <bounded implementation Tasks>
+Tasks:
+
+Task 1 — <title>
+
+Objective:
+<bounded outcome owned by this Task>
+
+Implementation approach:
+<evidence-based intended solution path>
+
+Expected touchpoints:
+<likely files, modules, or subsystems when useful>
+
+Acceptance criteria:
+<Task-specific completion criteria>
+
+Targeted validation:
+<Task-specific checks>
+
+Task 2 — ...
 Acceptance criteria: <criteria>
 Full validation: <commands or checks>
 ```
 
-Derive the goal, scope, Tasks, and acceptance criteria from Product Context and the request. Expected touchpoints guide execution, not a file allowlist. Each Task includes a bounded objective, evidence-based approach, touchpoints when useful, acceptance criteria, and targeted validation. Do not assign a durable `WORK-###` reference in the preview or materialize speculative plans.
+Derive the goal, scope, Tasks, and acceptance criteria from Product Context and the request. Every applicable Task field must be visible in the preview, not merely considered internally. Keep fields concise and omit a field only when it genuinely does not apply. Expected touchpoints guide execution, not a file allowlist. Implementation approach describes the intended solution path based on repository evidence; it is not a low-level coding script. Apply this same structure to remediation Tasks proposed after REWORK.
+
+A Plan Preview is not ready for approval when its Tasks are only titles, vague summaries, or otherwise require Execution to redesign the implementation path. Revise the preview before recommending `nerv approve`.
+
+Do not assign a durable `WORK-###` reference in the preview or materialize speculative plans.
 
 ### Approve And Execute
 
@@ -51,7 +74,7 @@ Execution uses the active Work context to complete each approved Task, run targe
 
 `nerv review WORK-###` evaluates intent, Product Context, relevant Repo Context and project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, Knowledge, external evidence, regressions, and risks.
 
-PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. `nerv approve` adds approved remediation to the same Work Item and reactivates it.
+PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it.
 
 Close selectively stages Work-owned changes, inspects the staged diff, and blocks unsafe boundaries. Never use `git add -A`; one Work Item produces one reviewed atomic commit by default.
 

@@ -41,7 +41,30 @@ Surface a concise non-blocking warning only when the intended direction material
 
 Relevant Skills, MCPs, plugins, and specialized tools may provide guidance, assistance, or evidence. They remain subordinate to Product Context, the Plan Preview, approval, Work boundaries, Work Review, and Git-safe Close.
 
-Before approval, show a concise Plan Preview with a proposed Work Item, goal, scope, expected touchpoints, meaningful out-of-scope boundaries, acceptance criteria, full validation, and execution-ready Tasks. Each Task needs a bounded objective, intended approach based on repository evidence, touchpoints when useful, task acceptance criteria, and targeted validation. Do not assign a durable Work reference or persist speculative plans.
+Before approval, show a concise Plan Preview with a proposed Work Item, goal, scope, expected touchpoints, meaningful out-of-scope boundaries, acceptance criteria, full validation, and execution-ready Tasks. Represent every applicable Task visibly, rather than only considering its details internally:
+
+```text
+Task 1 — <title>
+
+Objective:
+<bounded outcome owned by this Task>
+
+Implementation approach:
+<evidence-based intended solution path>
+
+Expected touchpoints:
+<likely files, modules, or subsystems when useful>
+
+Acceptance criteria:
+<Task-specific completion criteria>
+
+Targeted validation:
+<Task-specific checks>
+
+Task 2 — ...
+```
+
+Keep fields concise and omit a field only when it genuinely does not apply. Expected touchpoints guide execution, not a file allowlist. Implementation approach describes the intended solution path based on repository evidence; it is not a low-level coding script. Apply this same structure to remediation Tasks proposed after REWORK. A Plan Preview is not ready for approval when its Tasks are only titles, vague summaries, or otherwise require Execution to redesign the implementation path. Revise the preview before recommending `nerv-dev approve`. Do not assign a durable Work reference or persist speculative plans.
 
 `nerv-dev approve` materializes approved Work and Tasks, activates the Work Item, and persists compact execution handoff context. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record validation and attribution, run `pnpm validate`, then report readiness for Work Review. This is agent workflow behavior, not runtime agent control.
 
@@ -49,7 +72,7 @@ Before approval, show a concise Plan Preview with a proposed Work Item, goal, sc
 
 Execution uses the active Work context to implement approved Tasks, run targeted validation, persist evidence and attribution, and mark Tasks done. Do not replan ordinary execution. Stop with evidence for an explicit developer request, material scope expansion, architecture change, Product Context or authoritative-context conflict, or genuine block. After full validation, the Work Item is ready for Work Review.
 
-`nerv-dev review` evaluates the integrated implementation, diff, validation evidence, context, Knowledge, external evidence, regressions, and risks. PASS is ready for optional user or external verification, then Close on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. `nerv-dev approve` adds approved remediation to the same Work Item and reactivates it.
+`nerv-dev review` evaluates the integrated implementation, diff, validation evidence, context, Knowledge, external evidence, regressions, and risks. PASS is ready for optional user or external verification, then Close on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending `nerv-dev approve`. `nerv-dev approve` adds approved remediation to the same Work Item and reactivates it.
 
 ## Guardrails
 
