@@ -13,7 +13,7 @@ Read authoritative context in this order:
 
 1. `NERV_VNEXT_DESIGN.md` for the approved vNext model.
 2. `AGENTS.md` for repository constraints and validation.
-3. `.nerv/product/` and `.nerv/repo/` when available for canonical product and repository context.
+3. `.nerv-context/product/` and `.nerv-context/repo/` when available for tracked canonical product and repository context; `.nerv/repo/` contains only generated local observations.
 
 SQLite is the durable operational source of truth. Do not edit generated `.nerv/` state or `dist/` directly.
 
@@ -36,9 +36,9 @@ nerv-dev checkpoint WORK-###
 
 ## Workflow
 
-1. `plan` uses a reasoning model to propose the minimum coherent Work Items. Before approval, show a Plan Preview with the proposed title, goal, Tasks, acceptance criteria, and validation. Do not assign a durable `WORK-###` ID before approval. Detail Tasks only for the next Work Item when showing multiple Work Items.
+1. `plan` uses a reasoning model to inspect relevant implementation and propose the minimum coherent Work Items. Before approval, show a Plan Preview with the proposed title, goal, scope, meaningful expected touchpoints and out-of-scope boundaries, execution-ready Tasks, acceptance criteria, and validation. Do not assign a durable `WORK-###` ID before approval. Detail Tasks only for the next Work Item when showing multiple Work Items.
 2. `approve` materializes the approved Work Item and its Tasks, activates it, and reports that it is ready for execution. A Work Item is the governed outcome; every Task belongs to one Work Item.
-3. `execute` uses an execution model when appropriate. For each approved Task: make it active, implement it, run targeted validation, and mark it done. Do not re-plan ordinary execution. After full validation, stop at `Ready for Work Review` when the workflow separates model roles.
+3. `execute` uses an execution model when appropriate. For each approved Task: use the compact active context, make it active, implement it, run targeted validation, and mark it done. Do not re-plan ordinary execution or expand material scope without returning evidence for reasoning. After full validation, stop at `Ready for Work Review` when the workflow separates model roles.
 4. `review` uses a reasoning model to evaluate the integrated result, Git diff, validation evidence, context, regressions, and risks. A REWORK persists findings and minimum remediation Tasks, waits for human approval, adds approved Tasks to the same Work Item, then returns to execution.
 5. A PASS makes the Work Item ready for optional user or external-tool verification; it does not commit by default. External verification failures are new review evidence: persist REWORK on the same Work Item and follow the remediation path. Close only when the user requests it, unless the user explicitly requested auto-close for this Work Item.
 6. `checkpoint` is exceptional recovery evidence only when execution must genuinely stop before completion.

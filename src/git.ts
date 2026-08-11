@@ -12,15 +12,6 @@ export function captureBaseline(root: string): GitBaseline {
   const untracked = new Set(git(root, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean));
   return { head, dirty: changedPaths(root, head).map((path) => ({ ...fileState(root, path), origin: untracked.has(path) ? "untracked" : "tracked" })) };
 }
-export function highestWorkIdFromGit(root: string): number {
-  return git(root, ["log", "--format=%(trailers:key=Nerv-Work,valueonly)"])
-    .split("\n")
-    .reduce((highest, value) => {
-      const match = /^WORK-(\d+)$/.exec(value.trim());
-      const number = match ? Number(match[1]) : 0;
-      return Number.isSafeInteger(number) && number > 0 ? Math.max(highest, number) : highest;
-    }, 0);
-}
 export function changedPaths(root: string, head: string): string[] {
   const tracked = git(root, ["diff", "--name-only", head]).split("\n").filter(Boolean);
   const untracked = git(root, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);

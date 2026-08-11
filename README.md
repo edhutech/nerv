@@ -12,7 +12,7 @@ A Work Item is the governed unit of work. It contains one or more bounded Tasks.
 
 The normal flow is: relevant Product Context, plan preview, human approval, materialize, execute Tasks, validate, Work Review, optional user or external verification, then Git-safe close on request. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
 
-SQLite is the durable operational source of truth. Product Context and Repo Context are canonical long-lived context. Generated Markdown is minimal temporary active context, not the lifecycle authority.
+SQLite is the durable local operational source of truth. Each Work Item has a stable UUID and a local friendly `WORK-###` reference; Tasks have UUID identities and positions scoped within their Work Item, never global task references. Shared canonical context is tracked in `.nerv-context/{product,repo,knowledge}`. `.nerv/` is local ignored state, including generated repository observations and temporary active context.
 
 ## Install
 
@@ -39,13 +39,13 @@ nerv work create "Durable knowledge storage" --intent "..." --goal "..." --scope
 nerv work list
 nerv work add-task WORK-001 "Add storage" --scope "..." --acceptance-criteria "..." --validation "..."
 nerv work activate WORK-001
-nerv task start TASK-001
-nerv task done TASK-001 --evidence "..." --files src/example.ts
+nerv work task start WORK-001 1
+nerv work task done WORK-001 1 --evidence "..." --files src/example.ts
 nerv review WORK-001 --outcome PASS --summary "..." --validation-evidence "..."
 nerv close WORK-001 --message "Add durable knowledge storage"
 ```
 
-`nerv work list` provides a read-only overview of every Work Item, including its ID, title, and current state. Other primitives include `nerv work status`, `nerv task block`, `nerv checkpoint`, and `nerv knowledge add|search|show`. Use `nerv --help` for exact arguments.
+`nerv work list` provides a read-only overview of every Work Item, including its local reference, title, and current state. Other primitives include `nerv work task block WORK-001 1`, `nerv checkpoint`, `nerv knowledge add|search|show|promote`, and `nerv repo scaffold`. Use `nerv --help` for exact arguments.
 
 Close is deliberately Git-safe: it requires a passing Work Review and validation evidence, stages only attributable Work Item changes, and blocks rather than guessing when unrelated changes cannot be separated safely.
 
@@ -55,7 +55,9 @@ Agents may plan and execute work using Nerv, but the runtime makes no assumption
 
 A PASS Review is ready for optional user or external verification and does not close automatically. Verification failures become REWORK evidence on the same Work Item. The user may request Git-safe Close after successful verification, or explicitly opt into auto-close for a Work Item without changing Nerv runtime configuration or state.
 
-Before planning product work, read relevant Product Context. When it is absent or only scaffold placeholders, confirm a concise product understanding with the developer, run `nerv product`, and record only approved facts through the restricted `nerv product write <document> --content "..."` primitive. Product Context grounds Work Item goals, scope, Tasks, acceptance criteria, and integrated Review; Repo Context remains separate and is refreshed only when useful.
+Before planning product work, read relevant tracked `.nerv-context/product/` files. When it is absent or only scaffold placeholders, confirm a concise product understanding with the developer, run `nerv product`, and record only approved facts through the restricted `nerv product write <document> --content "..."` primitive. `nerv repo` produces local observations under `.nerv/repo/`; use `nerv repo scaffold` only when a stable shared repository fact needs a tracked home. Promote a local knowledge observation explicitly to one small tracked `.nerv-context/knowledge/<id>.md` record only when it becomes shared truth.
+
+Planning inspects relevant implementation and authoritative project guidance before presenting an execution-ready preview. The developer's current decision takes precedence over Product Context, relevant project/domain guidance, and generic external-tool guidance. Surface only material conflicts; a developer may proceed, align the plan, or update Product Context. An exception changes Product Context only when confirmed as durable product truth, otherwise it is retained as Work evidence or small Knowledge. Relevant external Skills, MCPs, plugins, and tools may assist within approved boundaries but never replace Nerv governance.
 
 For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. It translates normal development requests into the installed runtime's deterministic primitives without creating another lifecycle. The package includes this file for host or developer skill discovery.
 

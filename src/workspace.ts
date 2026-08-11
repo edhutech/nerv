@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFil
 import { dirname, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
-const DIRS = [".nerv", ".nerv/product", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as const;
+const DIRS = [".nerv", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as const;
 const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
 const LEGACY_PUBLIC_SKILL_HASHES = new Set(["638ef1586304c2e803be712bd8b97894b72bcaacba0b9cab1c84e77fb9e50aa8"]);
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };

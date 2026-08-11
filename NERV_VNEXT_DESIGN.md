@@ -79,16 +79,16 @@ A Work Item may contain one or many Tasks.
 
 ```text
 WORK-017
-├── TASK-061
-├── TASK-062
-└── TASK-063
+├── Task 1
+├── Task 2
+└── Task 3
 ```
 
 A small change may legitimately be:
 
 ```text
 WORK-018
-└── TASK-064
+└── Task 1
 ```
 
 Do not create a separate standalone Task lifecycle for small work.
@@ -119,9 +119,11 @@ A Work Review evaluates the actual integrated result against:
 - acceptance criteria,
 - Product Context,
 - Repo Context,
+- relevant authoritative project or domain guidance,
 - implementation results,
 - Git diff,
 - validation evidence,
+- relevant external verification or specialized tool evidence,
 - integration quality,
 - regressions,
 - risks.
@@ -171,9 +173,11 @@ Task → implement → targeted validate → done
   ↓
 FULL VALIDATION
   ↓
-WORK REVIEW — strong reasoning model
+WORK REVIEW — reasoning model
   ↓
-PASS ───────────────→ CLOSE
+PASS ───────────────→ optional user or external verification
+  │                         ↓
+  │                    CLOSE on request
   │
   └─ REWORK
        ↓
@@ -283,16 +287,18 @@ Canonical agent-facing invocation:
 nerv-dev plan "<intent>"
 ```
 
-Planning is performed by a strong reasoning model.
+Planning is performed by a reasoning model that inspects relevant implementation and context deeply enough to prepare an execution-ready path.
 
 The planner must determine the **minimum necessary number of coherent Work Items**.
 
-Possible result:
+Before approval, show a concise Plan Preview without durable Work Item IDs. It includes the proposed title, goal, scope, meaningful expected touchpoints and out-of-scope boundaries, execution-ready Tasks, acceptance criteria, and full validation. Expected touchpoints guide execution but are not an immutable file allowlist.
+
+Possible multi-Work roadmap:
 
 ```text
-WORK-017  Durable knowledge storage
-WORK-018  Context-aware knowledge retrieval
-WORK-019  Knowledge-aware planning integration
+Durable knowledge storage
+Context-aware knowledge retrieval
+Knowledge-aware planning integration
 ```
 
 ### Planning rule
@@ -331,7 +337,7 @@ Before approval:
 
 ```text
 plan
-→ show proposal
+→ show Plan Preview
 → discuss/edit in conversation
 ```
 
@@ -341,6 +347,8 @@ After approval:
 approved plan
 → materialize durable Work Item + Tasks
 ```
+
+Persist compact approved boundaries and execution guidance in the existing Work Item and Task scope fields so a fresh execution model can recover the approved path from active context.
 
 No normal lifecycle entity named Intake or Proposal is required.
 
@@ -392,7 +400,7 @@ for each pending Task:
     set done
 
 run full Work Item validation
-move Work Item to review
+→ Ready for Work Review when model roles are separated
 ```
 
 ### Execution rules
@@ -403,7 +411,7 @@ move Work Item to review
 - Do not create a Task Close ceremony.
 - Do not create a commit per Task.
 - Do not require a Checkpoint after each Task.
-- Do not re-plan unless a real block or newly discovered constraint requires it.
+- Do not re-plan unless a real block or newly discovered material scope, architecture, or Product Context constraint requires it. Incidental file-level adjustments inside approved boundaries are ordinary execution.
 
 ---
 
@@ -412,7 +420,7 @@ move Work Item to review
 If execution cannot safely continue:
 
 ```text
-TASK-063 → blocked
+Task 3 → blocked
 ```
 
 Stop Work Item execution.
@@ -420,13 +428,13 @@ Stop Work Item execution.
 Return concise evidence:
 
 ```text
-Blocked: TASK-063
+Blocked: Task 3
 Reason: ...
 Evidence: ...
 Next: nerv-dev review WORK-017
 ```
 
-A strong model can then diagnose the issue and propose a revised path.
+A reasoning model can then diagnose the issue and propose a revised path.
 
 The execution model should execute defined work.
 
@@ -476,7 +484,7 @@ Canonical invocation:
 nerv-dev review WORK-017
 ```
 
-A strong reasoning model performs the review.
+A reasoning model performs the review.
 
 Possible outcomes:
 
@@ -487,10 +495,10 @@ REWORK
 
 ### PASS
 
-The Work Item is eligible for Git-safe close.
+Persist PASS and make the Work Item ready for optional user or external verification. Do not commit by default. External verification failures are new review evidence and may produce REWORK on the same Work Item. After successful verification, Close is available on user request; explicit auto-close is a skill-level workflow preference only.
 
 ```text
-Next: nerv-dev close WORK-017
+Next: optional verification, then nerv-dev close WORK-017 on request
 ```
 
 ### REWORK
@@ -512,8 +520,8 @@ Findings:
 2. Full validation did not cover stale observations.
 
 Proposed Tasks:
-- TASK-074 Add project-scoped retrieval.
-- TASK-075 Add stale-observation regression coverage.
+- Task 4 Add project-scoped retrieval.
+- Task 5 Add stale-observation regression coverage.
 
 Waiting for approval.
 
@@ -621,13 +629,15 @@ It may contain:
 
 - Work Item ID and title,
 - goal,
+- scope,
 - current state,
 - acceptance criteria,
+- full validation,
 - completed Tasks,
-- pending Tasks,
+- pending Task titles, execution-relevant scope, acceptance criteria, and targeted validation,
 - active Task,
 - active Task scope,
-- targeted validation,
+- active Task acceptance criteria and targeted validation,
 - latest Review findings,
 - latest Checkpoint summary if relevant,
 - next operation.
@@ -756,6 +766,10 @@ rework if necessary
 ↓
 PASS
 ↓
+optional user or external verification
+↓
+Close on request
+↓
 selective stage
 ↓
 inspect staged diff
@@ -818,7 +832,8 @@ Nerv should not force Conventional Commits on every repository.
 For machine traceability, Nerv may add a Git trailer:
 
 ```text
-Nerv-Work: WORK-017
+Nerv-Work: <work-item-uuid>
+Nerv-Work-Ref: WORK-017
 ```
 
 Example:
@@ -829,7 +844,8 @@ refactor(lifecycle): replace run-scoped execution
 Remove the redundant Run lifecycle and execute Tasks directly
 inside the governing Work Item.
 
-Nerv-Work: WORK-017
+Nerv-Work: <work-item-uuid>
+Nerv-Work-Ref: WORK-017
 ```
 
 The exact subject/body style should follow the repository convention.
@@ -1315,15 +1331,15 @@ WORK-001  Replace Nerv core with vNext
 Possible implementation Tasks:
 
 ```text
-TASK-001  Define fresh vNext schema and repository contracts
-TASK-002  Implement Work Item and Task persistence
-TASK-003  Implement lifecycle state transitions and active context
-TASK-004  Implement Work Review, Rework, Checkpoint, and Knowledge
-TASK-005  Implement Git-safe Close
-TASK-006  Replace CLI lifecycle surface
-TASK-007  Replace smoke/E2E lifecycle coverage
-TASK-008  Remove legacy runtime and generated artifacts
-TASK-009  Rewrite nerv-development skill and authoritative docs
+Task 1  Define fresh vNext schema and repository contracts
+Task 2  Implement Work Item and Task persistence
+Task 3  Implement lifecycle state transitions and active context
+Task 4  Implement Work Review, Rework, Checkpoint, and Knowledge
+Task 5  Implement Git-safe Close
+Task 6  Replace CLI lifecycle surface
+Task 7  Replace smoke/E2E lifecycle coverage
+Task 8  Remove legacy runtime and generated artifacts
+Task 9  Rewrite nerv-development skill and authoritative docs
 ```
 
 These Tasks are an implementation starting point, not a substitute for planning against the actual repository state.
@@ -1375,6 +1391,19 @@ Do not add the following to vNext unless separately approved:
 ---
 
 ## 39. Implementation Guidance for the Agent
+
+### Identity And Shared Context Replacement
+
+The final replacement uses a UUID as the stable Work Item identity and a SQLite-allocated local `WORK-###` reference for human interaction. Git history never participates in Work reference allocation. Tasks have UUID identities plus a position scoped to their parent Work Item; there is no global `TASK-###` reference or command surface.
+
+Git commits carry both canonical trailers:
+
+```text
+Nerv-Work: <work-item-uuid>
+Nerv-Work-Ref: WORK-###
+```
+
+`.nerv/` is local ignored operational state only, including SQLite, active Markdown, and generated repository observations. Tracked canonical context is `.nerv-context/product/`, `.nerv-context/repo/`, and `.nerv-context/knowledge/`. Product commands operate on shared Product Context. `nerv repo` generates local observations; explicit shared Repo Context is scaffolded only for stable facts. SQLite knowledge remains local until explicitly promoted as one small shared record per observation.
 
 Before changing code:
 
