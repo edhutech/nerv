@@ -66,4 +66,24 @@ function finish(repo, ref = "WORK-001", position = "1", file = "feature.txt") { 
 {
   const repo = setup(); try { createWork(repo, "Unsafe close"); addAndActivate(repo); finish(repo); writeFileSync(join(repo, "unrelated.txt"), "unrelated\n"); run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "ok", "--validation-evidence", "full"]); assert(run(repo, ["close", "WORK-001", "--message", "unsafe"], 1).includes("unattributed"), "unsafe unrelated changes did not block close"); } finally { rmSync(repo, { recursive: true, force: true }); }
 }
+{
+  const repo = setup(); try {
+    createWork(repo, "No-diff close");
+    run(repo, ["work", "add-task", "WORK-001", "Restore baseline", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "targeted"]);
+    writeFileSync(join(repo, "README.md"), "preexisting change\n");
+    run(repo, ["work", "activate", "WORK-001"]);
+    run(repo, ["work", "task", "start", "WORK-001", "1"]);
+    writeFileSync(join(repo, "README.md"), "base\n");
+    run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "restored baseline", "--files", "README.md"]);
+    run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "no diff", "--validation-evidence", "full"]);
+    const baselineStatus = git(repo, ["status", "--porcelain"]).stdout;
+    assert(run(repo, ["close", "WORK-001", "--message", "no-diff work"]).includes("no tracked Git diff"), "no-diff close did not complete");
+    assert(git(repo, ["status", "--porcelain"]).stdout === baselineStatus && git(repo, ["rev-list", "--count", "HEAD"]).stdout.trim() === "1", "no-diff close changed Git state");
+    const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true });
+    const work = db.prepare("SELECT status, commit_hash FROM work_items WHERE ref = ?").get("WORK-001");
+    assert(work.status === "closed" && work.commit_hash === null, "no-diff close did not persist a closed Work without a commit");
+    db.close();
+    assert(!existsSync(join(repo, ".nerv/agent/active/WORK-001.md")), "no-diff close left active context behind");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
 console.log("ok - vNext smoke and E2E coverage");

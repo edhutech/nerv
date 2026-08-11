@@ -12,7 +12,7 @@ Developers need a compact, durable way to preserve the approved path, relevant c
 - Work Items govern coherent outcomes; Tasks are bounded execution units inside them.
 - Planning and Work Review use relevant context and evidence; Execution follows approved scope.
 - Human approval precedes durable Work and remediation Tasks, then normally continues into Execution in the same agent interaction.
-- One Work Item closes as one Git-safe reviewed atomic commit by default.
+- One Work Item closes as one Git-safe reviewed atomic commit by default; a verified clean no-diff outcome closes without an empty commit.
 
 ## Boundaries And Direction
 

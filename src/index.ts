@@ -10,7 +10,7 @@ import { scaffoldProductContext, writeProductContext } from "./product.js";
 import { generateRepoContext, scaffoldSharedRepoContext } from "./repo-context.js";
 import { discoverContext, getSharedKnowledge, searchSharedKnowledge } from "./context.js";
 import { nextOperation, removeActiveContext, syncActiveContext } from "./work.js";
-import { cachedPaths, captureBaseline, changedPaths, commit, fileState, stage, stagedDiff, validatePath } from "./git.js";
+import { cachedPaths, captureBaseline, changedPaths, commit, fileState, stage, stagedDiff, validatePath, type GitBaseline } from "./git.js";
 
 const packageVersion = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 const program = new Command().name("nerv").description("Local-first Agent Work Harness.").version(packageVersion);
@@ -56,5 +56,53 @@ program.command("status").action(() => action(() => { const status = getWorkspac
 
 function transitionTask(reference: string, position: string, operation: "start" | "block", reason?: string) { const status = workspace(); const repo = openRepository(status.databasePath); let item: WorkItem; let entry: Task; try { item = work(repo, reference); entry = taskAt(repo, item, position); const tasks = repo.listTasks(item.id) as Task[]; if (operation === "start") { if (item.status !== "active" || entry.status !== "pending" || tasks.some((task) => task.status === "active" || task.status === "blocked")) throw new Error(`Task ${entry.position} cannot start.`); repo.updateTask(entry.id, { status: "active" }); } else { if (entry.status !== "active") throw new Error(`Task ${entry.position} must be active.`); repo.updateTask(entry.id, { status: "blocked", block_reason: reason!.trim() }); } item = work(repo, item.id); } finally { repo.close(); } sync(status, item!); console.log(`${operation === "start" ? `Started Task ${entry!.position} in ${item!.ref}.` : `Blocked: Task ${entry!.position} in ${item!.ref}\nReason: ${reason}`}\nRecommended next operation: ${recommendedNext(status, item!)}`); }
 function completeTask(reference: string, position: string, options: { evidence: string; files: string[] }) { const status = workspace(); const repo = openRepository(status.databasePath); let item: WorkItem; let entry: Task; try { item = work(repo, reference); entry = taskAt(repo, item, position); if (entry.status !== "active") throw new Error(`Task ${entry.position} must be active.`); const baseline = JSON.parse(item.git_baseline_json ?? "null"); if (!baseline) throw new Error("Task completion requires an activation Git baseline."); const paths = [...new Set(options.files.map((path) => validatePath(status.repoRoot, path)))].sort(); const baselinePaths = new Set(baseline.dirty.map((dirty: { path: string }) => dirty.path)); const ambiguousBaselinePaths = paths.filter((path) => baselinePaths.has(path)); const attribution: Attribution = { paths: paths.map((path) => fileState(status.repoRoot, path)), ambiguousBaselinePaths }; repo.updateTask(entry.id, { status: "done", validation_evidence: options.evidence.trim(), attribution_json: JSON.stringify(attribution) }); item = work(repo, item.id); } finally { repo.close(); } sync(status, item!); console.log(`Completed Task ${entry!.position} in ${item!.ref}.\nRecommended next operation: ${recommendedNext(status, item!)}`); }
-function closeWork(reference: string, message: string) { const status = workspace(); const repo = openRepository(status.databasePath); try { const item = work(repo, reference); if (item.status !== "review" || repo.latestReview(item.id)?.outcome !== "PASS" || !item.validation_evidence) throw new Error(`Work Item ${item.ref} is not ready to close.`); const baseline = JSON.parse(item.git_baseline_json ?? "null"); if (!baseline || (repo.listTasks(item.id) as Task[]).some((task) => task.status !== "done")) throw new Error("Close requires an activated Work Item with all Tasks done."); const attributed = new Set<string>(); for (const task of repo.listTasks(item.id) as Task[]) { const attribution = task.attribution_json ? JSON.parse(task.attribution_json) as Attribution : null; for (const path of attribution?.paths ?? []) attributed.add(path.path); if (attribution?.ambiguousBaselinePaths?.length) throw new Error("Close blocked: baseline-dirty paths cannot be attributed safely."); } const baselinePaths = new Set<string>(); for (const dirty of baseline.dirty) { baselinePaths.add(dirty.path); const actual = fileState(status.repoRoot, dirty.path); if (actual.state !== dirty.state || actual.hash !== dirty.hash) throw new Error(`Close blocked: baseline-dirty path changed: ${dirty.path}`); } const changed = changedPaths(status.repoRoot, baseline.head); const unowned = changed.filter((path) => !attributed.has(path) && !baselinePaths.has(path)); if (unowned.length) throw new Error(`Close blocked: unattributed changes: ${unowned.join(", ")}`); if (cachedPaths(status.repoRoot).length) throw new Error("Close blocked: Git index is not clean."); stage(status.repoRoot, [...attributed]); if (!stagedDiff(status.repoRoot)) throw new Error("Close blocked: no attributable changes to commit."); const hash = commit(status.repoRoot, `${message}\n\nNerv-Work: ${item.id}\nNerv-Work-Ref: ${item.ref}`); repo.updateWork(item.id, { status: "closed", closed_at: new Date().toISOString(), commit_hash: hash }); removeActiveContext(status.workspaceRoot, item.ref); console.log(`Closed ${item.ref}: ${hash}`); } finally { repo.close(); } }
+function closeWork(reference: string, message: string) {
+  const status = workspace();
+  const repo = openRepository(status.databasePath);
+  try {
+    const item = work(repo, reference);
+    if (item.status !== "review" || repo.latestReview(item.id)?.outcome !== "PASS" || !item.validation_evidence) throw new Error(`Work Item ${item.ref} is not ready to close.`);
+    const baseline = JSON.parse(item.git_baseline_json ?? "null") as GitBaseline | null;
+    if (!baseline || (repo.listTasks(item.id) as Task[]).some((task) => task.status !== "done")) throw new Error("Close requires an activated Work Item with all Tasks done.");
+    if (cachedPaths(status.repoRoot).length) throw new Error("Close blocked: Git index is not clean.");
+    const tasks = repo.listTasks(item.id) as Task[];
+    const attributed = new Set<string>();
+    const ambiguousBaselinePaths = new Set<string>();
+    for (const task of tasks) {
+      const attribution = task.attribution_json ? JSON.parse(task.attribution_json) as Attribution : null;
+      for (const path of attribution?.paths ?? []) attributed.add(path.path);
+      for (const path of attribution?.ambiguousBaselinePaths ?? []) ambiguousBaselinePaths.add(path);
+    }
+    const changed = changedPaths(status.repoRoot, baseline.head);
+    const changedSet = new Set(changed);
+    const baselinePaths = new Set(baseline.dirty.map((dirty) => dirty.path));
+    const unchangedBaselinePaths = new Set(baseline.dirty.filter((dirty) => {
+      const actual = fileState(status.repoRoot, dirty.path);
+      return changedSet.has(dirty.path) && actual.state === dirty.state && actual.hash === dirty.hash;
+    }).map((dirty) => dirty.path));
+    const restoredBaselinePaths = baseline.dirty.filter((dirty) => !changedSet.has(dirty.path)).map((dirty) => dirty.path);
+    const noWorkDiff = changed.every((path) => baselinePaths.has(path) && unchangedBaselinePaths.has(path)) && restoredBaselinePaths.every((path) => attributed.has(path) && ambiguousBaselinePaths.has(path));
+    if (noWorkDiff) {
+      repo.updateWork(item.id, { status: "closed", closed_at: new Date().toISOString(), commit_hash: null });
+      removeActiveContext(status.workspaceRoot, item.ref);
+      console.log(`Closed ${item.ref}: no tracked Git diff.`);
+      return;
+    }
+    if (ambiguousBaselinePaths.size) throw new Error("Close blocked: baseline-dirty paths cannot be attributed safely.");
+    for (const dirty of baseline.dirty) {
+      const actual = fileState(status.repoRoot, dirty.path);
+      if (actual.state !== dirty.state || actual.hash !== dirty.hash) throw new Error(`Close blocked: baseline-dirty path changed: ${dirty.path}`);
+    }
+    const unowned = changed.filter((path) => !attributed.has(path) && !baselinePaths.has(path));
+    if (unowned.length) throw new Error(`Close blocked: unattributed changes: ${unowned.join(", ")}`);
+    stage(status.repoRoot, [...attributed]);
+    if (!stagedDiff(status.repoRoot)) throw new Error("Close blocked: no attributable changes to commit.");
+    const hash = commit(status.repoRoot, `${message}\n\nNerv-Work: ${item.id}\nNerv-Work-Ref: ${item.ref}`);
+    repo.updateWork(item.id, { status: "closed", closed_at: new Date().toISOString(), commit_hash: hash });
+    removeActiveContext(status.workspaceRoot, item.ref);
+    console.log(`Closed ${item.ref}: ${hash}`);
+  } finally {
+    repo.close();
+  }
+}
 await program.parseAsync();

@@ -727,6 +727,8 @@ The default Git model is:
 
 > **One Work Item = one reviewed atomic commit.**
 
+This is the default when a Work Item produces tracked changes. If a PASS-reviewed Work Item has no Work-owned tracked Git diff, Close records the completed Work without manufacturing an empty commit; its commit hash remains null.
+
 Tasks do not create their own commit lifecycle.
 
 Normal flow:

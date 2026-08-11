@@ -44,7 +44,7 @@ Execution implements the approved Tasks, records targeted validation and attribu
 
 `nerv review WORK-###` evaluates the integrated result against intent, Product Context, relevant project authority, the approved boundaries, implementation, diff, validation, Knowledge, and supplied external evidence. PASS makes the Work Item ready for optional verification. REWORK proposes the minimum remediation Tasks without materializing them; `nerv approve` adds approved remediation to the same Work Item.
 
-`nerv close WORK-###` is Git-safe: it requires PASS and validation evidence, stages only attributable Work Item changes, inspects the staged diff, and blocks rather than guessing when unrelated changes cannot be separated. One Work Item produces one reviewed atomic commit by default.
+`nerv close WORK-###` is Git-safe: it requires PASS and validation evidence, stages only attributable Work Item changes, inspects the staged diff, and blocks rather than guessing when unrelated changes cannot be separated. One Work Item produces one reviewed atomic commit by default; a verified clean no-diff outcome closes without manufacturing an empty commit.
 
 `nerv status` is a read-only query. `nerv checkpoint` is only for a genuine interruption.
 
