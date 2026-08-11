@@ -13,18 +13,18 @@ const assert = (value, message) => { if (!value) throw new Error(message); };
 function run(cwd, args, expected = 0) { const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" }); const output = `${result.stdout}${result.stderr}`; if (result.status !== expected) throw new Error(`${args.join(" ")} expected ${expected}: ${output}`); return output; }
 function managedSkill(content) { const marker = content.match(/^nerv_managed_sha256: "[a-f0-9]{64}"$/m); const normalized = content.replace(marker[0], "nerv_managed_sha256: \"\""); return normalized.replace("nerv_managed_sha256: \"\"", `nerv_managed_sha256: "${createHash("sha256").update(normalized).digest("hex")}"`); }
 function git(cwd, args) { return spawnSync("git", args, { cwd, encoding: "utf8" }); }
-function setup() { const repo = mkdtempSync(join(tmpdir(), "nerv-vnext-")); git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]); writeFileSync(join(repo, "README.md"), "base\n"); git(repo, ["add", "README.md"]); git(repo, ["commit", "-m", "initial"]); run(repo, ["init"]); return repo; }
+function setup() { const repo = mkdtempSync(join(tmpdir(), "nerv-smoke-")); git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]); writeFileSync(join(repo, "README.md"), "base\n"); git(repo, ["add", "README.md"]); git(repo, ["commit", "-m", "initial"]); run(repo, ["init"]); return repo; }
 function createWork(repo, title = "Smoke work") { const output = run(repo, ["work", "create", title, "--intent", "intent", "--goal", "goal", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "full"]); const stableId = /Stable ID: ([0-9a-f-]{36})/.exec(output)?.[1]; assert(stableId, "work creation did not report UUID identity"); return stableId; }
 function addAndActivate(repo, ref = "WORK-001") { run(repo, ["work", "add-task", ref, "Implement", "--scope", "scope", "--acceptance-criteria", "criteria", "--validation", "targeted"]); run(repo, ["work", "activate", ref]); }
 function finish(repo, ref = "WORK-001", position = "1", file = "feature.txt") { run(repo, ["work", "task", "start", ref, position]); writeFileSync(join(repo, file), "feature\n"); run(repo, ["work", "task", "done", ref, position, "--evidence", "targeted passed", "--files", file]); }
 
 {
-  const readme = readFileSync(join(root, "README.md"), "utf8"); const productContext = readFileSync(join(root, ".nerv-context/product/product.md"), "utf8"); const design = readFileSync(join(root, "NERV_VNEXT_DESIGN.md"), "utf8"); const publicSkill = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8"); const developmentSkill = readFileSync(join(root, ".agents/skills/nerv-development/SKILL.md"), "utf8");
+  const readme = readFileSync(join(root, "README.md"), "utf8"); const productContext = readFileSync(join(root, ".nerv-context/product/product.md"), "utf8"); const publicSkill = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8"); const developmentSkill = readFileSync(join(root, ".agents/skills/nerv-development/SKILL.md"), "utf8");
   assert(readme.includes("nerv plan") && readme.includes("nerv approve") && readme.includes("nerv review") && readme.includes("nerv close"), "README does not expose the simplified public workflow");
   assert(publicSkill.includes("## Public Workflow") && publicSkill.includes("Recommended next operation") && publicSkill.includes("continue through approved Execution in the same agent interaction") && developmentSkill.includes("Before planning, inspect relevant Product Context") && developmentSkill.includes("Skills, MCPs, plugins") && developmentSkill.includes("Recommended next operation") && developmentSkill.includes("continue through approved Execution in the same agent interaction"), "public and development skills are not semantically aligned");
   assert(existsSync(join(root, ".nerv-context/product/product.md")), "Nerv lacks tracked Product Context");
-  assert(productContext.includes("Semantic Versioning") && design.includes("## 21.1 Versioning And Releases") && readme.includes("## Releases"), "lightweight versioning policy is not documented");
-  assert(productContext.includes("normally continues into Execution in the same agent interaction") && design.includes("normally continues through approved Execution in the same interaction") && readme.includes("normally continues through approved Execution in the same agent interaction"), "automatic execution after approval is not documented");
+  assert(productContext.includes("Semantic Versioning") && readme.includes("## Releases"), "lightweight versioning policy is not documented");
+  assert(productContext.includes("normally continues into Execution in the same agent interaction") && readme.includes("normally continues through approved Execution in the same agent interaction"), "automatic execution after approval is not documented");
   assert(!readFileSync(join(root, "src/workspace.ts"), "utf8").includes("LEGACY_PUBLIC_SKILL_HASHES"), "obsolete managed-skill compatibility remains");
 }
 {
@@ -86,4 +86,4 @@ function finish(repo, ref = "WORK-001", position = "1", file = "feature.txt") { 
     assert(!existsSync(join(repo, ".nerv/agent/active/WORK-001.md")), "no-diff close left active context behind");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 }
-console.log("ok - vNext smoke and E2E coverage");
+console.log("ok - smoke and E2E coverage");

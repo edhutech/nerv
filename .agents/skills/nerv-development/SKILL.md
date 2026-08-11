@@ -1,6 +1,6 @@
 ---
 name: nerv-development
-description: "Develop, review, or validate the Nerv repository using the vNext Work Item protocol. Use for this repository's CLI, SQLite, context, Git-safe close, and validation work. Do not use for consumer repositories that merely use Nerv or for unrelated Node.js work."
+description: "Develop, review, or validate the Nerv repository using the Nerv Work Item protocol. Use for this repository's CLI, SQLite, context, Git-safe close, and validation work. Do not use for consumer repositories that merely use Nerv or for unrelated Node.js work."
 ---
 
 # Nerv Development
@@ -13,7 +13,7 @@ Read only the authority relevant to the request, in this order:
 
 1. The developer's current decision.
 2. `.nerv-context/product/` for canonical product direction.
-3. `NERV_VNEXT_DESIGN.md`, `AGENTS.md`, and other applicable authoritative repository guidance.
+3. `AGENTS.md` and other applicable authoritative repository guidance.
 4. Generic external guidance.
 
 SQLite is the durable operational source of truth. `.nerv/repo/` contains generated local observations; do not edit `.nerv/` state or `dist/` directly.
@@ -35,7 +35,7 @@ End every governed interaction with one concise **Recommended next operation**. 
 
 ## Planning And Approval
 
-Before planning, inspect relevant Product Context. If it is missing or scaffold-only, establish the minimum confirmed product understanding with the developer before materializing work; record only confirmed facts. Inspect relevant implementation, `NERV_VNEXT_DESIGN.md`, `AGENTS.md`, and focused local or shared Knowledge.
+Before planning, inspect relevant Product Context. If it is missing or scaffold-only, establish the minimum confirmed product understanding with the developer before materializing work; record only confirmed facts. Inspect relevant implementation, `AGENTS.md`, and focused local or shared Knowledge.
 
 Surface a concise non-blocking warning only when the intended direction materially conflicts with Product Context or relevant authority and has no safe interpretation. The developer may proceed, adjust the implementation, or update Product Context; do not rewrite canonical context without confirmation.
 

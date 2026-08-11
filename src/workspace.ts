@@ -26,7 +26,7 @@ export function getWorkspaceStatus(start: string): WorkspaceStatus {
 }
 export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync } {
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
-  if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db is not a vNext Nerv database; remove generated .nerv state and run `nerv init` again");
+  if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db is not a compatible Nerv database; remove generated .nerv state and run `nerv init` again");
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath);
   ensureGitIgnore(repoRoot);

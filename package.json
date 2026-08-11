@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke": "node scripts/smoke-vnext.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "validate": "pnpm build && pnpm typecheck && pnpm smoke"
   },
   "devDependencies": {

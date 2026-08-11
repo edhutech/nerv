@@ -17,7 +17,7 @@
 - Work Items have UUID stable IDs and local `WORK-###` refs. Tasks have UUID identities and positions scoped to their Work Item, with no global `TASK-###` ref. Git trailers are `Nerv-Work` (UUID) and `Nerv-Work-Ref` (friendly ref). Do not derive work numbering from Git.
 - `.nerv/` is gitignored, generated workspace state. Create and access it through `workspace.ts` and repository helpers, never by assuming it exists or editing `dist/`.
 
-## vNext Boundaries
+## Lifecycle Boundaries
 
 - The normal lifecycle is Work Item planning, human approval, Task execution, validation, Work Review, and Git-safe close. Checkpoints are exceptional recovery evidence.
 - Do not add a standalone Task lifecycle, Runs, Builds, Intake, Proposal, formal Task Review, or Task Close behavior.
