@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "89622ad2a1e705358ff98a2e67c175cde66d757788553d395783089973ab2426"
+nerv_managed_sha256: "a4453a44d597ee42b7bf29a06d605cb0ca7539e21d763c4936b4e76efd77a3dd"
 ---
 
 # Nerv
@@ -43,9 +43,9 @@ Derive the goal, scope, Tasks, and acceptance criteria from Product Context and 
 
 ### Approve And Execute
 
-`nerv approve` materializes the currently approved Work Item and Tasks, activates the Work Item, and persists compact execution guidance in the Work and Task scopes. It reports readiness for execution; approval does not implement code.
+`nerv approve` materializes the currently approved Work Item and Tasks, activates the Work Item, and persists compact execution guidance in the Work and Task scopes. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
 
-Execution uses the active Work context to complete each approved Task, run targeted validation, record evidence and attributable paths, then run full validation. Do not require approval between normal Tasks. Stop and return evidence for a material scope expansion, architecture change, Product Context conflict, authoritative-context conflict, or genuine block. Use a checkpoint only for a genuine interruption.
+Execution uses the active Work context to complete each approved Task, run targeted validation, record evidence and attributable paths, then run full validation. Do not require approval between normal Tasks. Stop and return evidence for an explicit developer request, material scope expansion, architecture change, Product Context conflict, authoritative-context conflict, or genuine block. Use a checkpoint only for a genuine interruption.
 
 ### Review And Close
 

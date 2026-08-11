@@ -38,9 +38,9 @@ intent
   -> nerv close WORK-###
 ```
 
-`nerv plan` is an agent-facing planning operation: it inspects the relevant Product Context, repository evidence, authoritative project guidance, and focused Knowledge before showing a non-durable execution-ready Plan Preview. `nerv approve` approves the currently proposed change, materializes its Work Item and Tasks, activates it, and leaves it ready for execution. The runtime remains agent agnostic and never calls an AI API; it provides deterministic primitives behind these operations rather than attempting to perform planning itself.
+`nerv plan` is an agent-facing planning operation: it inspects the relevant Product Context, repository evidence, authoritative project guidance, and focused Knowledge before showing a non-durable execution-ready Plan Preview. `nerv approve` approves the currently proposed change, materializes its Work Item and Tasks, activates it, and normally continues through approved Execution in the same agent interaction. The runtime remains agent agnostic and never calls an AI API; it provides deterministic primitives behind these operations rather than attempting to perform planning itself.
 
-Execution implements the approved Tasks, records targeted validation and attributable paths, and stops for Work Review. A material scope or context conflict returns evidence for replanning; incidental implementation differences inside the approved outcome do not create ceremony.
+Execution implements the approved Tasks, records targeted validation and attributable paths, and stops for Work Review. Stop execution only for an explicit developer request, a material scope or context conflict, a genuine block, or an exceptional checkpoint; incidental implementation differences inside the approved outcome do not create ceremony.
 
 `nerv review WORK-###` evaluates the integrated result against intent, Product Context, relevant project authority, the approved boundaries, implementation, diff, validation, Knowledge, and supplied external evidence. PASS makes the Work Item ready for optional verification. REWORK proposes the minimum remediation Tasks without materializing them; `nerv approve` adds approved remediation to the same Work Item.
 

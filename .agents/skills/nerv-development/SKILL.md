@@ -43,11 +43,11 @@ Relevant Skills, MCPs, plugins, and specialized tools may provide guidance, assi
 
 Before approval, show a concise Plan Preview with a proposed Work Item, goal, scope, expected touchpoints, meaningful out-of-scope boundaries, acceptance criteria, full validation, and execution-ready Tasks. Each Task needs a bounded objective, intended approach based on repository evidence, touchpoints when useful, task acceptance criteria, and targeted validation. Do not assign a durable Work reference or persist speculative plans.
 
-`nerv-dev approve` materializes approved Work and Tasks, activates the Work Item, and persists compact execution handoff context. It does not implement code.
+`nerv-dev approve` materializes approved Work and Tasks, activates the Work Item, and persists compact execution handoff context. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record validation and attribution, run `pnpm validate`, then report readiness for Work Review. This is agent workflow behavior, not runtime agent control.
 
 ## Execution And Review
 
-Execution uses the active Work context to implement approved Tasks, run targeted validation, persist evidence and attribution, and mark Tasks done. Do not replan ordinary execution. Stop with evidence for a material scope expansion, architecture change, Product Context or authoritative-context conflict, or genuine block. After full validation, the Work Item is ready for Work Review.
+Execution uses the active Work context to implement approved Tasks, run targeted validation, persist evidence and attribution, and mark Tasks done. Do not replan ordinary execution. Stop with evidence for an explicit developer request, material scope expansion, architecture change, Product Context or authoritative-context conflict, or genuine block. After full validation, the Work Item is ready for Work Review.
 
 `nerv-dev review` evaluates the integrated implementation, diff, validation evidence, context, Knowledge, external evidence, regressions, and risks. PASS is ready for optional user or external verification, then Close on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. `nerv-dev approve` adds approved remediation to the same Work Item and reactivates it.
 

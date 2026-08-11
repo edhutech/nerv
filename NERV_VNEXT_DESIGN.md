@@ -360,6 +360,8 @@ apply-proposal
 
 Approval must remain conceptually simple.
 
+After approval materializes and activates the Work Item, the agent normally continues through approved Execution in the same interaction. This is agent workflow behavior, not runtime agent control: Nerv still exposes deterministic primitives and does not launch or route agents. Stop only for an explicit developer request, a material conflict or scope change, a genuine implementation block, or an exceptional checkpoint.
+
 ---
 
 ## 9. Execution
