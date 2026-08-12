@@ -12,7 +12,7 @@ Use this skill to develop Nerv itself. It defines the `nerv-dev` agent workflow 
 Read only the authority relevant to the request, in this order:
 
 1. The developer's current decision.
-2. `.nerv-context/product/` for canonical product direction.
+2. Relevant portions of `.nerv-context/product.md` for canonical product direction and `.nerv-context/repo.md` for durable repository truth.
 3. `AGENTS.md` and other applicable authoritative repository guidance.
 4. Generic external guidance.
 
@@ -35,7 +35,7 @@ End every governed interaction with one concise **Recommended next operation**. 
 
 ## Planning And Approval
 
-Before the `nerv-dev plan` protocol operation, inspect relevant Product Context. If it is missing or scaffold-only, establish the minimum confirmed product understanding with the developer before materializing work; record only confirmed facts. Inspect relevant implementation, `AGENTS.md`, and focused local or shared Knowledge. After approval, translate `nerv-dev approve` in this order: create the Work with its approved title, intent, goal, scope, Work acceptance criteria, and full validation; add every approved Task with its title, scope, Task acceptance criteria, and targeted validation; then activate the Work. Use `nerv work create`, `nerv work add-task`, and `nerv work activate` directly for that materialization; use `nerv --help` only for exact primitive arguments, never to discover whether `nerv-dev` exists.
+Before the `nerv-dev plan` protocol operation, inspect only relevant portions of `.nerv-context/product.md` and `.nerv-context/repo.md`; do not load either file ritualistically. If required context is missing, minimal, or insufficient, establish only the minimum confirmed truth needed for the Work. Product facts require current developer statements, authoritative product documentation, or confirmed behavior; do not infer speculative product strategy. Repository facts may be derived from authoritative repository evidence. Update either file only when the Work establishes or changes durable current truth, replacing outdated truth rather than appending Work history. Inspect relevant implementation, `AGENTS.md`, and focused local or shared Knowledge. After approval, translate `nerv-dev approve` in this order: create the Work with its approved title, intent, goal, scope, Work acceptance criteria, and full validation; add every approved Task with its title, scope, Task acceptance criteria, and targeted validation; then activate the Work. Use `nerv work create`, `nerv work add-task`, and `nerv work activate` directly for that materialization; use `nerv --help` only for exact primitive arguments, never to discover whether `nerv-dev` exists.
 
 Surface a concise non-blocking warning only when the intended direction materially conflicts with Product Context or relevant authority and has no safe interpretation. The developer may proceed, adjust the implementation, or update Product Context; do not rewrite canonical context without confirmation.
 

@@ -12,7 +12,7 @@ A Work Item is the governed unit of work. It contains one or more bounded Tasks.
 
 The normal flow is: relevant Product Context, plan preview, human approval, materialize, execute Tasks, validate, Work Review, optional user or external verification, then Git-safe close on request. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
 
-SQLite is the durable local operational source of truth. Each Work Item has a stable UUID and a local friendly `WORK-###` reference; Tasks have UUID identities and positions scoped within their Work Item, never global task references. Shared canonical context is tracked in `.nerv-context/{product,repo,knowledge}`. `.nerv/` is local ignored state, including generated repository observations and temporary active context.
+SQLite is the durable local operational source of truth. Each Work Item has a stable UUID and a local friendly `WORK-###` reference; Tasks have UUID identities and positions scoped within their Work Item, never global task references. Shared canonical context is tracked in `.nerv-context/product.md` and `.nerv-context/repo.md`; promoted Knowledge remains tracked separately under `.nerv-context/knowledge/`. `.nerv/` is local ignored state, including generated repository observations and temporary active context.
 
 ## Install
 
@@ -50,13 +50,15 @@ Execution implements the approved Tasks, records targeted validation and attribu
 
 ## Context Infrastructure
 
-Before planning product work, inspect relevant tracked `.nerv-context/product/` files. If they are absent or only placeholders, establish and record only the minimum confirmed product understanding before materializing work. Product Context governs both planning and review.
+`product.md` holds compact current product truth: what is being built, for whom, core capabilities, product invariants, boundaries, and current direction. `repo.md` holds compact durable repository truth: stack, architecture, important paths, development rules, generated/local state, validation, and repository invariants. Planning and Review use only relevant portions, not the entire context surface by default.
+
+`nerv init` creates minimal canonical headings for both files but does not inspect the repository, invent facts, or run a wizard. When relevant context is insufficient, establish only the minimum confirmed truth needed for the Work. Product facts require developer statements, authoritative product documentation, or confirmed behavior; do not infer strategy from code. Repository facts may be derived from authoritative repository evidence. Update either file only when durable current truth changes, replacing obsolete truth rather than adding Work history or evolution logs. Legacy `product/` and `repo/facts.md` context is preserved and reported for deliberate consolidation.
 
 Planning uses this precedence: the developer's current decision, Product Context, relevant authoritative project or domain guidance, then generic external guidance. Surface only material conflicts. Skills, MCPs, plugins, and specialized tools can assist when relevant, but cannot bypass Plan Preview, approval, Work boundaries, Work Review, or Git-safe Close.
 
 Plan Previews distinguish Work-level Expected touchpoints, which describe the Work boundary, from Task-level Expected touchpoints, which describe where each Task is expected to act. When repository evidence makes Task touchpoints clear, show them even if the Work-level field names the same paths; omit them only when genuinely inapplicable rather than adding boilerplate.
 
-Shared Product Context, explicit shared Repo Context, and selectively promoted Knowledge are tracked in `.nerv-context/`. SQLite Knowledge and `.nerv/` operational state remain local. The low-level `work`, `product`, `repo`, and `knowledge` commands are deterministic implementation primitives; use `nerv --help` when an agent needs their exact arguments.
+Shared Product Context, shared Repo Context, and selectively promoted Knowledge are tracked in `.nerv-context/`. SQLite Knowledge and `.nerv/` operational state remain local. The low-level `work`, `product`, `repo`, and `knowledge` commands are deterministic implementation primitives; use `nerv --help` when an agent needs their exact arguments.
 
 For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent skill. For development of Nerv itself, `.agents/skills/nerv-development/SKILL.md` adds repository-specific constraints without creating a second lifecycle.
 

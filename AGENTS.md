@@ -12,7 +12,7 @@
 - This is a Node.js TypeScript ESM CLI; the runtime entrypoint is `src/index.ts`, compiled to `dist/index.js` for the `nerv` bin.
 - TypeScript uses `module: NodeNext`; local TS imports should use `.js` specifiers, matching existing files.
 - SQLite is the durable operational source of truth. Work Items govern work, Tasks belong to Work Items, and Markdown is only minimal temporary active context.
-- Shared Product Context, explicit shared Repo Context, and promoted knowledge are tracked under `.nerv-context/`. Generated Repo observations, operational state, and active Markdown remain local under `.nerv/`. Durable local knowledge is small and searchable; promote only stable observations as one small shared record.
+- Shared current product truth is `.nerv-context/product.md`; shared durable repository truth is `.nerv-context/repo.md`; promoted knowledge remains under `.nerv-context/knowledge/`. Generated Repo observations, operational state, and active Markdown remain local under `.nerv/`. Durable local knowledge is small and searchable; promote only stable observations as one small shared record.
 - The runtime CLI is agent agnostic. It must not launch, control, route, or require coding agents or models.
 - Work Items have UUID stable IDs and local `WORK-###` refs. Tasks have UUID identities and positions scoped to their Work Item, with no global `TASK-###` ref. Git trailers are `Nerv-Work` (UUID) and `Nerv-Work-Ref` (friendly ref). Do not derive work numbering from Git.
 - `.nerv/` is gitignored, generated workspace state. Create and access it through `workspace.ts` and repository helpers, never by assuming it exists or editing `dist/`.

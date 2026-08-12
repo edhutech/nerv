@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
@@ -7,6 +7,11 @@ const DIRS = [".nerv", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as con
 const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 type SkillSync = { status: "installed" | "current" | "updated" | "preserved"; message?: string };
+export type SharedContextSync = { created: string[]; legacy: string[] };
+const SHARED_CONTEXT_FILES = [
+  ["product.md", "# Product\n\n## What it is\n\n## Users and problem\n\n## Core capabilities\n\n## Product invariants\n\n## Boundaries\n\n## Current direction\n"],
+  ["repo.md", "# Repository\n\n## Stack\n\n## Architecture\n\n## Important paths\n\n## Development rules\n\n## Generated and local state\n\n## Validation\n\n## Repository invariants\n"],
+] as const;
 
 export function findRepoRoot(start: string): string | null {
   let current = resolve(start);
@@ -24,14 +29,29 @@ export function getWorkspaceStatus(start: string): WorkspaceStatus {
   const databasePath = join(workspaceRoot, "nerv.db");
   return { repoRoot, workspaceRoot, databasePath, initialized: DIRS.every((dir) => isDirectory(join(repoRoot, dir))) && existsSync(databasePath) && hasRequiredSchema(databasePath) };
 }
-export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync } {
+export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync; contextSync: SharedContextSync } {
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db is not a compatible Nerv database; remove generated .nerv state and run `nerv init` again");
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath);
   ensureGitIgnore(repoRoot);
   const skillSync = ensurePublicSkill(repoRoot);
-  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillSync };
+  const contextSync = ensureSharedContext(repoRoot);
+  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillSync, contextSync };
+}
+export function ensureSharedContext(repoRoot: string): SharedContextSync {
+  const directory = join(repoRoot, ".nerv-context");
+  mkdirSync(directory, { recursive: true });
+  const created: string[] = [];
+  for (const [name, content] of SHARED_CONTEXT_FILES) {
+    const path = join(directory, name);
+    if (!existsSync(path)) { writeFileSync(path, content, "utf8"); created.push(name); }
+  }
+  const legacy: string[] = [];
+  const legacyProduct = join(directory, "product");
+  if (existsSync(legacyProduct) && statSync(legacyProduct).isDirectory() && readdirSync(legacyProduct).some((entry) => entry.endsWith(".md"))) legacy.push(".nerv-context/product/");
+  if (existsSync(join(directory, "repo", "facts.md"))) legacy.push(".nerv-context/repo/facts.md");
+  return { created, legacy };
 }
 function ensureGitIgnore(repoRoot: string): void {
   const path = join(repoRoot, ".gitignore");
