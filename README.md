@@ -42,7 +42,7 @@ intent
 
 Execution implements the approved Tasks, records targeted validation and attributable paths, and stops for Work Review. Stop execution only for an explicit developer request, a material scope or context conflict, a genuine block, or an exceptional checkpoint; incidental implementation differences inside the approved outcome do not create ceremony.
 
-`nerv review WORK-###` evaluates the integrated result against intent, Product Context, relevant project authority, the approved boundaries, implementation, diff, validation, Knowledge, and supplied external evidence. PASS makes the Work Item ready for optional verification. REWORK proposes the minimum remediation Tasks without materializing them; `nerv approve` adds approved remediation to the same Work Item.
+`nerv review WORK-###` evaluates the integrated result against intent, Product Context, relevant project authority, the approved boundaries, implementation, diff, validation, Knowledge, and supplied external evidence. PASS makes the Work Item ready for optional verification. REWORK requires findings and a minimum execution-ready remediation preview before recommending approval; `nerv approve` adds approved remediation to the same Work Item without materializing it first.
 
 `nerv close WORK-###` is Git-safe: it requires PASS and validation evidence, stages only attributable Work Item changes, inspects the staged diff, and blocks rather than guessing when unrelated changes cannot be separated. One Work Item produces one reviewed atomic commit by default; a verified clean no-diff outcome closes without manufacturing an empty commit.
 
@@ -53,6 +53,8 @@ Execution implements the approved Tasks, records targeted validation and attribu
 Before planning product work, inspect relevant tracked `.nerv-context/product/` files. If they are absent or only placeholders, establish and record only the minimum confirmed product understanding before materializing work. Product Context governs both planning and review.
 
 Planning uses this precedence: the developer's current decision, Product Context, relevant authoritative project or domain guidance, then generic external guidance. Surface only material conflicts. Skills, MCPs, plugins, and specialized tools can assist when relevant, but cannot bypass Plan Preview, approval, Work boundaries, Work Review, or Git-safe Close.
+
+Plan Previews distinguish Work-level Expected touchpoints, which describe the Work boundary, from Task-level Expected touchpoints, which describe where each Task is expected to act. When repository evidence makes Task touchpoints clear, show them even if the Work-level field names the same paths; omit them only when genuinely inapplicable rather than adding boilerplate.
 
 Shared Product Context, explicit shared Repo Context, and selectively promoted Knowledge are tracked in `.nerv-context/`. SQLite Knowledge and `.nerv/` operational state remain local. The low-level `work`, `product`, `repo`, and `knowledge` commands are deterministic implementation primitives; use `nerv --help` when an agent needs their exact arguments.
 

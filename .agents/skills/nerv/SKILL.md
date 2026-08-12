@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "1e6b3fcc298d437de7ebf62fbc3296c0936a96a724ab0efbd541ff34769d88e5"
+nerv_managed_sha256: "639cce160a5762dc6e5678be33044f8e66c816e2dad6cfe7137c1ffbb1f0d843"
 ---
 
 # Nerv
@@ -59,9 +59,9 @@ Acceptance criteria: <integrated Work-level completion criteria>
 Full validation: <commands or checks>
 ```
 
-Derive the goal, scope, Tasks, and acceptance criteria from Product Context and the request. Every applicable Work-level and Task-level field must be visible in the preview, not merely considered internally. Do not collapse meaningful exclusions into Scope or rely only on Task criteria when integrated Work-level criteria are meaningful. Keep fields concise and omit a field only when it genuinely does not apply. Expected touchpoints guide execution, not a file allowlist. Implementation approach describes the intended solution path based on repository evidence; it is not a low-level coding script. Apply this same structure to remediation Tasks proposed after REWORK.
+Derive the goal, scope, Tasks, and acceptance criteria from Product Context and the request. Every applicable Work-level and Task-level field must be visible in the preview, not merely considered internally. Do not collapse meaningful exclusions into Scope or rely only on Task criteria when integrated Work-level criteria are meaningful. Keep fields concise and omit a field only when it genuinely does not apply. Work-level Expected touchpoints describe the Work boundary; Task-level Expected touchpoints describe where that Task is expected to act. Show Task-level touchpoints explicitly when repository evidence makes them clear, even when the Work-level field already names the same location. Expected touchpoints guide execution, not a file allowlist; do not invent boilerplate touchpoints when none are evidenced. Implementation approach describes the intended solution path based on repository evidence; it is not a low-level coding script. Apply this same structure to remediation Tasks proposed after REWORK.
 
-A Plan Preview is not ready for approval when applicable Work-level or Task-level information is missing and the execution boundary is less reviewable, or when its Tasks are only titles, vague summaries, or otherwise require Execution to redesign the implementation path. Revise the preview before recommending `nerv approve`.
+A Plan Preview is not ready for approval when applicable Work-level or Task-level information is missing, including repository-evidenced Task-level Expected touchpoints, and the execution boundary is less reviewable, or when its Tasks are only titles, vague summaries, or otherwise require Execution to redesign the implementation path. Revise the preview before recommending `nerv approve`.
 
 Do not assign a durable `WORK-###` reference in the preview or materialize speculative plans.
 
