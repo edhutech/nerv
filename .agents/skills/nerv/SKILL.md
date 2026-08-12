@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "639cce160a5762dc6e5678be33044f8e66c816e2dad6cfe7137c1ffbb1f0d843"
+nerv_managed_sha256: "19d9e194631ad1b5d98a9083e492e2fddf1b3cfbf70b4d921aeb21836eabc3ae"
 ---
 
 # Nerv
@@ -12,13 +12,13 @@ Nerv is agent agnostic. Use its deterministic runtime primitives; do not create 
 
 ## Public Workflow
 
-The normal operations are `nerv plan`, `nerv approve`, `nerv review`, and `nerv close`. `nerv status` is read-only; `nerv checkpoint` is exceptional recovery evidence. The runtime is agent and provider agnostic: these agent-facing operations use its deterministic primitives and never require the runtime to call an AI API.
+The normal operations are `nerv plan`, `nerv approve`, `nerv review`, and `nerv close`. They are agent-facing protocol operations, not necessarily literal shell commands. Do not blindly execute a command because it appears in this workflow. `nerv review` and `nerv close` are runtime commands; `nerv plan` is the agent's planning protocol and `nerv approve` is the developer approval boundary. Translate those protocol operations directly through the deterministic `work` primitives when persistence is required. `nerv status` is read-only; `nerv checkpoint` is exceptional recovery evidence. The runtime is agent and provider agnostic and never requires the runtime to call an AI API.
 
 End every governed interaction with one concise **Recommended next operation**. Prefer `nerv approve` after a Plan Preview or REWORK remediation proposal, `nerv review WORK-###` after approved execution and full validation, and `nerv close WORK-###` after explaining optional verification on PASS. During Execution, use phase-level continuation such as `Continue with Task 2.` rather than exposing persistence primitives. After Close, state that no further Nerv lifecycle operation is required.
 
 ### Plan
 
-Before `nerv plan "<intent>"`, inspect only relevant Product Context, implementation, authoritative project or domain guidance, and focused local or shared Knowledge. In a fresh session, reconstruct existing work from SQLite, active context, canonical context, and Git state, not conversational memory.
+Before the `nerv plan "<intent>"` protocol operation, inspect only relevant Product Context, implementation, authoritative project or domain guidance, and focused local or shared Knowledge. In a fresh session, reconstruct existing work from SQLite, active context, canonical context, and Git state, not conversational memory. After the developer approves, translate `nerv approve` by using the required `work create`, `work add-task`, and `work activate` primitives for the approved preview; use `nerv --help` only to obtain their exact arguments. Never probe whether `nerv plan` or `nerv approve` exists as a literal command.
 
 For product work, treat missing or placeholder Product Context as empty. Establish the minimum confirmed product understanding before materializing a Work Item, then record only confirmed facts in tracked Product Context. Do not create another lifecycle for this preparation.
 
@@ -67,7 +67,7 @@ Do not assign a durable `WORK-###` reference in the preview or materialize specu
 
 ### Approve And Execute
 
-`nerv approve` materializes the currently approved Work Item and Tasks, activates the Work Item, and persists compact execution guidance in the Work and Task scopes. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
+`nerv approve` is satisfied by materializing the currently approved Work Item and Tasks with the deterministic primitives, activating the Work Item, and persisting compact execution guidance in the Work and Task scopes. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
 
 Execution uses the active Work context to complete each approved Task, run targeted validation, record evidence and attributable paths, then run full validation. Do not require approval between normal Tasks. After successful Execution and validation, stop before Work Review and report:
 
@@ -83,12 +83,12 @@ Do not invoke or simulate `nerv review`, record PASS or REWORK, proceed to optio
 
 ### Review And Close
 
-`nerv review WORK-###` evaluates intent, Product Context, relevant Repo Context and project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, Knowledge, external evidence, regressions, and risks.
+`nerv review WORK-###` evaluates intent, Product Context, relevant Repo Context and project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, Knowledge, external evidence, regressions, and risks. Classify every finding as `critical`, `high`, `medium`, or `low`. Critical and high findings always require REWORK. Medium findings require REWORK unless the developer explicitly accepts them as durable residual risk. Low findings are residual by default. Review has one Work-level outcome only: PASS or REWORK.
 
-PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. REWORK persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
+PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. Show residual low findings and explicitly accepted medium risks, and state that they do not block Close. REWORK first shows severity-labeled findings and which findings block PASS, then persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
 
 Close selectively stages Work-owned changes, inspects the staged diff, and blocks unsafe boundaries. Never use `git add -A`; one Work Item produces one reviewed atomic commit by default.
 
 ## Deterministic Primitives
 
-The runtime retains `work`, `product`, `repo`, and `knowledge` persistence commands for agents implementing an approved path. They are not the normal developer-facing lifecycle. Use `nerv --help` only when exact primitive arguments are needed.
+The runtime retains `work`, `product`, `repo`, and `knowledge` persistence commands for agents implementing an approved path. They are not the normal developer-facing lifecycle. Use `nerv --help` only when exact primitive arguments are needed, not to discover how to interpret protocol operations.
