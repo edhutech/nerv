@@ -24,7 +24,7 @@ Developers need compact durable work context across sessions without historical 
 
 ## Boundaries
 
-Nerv has no agent hosting, model routing, sync service, parallel lifecycle, or persistent conversation-memory requirement.
+Nerv governs work; it is not an agent memory or code-intelligence system. Nerv has no agent hosting, model routing, sync service, parallel lifecycle, or persistent conversation-memory requirement.
 
 ## Current direction
 
