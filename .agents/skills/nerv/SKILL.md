@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "19d9e194631ad1b5d98a9083e492e2fddf1b3cfbf70b4d921aeb21836eabc3ae"
+nerv_managed_sha256: "d643c8418b333061f704738699a56c9bc89e9c4c6f4247a0393dcd34eb174297"
 ---
 
 # Nerv
@@ -18,7 +18,7 @@ End every governed interaction with one concise **Recommended next operation**. 
 
 ### Plan
 
-Before the `nerv plan "<intent>"` protocol operation, inspect only relevant Product Context, implementation, authoritative project or domain guidance, and focused local or shared Knowledge. In a fresh session, reconstruct existing work from SQLite, active context, canonical context, and Git state, not conversational memory. After the developer approves, translate `nerv approve` by using the required `work create`, `work add-task`, and `work activate` primitives for the approved preview; use `nerv --help` only to obtain their exact arguments. Never probe whether `nerv plan` or `nerv approve` exists as a literal command.
+Before the `nerv plan "<intent>"` protocol operation, inspect only relevant Product Context, implementation, authoritative project or domain guidance, and focused local or shared Knowledge. In a fresh session, reconstruct existing work from SQLite, active context, canonical context, and Git state, not conversational memory. After the developer approves, translate `nerv approve` in this order: create the Work with its approved title, intent, goal, scope, Work acceptance criteria, and full validation; add every approved Task with its title, scope, Task acceptance criteria, and targeted validation; then activate the Work. Use the required `work create`, `work add-task`, and `work activate` primitives for that materialization; use `nerv --help` only to obtain their exact arguments. Never probe whether `nerv plan` or `nerv approve` exists as a literal command.
 
 For product work, treat missing or placeholder Product Context as empty. Establish the minimum confirmed product understanding before materializing a Work Item, then record only confirmed facts in tracked Product Context. Do not create another lifecycle for this preparation.
 
@@ -69,7 +69,7 @@ Do not assign a durable `WORK-###` reference in the preview or materialize specu
 
 `nerv approve` is satisfied by materializing the currently approved Work Item and Tasks with the deterministic primitives, activating the Work Item, and persisting compact execution guidance in the Work and Task scopes. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
 
-Execution uses the active Work context to complete each approved Task, run targeted validation, record evidence and attributable paths, then run full validation. Do not require approval between normal Tasks. After successful Execution and validation, stop before Work Review and report:
+Execution uses the active Work context to complete each approved Task in order: start the pending Task, perform its approved implementation, run its targeted validation, then mark it done with validation evidence and attributable paths before starting the next Task. Do not require approval between normal Tasks. After successful Execution and validation, stop before Work Review and report:
 
 ```text
 Execution complete.
@@ -83,9 +83,9 @@ Do not invoke or simulate `nerv review`, record PASS or REWORK, proceed to optio
 
 ### Review And Close
 
-`nerv review WORK-###` evaluates intent, Product Context, relevant Repo Context and project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, Knowledge, external evidence, regressions, and risks. Classify every finding as `critical`, `high`, `medium`, or `low`. Critical and high findings always require REWORK. Medium findings require REWORK unless the developer explicitly accepts them as durable residual risk. Low findings are residual by default. Review has one Work-level outcome only: PASS or REWORK.
+`nerv review WORK-###` evaluates intent, Product Context, relevant Repo Context and project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, Knowledge, external evidence, regressions, and risks. A Nerv Review outcome exists only after this runtime command succeeds and persists it; narrative analysis alone is not a completed Nerv Review and must not recommend approval. Classify every finding as `critical`, `high`, `medium`, or `low`. Critical and high findings always require REWORK. Medium findings require REWORK unless the developer explicitly accepts them as durable residual risk. Low findings are residual by default. Review has one Work-level outcome only: PASS or REWORK.
 
-PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. Show residual low findings and explicitly accepted medium risks, and state that they do not block Close. REWORK first shows severity-labeled findings and which findings block PASS, then persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
+PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. Show residual low findings and explicitly accepted medium risks, and state that they do not block Close. Every persisted REWORK, including a Review after remediation, first shows severity-labeled findings and which findings block PASS, then persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
 
 Close selectively stages Work-owned changes, inspects the staged diff, and blocks unsafe boundaries. Never use `git add -A`; one Work Item produces one reviewed atomic commit by default.
 
