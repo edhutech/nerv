@@ -1,6 +1,6 @@
 {
   "name": "nerv",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Local-first agent work harness for developers who work with coding agents.",
   "license": "Apache-2.0",
   "type": "module",
