@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
-import { canUpgradeKnowledgeSchema, hasRequiredSchema, initializeDatabase } from "./database.js";
+import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
 const DIRS = [".nerv", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as const;
 const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
@@ -31,7 +31,7 @@ export function getWorkspaceStatus(start: string): WorkspaceStatus {
 }
 export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync; contextSync: SharedContextSync } {
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
-  if (existsSync(databasePath) && !hasRequiredSchema(databasePath) && !canUpgradeKnowledgeSchema(databasePath)) throw new Error("existing .nerv/nerv.db is not a compatible Nerv database; remove generated .nerv state and run `nerv init` again");
+  if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db uses an unsupported generated schema; remove .nerv and run `nerv init` again");
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath);
   ensureGitIgnore(repoRoot);

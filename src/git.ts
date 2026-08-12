@@ -3,14 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { relative, resolve } from "node:path";
 
-export type GitBaseline = { head: string; dirty: Array<FileState & { origin: "tracked" | "untracked" }> };
+export type GitBaseline = { head: string; dirty: FileState[] };
 export type FileState = { path: string; state: "present" | "deleted"; hash: string | null };
 function git(root: string, args: string[]) { return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim(); }
 export function captureBaseline(root: string): GitBaseline {
   try { git(root, ["diff", "--cached", "--quiet"]); } catch { throw new Error("Work Item activation requires a clean Git index."); }
   let head: string; try { head = git(root, ["rev-parse", "HEAD"]); } catch { throw new Error("Work Item activation requires an existing HEAD commit."); }
-  const untracked = new Set(git(root, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean));
-  return { head, dirty: changedPaths(root, head).map((path) => ({ ...fileState(root, path), origin: untracked.has(path) ? "untracked" : "tracked" })) };
+  return { head, dirty: changedPaths(root, head).map((path) => fileState(root, path)) };
 }
 export function changedPaths(root: string, head: string): string[] {
   const tracked = git(root, ["diff", "--name-only", head]).split("\n").filter(Boolean);

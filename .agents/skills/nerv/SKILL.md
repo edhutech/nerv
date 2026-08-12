@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "ebb0e6f1fa2f00f94e84b38257dbf06f34dc5ea59d44d355a68dca4625c8cc13"
+nerv_managed_sha256: "269fc65a6fa579e5d44576c7f92e0a6b94e338d1529aca2631e41ee11142198f"
 ---
 
 # Nerv
@@ -67,7 +67,7 @@ Do not assign a durable `WORK-###` reference in the preview or materialize specu
 
 ### Approve And Execute
 
-`nerv approve` is satisfied by materializing the currently approved Work Item and Tasks with the deterministic primitives, activating the Work Item, and persisting compact execution guidance in the Work and Task scopes. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
+`nerv approve` is satisfied by atomically materializing the complete currently approved Work Item and every approved Task with the deterministic persistence primitive, including its activation baseline, then persisting compact execution guidance. The Task contract maps directly from the Plan Preview: title, objective, implementation approach, expected touchpoints, acceptance criteria, and targeted validation. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
 
 Execution uses the active Work context to complete each approved Task in order: start the pending Task, perform its approved implementation, run its targeted validation, then mark it done with validation evidence and attributable paths before starting the next Task. Do not require approval between normal Tasks. After successful Execution and validation, stop before Work Review and report:
 
