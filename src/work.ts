@@ -23,7 +23,6 @@ export function syncActiveContext(workspaceRoot: string, work: WorkItem, tasks: 
 export function removeActiveContext(workspaceRoot: string, workRef: string) { const path = activePath(workspaceRoot, workRef); if (existsSync(path)) rmSync(path); }
 export function nextOperation(work: WorkItem, tasks: Task[], review: Review | null): string {
   if (work.status === "closed") return "No further Nerv lifecycle operation is required.";
-  if (tasks.some((task) => task.status === "blocked")) return "Return the blocking evidence for replanning.";
   if (work.status === "rework") return "nerv approve";
   const active = tasks.find((task) => task.status === "active");
   if (active) return `Continue with Task ${active.position}.`;

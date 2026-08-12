@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "269fc65a6fa579e5d44576c7f92e0a6b94e338d1529aca2631e41ee11142198f"
+nerv_managed_sha256: "74e63c99adeec2f9724d2fc4132af360075bfb8a406ebc690dffc85884aed609"
 ---
 
 # Nerv
@@ -69,7 +69,7 @@ Do not assign a durable `WORK-###` reference in the preview or materialize specu
 
 `nerv approve` is satisfied by atomically materializing the complete currently approved Work Item and every approved Task with the deterministic persistence primitive, including its activation baseline, then persisting compact execution guidance. The Task contract maps directly from the Plan Preview: title, objective, implementation approach, expected touchpoints, acceptance criteria, and targeted validation. Unless the developer explicitly asks to stop after approval, continue through approved Execution in the same agent interaction: complete each Task, record targeted validation and attribution, then run full validation and report readiness for Work Review. This agent workflow behavior does not make the runtime launch, route, or control agents.
 
-Execution uses the active Work context to complete each approved Task in order: start the pending Task, perform its approved implementation, run its targeted validation, then mark it done with validation evidence and attributable paths before starting the next Task. Do not require approval between normal Tasks. After successful Execution and validation, stop before Work Review and report:
+Execution uses the active Work context to complete each approved Task in order: only the earliest pending Task may start, and only the active Task may become done. A genuine interruption keeps the Task active and may record a Checkpoint with a summary and next step; it does not create another Task state. Do not require approval between normal Tasks. After successful Execution and validation, stop before Work Review and report:
 
 ```text
 Execution complete.
@@ -83,7 +83,7 @@ Do not invoke or simulate `nerv review`, record PASS or REWORK, proceed to optio
 
 ### Review And Close
 
-`nerv review WORK-###` evaluates intent, relevant product or repository context, project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, optional external evidence, regressions, and risks. A Nerv Review outcome exists only after this runtime command succeeds and persists it; narrative analysis alone is not a completed Nerv Review and must not recommend approval. Classify every finding as `critical`, `high`, `medium`, or `low`. Critical and high findings always require REWORK. Medium findings require REWORK unless the developer explicitly accepts them as durable residual risk. Low findings are residual by default. Review has one Work-level outcome only: PASS or REWORK.
+`nerv review WORK-###` is accepted only from an active Work with every Task done. It evaluates intent, relevant product or repository context, project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, optional external evidence, regressions, and risks. A Nerv Review outcome exists only after this runtime command succeeds and persists it; narrative analysis alone is not a completed Nerv Review and must not recommend approval. Classify every finding as `critical`, `high`, `medium`, or `low`. Critical and high findings always require REWORK. Medium findings require REWORK unless the developer explicitly accepts them as durable residual risk. Low findings are residual by default. Review has one Work-level outcome only: PASS or REWORK.
 
 PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. Show residual low findings and explicitly accepted medium risks, and state that they do not block Close. Every persisted REWORK, including a Review after remediation, first shows severity-labeled findings and which findings block PASS, then persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
 
