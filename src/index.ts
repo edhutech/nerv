@@ -95,7 +95,7 @@ function closeWork(reference: string, message: string) {
     }
     const unowned = changed.filter((path) => !attributed.has(path) && !baselinePaths.has(path));
     if (unowned.length) throw new Error(`Close blocked: unattributed changes: ${unowned.join(", ")}`);
-    stage(status.repoRoot, [...attributed]);
+    stage(status.repoRoot, changed.filter((path) => attributed.has(path)));
     if (!stagedDiff(status.repoRoot)) throw new Error("Close blocked: no attributable changes to commit.");
     const hash = commit(status.repoRoot, `${message}\n\nNerv-Work: ${item.id}\nNerv-Work-Ref: ${item.ref}`);
     repo.updateWork(item.id, { status: "closed", closed_at: new Date().toISOString(), commit_hash: hash });
