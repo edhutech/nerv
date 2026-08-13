@@ -17,12 +17,21 @@ SQLite is the durable local operational source of truth. Each Work Item has a st
 ## Install
 
 ```bash
-git clone https://github.com/edhutech/nerv.git ~/tools/nerv
-pnpm --dir ~/tools/nerv install
-pnpm --dir ~/tools/nerv build
+npm install --global @edhutech/nerv
 ```
 
-Nerv requires Node.js 20 or later, pnpm, and a Git repository.
+Nerv supports Node.js 22 and 24 LTS and requires Git. The installed command remains `nerv`; package installation does not require cloning this repository or installing pnpm.
+
+In the Git repository you want Nerv to govern:
+
+```bash
+cd path/to/repository
+nerv init
+git add .agents/skills/nerv/SKILL.md .nerv-context/product.md .nerv-context/repo.md
+git commit -m "Establish Nerv setup"
+```
+
+`nerv init` creates the tracked managed public skill and canonical context files. It also creates `.nerv/` for local SQLite operational state and temporary active Work context, then excludes it through Git's repository-local exclude file. Do not commit `.nerv/`.
 
 ## Workflow
 
@@ -38,7 +47,7 @@ intent
   -> nerv close WORK-###
 ```
 
-`nerv plan` and `nerv approve` are agent-facing protocol operations, not commands an agent should blindly execute in a shell. Planning inspects relevant Product/Repo Context, repository evidence, and authoritative project guidance before showing a non-durable execution-ready Plan Preview. Optional external tools and context sources may assist Planning and Review when available, but never replace Nerv governance. Approval atomically materializes the approved Work, all approved Tasks, and its activation baseline through deterministic `work` primitives. REWORK remediation is persisted with the Review and approval materializes that exact proposal, never caller-supplied replacement Tasks. Execution starts each pending Task, implements its approved scope, runs targeted validation, and records completion evidence and attributable paths before beginning the next Task. It then normally continues through approved Execution in the same agent interaction. `nerv review` and `nerv close` are runtime commands. The runtime remains agent agnostic and never calls an AI API.
+`nerv plan` and `nerv approve` are agent-facing protocol operations, not commands an agent should blindly execute in a shell. Planning inspects relevant Product/Repo Context, repository evidence, and authoritative project guidance before showing a non-durable execution-ready Plan Preview. Optional external tools and context sources may assist Planning and Review when available, but never replace Nerv governance. Approval atomically materializes the approved Work, all approved Tasks, and its activation baseline through deterministic `work` primitives. REWORK remediation is persisted with the Review and approval materializes that exact proposal, never caller-supplied replacement Tasks. Execution starts each pending Task, implements its approved scope, runs targeted validation, and records completion evidence and attributable paths before beginning the next Task. It then normally continues through approved Execution in the same agent interaction. `nerv review` and `nerv close` are literal runtime commands. The runtime remains agent agnostic and never calls an AI API.
 
 Execution implements the approved Tasks, records targeted validation and attributable paths, and stops for Work Review. Stop execution only for an explicit developer request, a material scope or context conflict, a genuine block, or an exceptional checkpoint; incidental implementation differences inside the approved outcome do not create ceremony.
 
@@ -67,6 +76,8 @@ For consumer repositories, `.agents/skills/nerv/SKILL.md` is the public agent sk
 `package.json` is the single source of the Nerv version. Nerv follows Semantic Versioning and remains in `0.x.y` during normal pre-1.0 development: PATCH is for compatible fixes, MINOR is for meaningful compatible product or runtime evolution, and `1.0.0` is a deliberate stable public-contract decision. Work Items do not automatically change the product version.
 
 When an actual distribution is made, create an optional Git tag as `v<version>` such as `v0.1.0`; a GitHub Release may then be created from that tag. Pre-release identifiers are available for external testing. Nerv has no release subsystem or release automation.
+
+Npm publication and npm Trusted Publishing are intentional future release actions; they are not performed by normal CI.
 
 ## Development
 

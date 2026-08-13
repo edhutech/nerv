@@ -1,8 +1,23 @@
 {
-  "name": "nerv",
+  "name": "@edhutech/nerv",
   "version": "0.2.4",
   "description": "Local-first agent work harness for developers who work with coding agents.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edhutech/nerv.git"
+  },
+  "bugs": {
+    "url": "https://github.com/edhutech/nerv/issues"
+  },
+  "homepage": "https://github.com/edhutech/nerv#readme",
+  "keywords": [
+    "cli",
+    "coding-agents",
+    "developer-workflow",
+    "git",
+    "local-first"
+  ],
   "type": "module",
   "packageManager": "pnpm@10.33.4",
   "bin": {
@@ -10,17 +25,24 @@
   },
   "files": [
     "dist",
+    "README.md",
+    "LICENSE",
     ".agents/skills/nerv/SKILL.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3"
     ]
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build.mjs",
+    "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.test.mjs",
+    "test:package": "node scripts/test-package.mjs",
     "validate": "pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
@@ -29,7 +51,7 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.14.0 <25"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",

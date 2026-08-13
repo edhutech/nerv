@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+            package_artifact: false
+          - os: ubuntu-latest
+            node: 24
+            package_artifact: true
+          - os: macos-latest
+            node: 24
+            package_artifact: false
+          - os: windows-latest
+            node: 24
+            package_artifact: false
+    steps:
+      # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ matrix.node }}
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate
+      - if: matrix.package_artifact
+        run: pnpm test:package
