@@ -20,8 +20,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke": "node scripts/smoke.mjs",
-    "validate": "pnpm build && pnpm typecheck && pnpm smoke"
+    "test": "node --test test/*.test.mjs",
+    "validate": "pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

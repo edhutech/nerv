@@ -74,7 +74,7 @@ When an actual distribution is made, create an optional Git tag as `v<version>` 
 pnpm validate
 ```
 
-`pnpm validate` runs build, typecheck, and smoke validation.
+`pnpm validate` runs build, typecheck, and focused regression tests.
 
 ## License
 

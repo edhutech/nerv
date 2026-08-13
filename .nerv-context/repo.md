@@ -16,7 +16,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 
 - `.agents/skills/nerv/SKILL.md`: managed public Nerv skill.
 - `.agents/skills/nerv-development/SKILL.md`: development protocol for this repository.
-- `scripts/smoke.mjs`: built-CLI smoke and E2E coverage in temporary Git repositories.
+- `test/`: focused built-CLI regression coverage in temporary Git repositories.
 
 ## Development rules
 
@@ -30,7 +30,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 
 ## Validation
 
-`pnpm validate` runs build, typecheck, then smoke. `pnpm smoke` exercises built `dist/index.js`.
+`pnpm validate` runs build, typecheck, then test. `pnpm test` exercises built `dist/index.js`.
 
 ## Repository invariants
 

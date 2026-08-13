@@ -13,18 +13,102 @@ type Workspace = { repoRoot: string; workspaceRoot: string; databasePath: string
 type FindingSeverity = "critical" | "high" | "medium" | "low";
 type ReviewFinding = { severity: FindingSeverity; finding: string; accepted_as_residual_risk?: boolean };
 type RemediationOptions = { remediationTitle?: string; remediationObjective?: string; remediationApproach?: string; remediationTouchpoints?: string; remediationAcceptanceCriteria?: string; remediationValidation?: string };
-function action(handler: () => void) { try { handler(); } catch (error) { program.error(error instanceof Error ? error.message : String(error), { exitCode: 1, code: "NERV_OPERATION_FAILED" }); } }
-function workspace(): Workspace { const status = getWorkspaceStatus(process.cwd()); if (!status.initialized || !status.repoRoot || !status.workspaceRoot || !status.databasePath) throw new Error("Nerv is not initialized in this repo. Execute `nerv init` first."); return { repoRoot: status.repoRoot, workspaceRoot: status.workspaceRoot, databasePath: status.databasePath }; }
-function work(repo: Repository, reference: string): WorkItem { const item = repo.getWork(reference); if (!item) throw new Error(`Work Item ${reference.toUpperCase()} not found.`); return item; }
-function taskAt(repo: Repository, item: WorkItem, position: string): Task { const task = repo.getTaskAt(item.id, Number(position)); if (!task || !Number.isInteger(Number(position)) || Number(position) < 1) throw new Error(`Task ${position} not found in ${item.ref}.`); return task; }
-function sync(status: Workspace, item: WorkItem) { const repo = openRepository(status.databasePath); try { return syncActiveContext(status.workspaceRoot, item, repo.listTasks(item.id), repo.latestReview(item.id), repo.latestCheckpoint(item.id)); } finally { repo.close(); } }
-function recommendedNext(status: Workspace, item: WorkItem) { const repo = openRepository(status.databasePath); try { return nextOperation(item, repo.listTasks(item.id), repo.latestReview(item.id)); } finally { repo.close(); } }
-function approvedPlan(value: string): ApprovedPlan { let parsed: unknown; try { parsed = JSON.parse(value); } catch { throw new Error("--plan must be valid JSON."); } if (!parsed || typeof parsed !== "object") throw new Error("--plan must be an approved Work plan object."); const input = parsed as Record<string, unknown>; const workFields = ["title", "intent", "goal", "scope", "expected_touchpoints", "out_of_scope", "acceptance_criteria", "validation"] as const; const taskFields = ["title", "objective", "implementation_approach", "expected_touchpoints", "acceptance_criteria", "validation"] as const; for (const field of workFields) if (typeof input[field] !== "string" || !input[field].trim()) throw new Error(`Approved Work plan requires ${field}.`); if (!Array.isArray(input.tasks) || !input.tasks.length) throw new Error("Approved Work plan requires at least one Task."); for (const task of input.tasks) { if (!task || typeof task !== "object") throw new Error("Each approved Task must be an object."); for (const field of taskFields) if (typeof (task as Record<string, unknown>)[field] !== "string" || !String((task as Record<string, unknown>)[field]).trim()) throw new Error(`Each approved Task requires ${field}.`); } return input as ApprovedPlan; }
+function action(handler: () => void) {
+  try {
+    handler();
+  } catch (error) {
+    program.error(error instanceof Error ? error.message : String(error), {
+      exitCode: 1,
+      code: "NERV_OPERATION_FAILED",
+    });
+  }
+}
+function workspace(): Workspace {
+  const status = getWorkspaceStatus(process.cwd());
+  if (!status.initialized || !status.repoRoot || !status.workspaceRoot || !status.databasePath) {
+    throw new Error("Nerv is not initialized in this repo. Execute `nerv init` first.");
+  }
+  return {
+    repoRoot: status.repoRoot,
+    workspaceRoot: status.workspaceRoot,
+    databasePath: status.databasePath,
+  };
+}
+function work(repo: Repository, reference: string): WorkItem {
+  const item = repo.getWork(reference);
+  if (!item) throw new Error(`Work Item ${reference.toUpperCase()} not found.`);
+  return item;
+}
+function taskAt(repo: Repository, item: WorkItem, position: string): Task {
+  const task = repo.getTaskAt(item.id, Number(position));
+  if (!task || !Number.isInteger(Number(position)) || Number(position) < 1) {
+    throw new Error(`Task ${position} not found in ${item.ref}.`);
+  }
+  return task;
+}
+function sync(status: Workspace, item: WorkItem) {
+  const repo = openRepository(status.databasePath);
+  try {
+    return syncActiveContext(status.workspaceRoot, item, repo.listTasks(item.id), repo.latestReview(item.id), repo.latestCheckpoint(item.id));
+  } finally {
+    repo.close();
+  }
+}
+function recommendedNext(status: Workspace, item: WorkItem) {
+  const repo = openRepository(status.databasePath);
+  try {
+    return nextOperation(item, repo.listTasks(item.id), repo.latestReview(item.id));
+  } finally {
+    repo.close();
+  }
+}
+function approvedPlan(value: string): ApprovedPlan {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("--plan must be valid JSON.");
+  }
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("--plan must be an approved Work plan object.");
+  }
+  const input = parsed as Record<string, unknown>;
+  const workFields = ["title", "intent", "goal", "scope", "expected_touchpoints", "out_of_scope", "acceptance_criteria", "validation"] as const;
+  const taskFields = ["title", "objective", "implementation_approach", "expected_touchpoints", "acceptance_criteria", "validation"] as const;
+  for (const field of workFields) {
+    if (typeof input[field] !== "string" || !input[field].trim()) {
+      throw new Error(`Approved Work plan requires ${field}.`);
+    }
+  }
+  if (!Array.isArray(input.tasks) || !input.tasks.length) {
+    throw new Error("Approved Work plan requires at least one Task.");
+  }
+  for (const task of input.tasks) {
+    if (!task || typeof task !== "object") {
+      throw new Error("Each approved Task must be an object.");
+    }
+    for (const field of taskFields) {
+      if (typeof (task as Record<string, unknown>)[field] !== "string" || !String((task as Record<string, unknown>)[field]).trim()) {
+        throw new Error(`Each approved Task requires ${field}.`);
+      }
+    }
+  }
+  return input as ApprovedPlan;
+}
 function reviewFindings(value?: string): ReviewFinding[] { if (!value?.trim()) return []; let parsed: unknown; try { parsed = JSON.parse(value); } catch { throw new Error("--findings must be a JSON array of severity-labeled findings."); } if (!Array.isArray(parsed) || !parsed.length) throw new Error("--findings must be a non-empty JSON array when supplied."); return parsed.map((entry) => { if (!entry || typeof entry !== "object") throw new Error("Each Review finding must be an object."); const finding = entry as Record<string, unknown>; if (typeof finding.finding !== "string" || !finding.finding.trim() || !["critical", "high", "medium", "low"].includes(String(finding.severity))) throw new Error("Each Review finding requires a severity of critical, high, medium, or low and non-empty finding text."); if (finding.accepted_as_residual_risk !== undefined && typeof finding.accepted_as_residual_risk !== "boolean") throw new Error("accepted_as_residual_risk must be boolean when supplied."); if (finding.accepted_as_residual_risk && finding.severity !== "medium") throw new Error("Only medium findings may be accepted as residual risk."); return { severity: finding.severity as FindingSeverity, finding: finding.finding.trim(), ...(finding.accepted_as_residual_risk ? { accepted_as_residual_risk: true } : {}) }; }); }
 const blocksPass = (finding: ReviewFinding) => finding.severity === "critical" || finding.severity === "high" || (finding.severity === "medium" && !finding.accepted_as_residual_risk);
 const formatFindings = (findings: ReviewFinding[], heading: string) => findings.length ? `${heading}:\n${findings.map((finding) => `- ${finding.severity.toUpperCase()}${finding.accepted_as_residual_risk ? " (accepted residual risk)" : ""} - ${finding.finding}`).join("\n")}` : "";
 function remediation(options: RemediationOptions): PlanTask[] { const values = [options.remediationTitle, options.remediationObjective, options.remediationApproach, options.remediationTouchpoints, options.remediationAcceptanceCriteria, options.remediationValidation]; if (values.some((value) => !value?.trim())) throw new Error("REWORK requires an execution-ready remediation Task."); return [{ title: options.remediationTitle!, objective: options.remediationObjective!, implementation_approach: options.remediationApproach!, expected_touchpoints: options.remediationTouchpoints!, acceptance_criteria: options.remediationAcceptanceCriteria!, validation: options.remediationValidation! }]; }
-function ownedPaths(tasks: Task[]): string[] { return [...new Set(tasks.flatMap((task) => { try { const value = JSON.parse(task.attribution_json ?? "{\"paths\":[]}") as { paths?: unknown }; return Array.isArray(value.paths) && value.paths.every((path) => typeof path === "string") ? value.paths : []; } catch { return []; } }))].sort(); }
+function ownedPaths(tasks: Task[]): string[] {
+  return [...new Set(tasks.flatMap((task) => {
+    try {
+      const value = JSON.parse(task.attribution_json ?? "{\"paths\":[]}") as { paths?: unknown };
+      return Array.isArray(value.paths) && value.paths.every((path) => typeof path === "string") ? value.paths : [];
+    } catch {
+      return [];
+    }
+  }))].sort();
+}
 
 program.command("init").action(() => action(() => { const status = getWorkspaceStatus(process.cwd()); if (!status.repoRoot) throw new Error("nerv init must be run inside a Git repository."); const existed = status.initialized; const result = ensureWorkspace(status.repoRoot); console.log(existed ? `Nerv is already initialized in ${status.repoRoot}.` : `Initialized Nerv in ${status.repoRoot}.`); console.log(`Repository setup: ${result.setup.every((entry) => entry.established) ? "established at HEAD" : `not established (${result.setup.filter((entry) => !entry.established).map((entry) => entry.path).join(", ")})`}.`); if (result.skillSync.message) console.log(result.skillSync.message); }));
 const workCommand = program.command("work").description("Deterministic Work Item persistence primitives.");
