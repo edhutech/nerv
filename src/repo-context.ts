@@ -1,7 +1,0 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { ensureSharedContext } from "./workspace.js";
-
-export function generateRepoContext(repoRoot: string, workspaceRoot: string): string { const packagePath = join(repoRoot, "package.json"); let scripts: Record<string, string> = {}; if (existsSync(packagePath)) { try { scripts = JSON.parse(readFileSync(packagePath, "utf8")).scripts ?? {}; } catch {} } const folders = readdirSync(repoRoot).filter((entry) => !entry.startsWith(".") && entry !== "node_modules" && statSync(join(repoRoot, entry)).isDirectory()); const git = spawnSync("git", ["status", "--short"], { cwd: repoRoot, encoding: "utf8" }); const output = `# Development Context\n\n## Scripts\n\n${Object.entries(scripts).map(([name, value]) => `- \`${name}\`: \`${value}\``).join("\n") || "No scripts detected."}\n\n## Top-Level Folders\n\n${folders.map((folder) => `- \`${folder}/\``).join("\n") || "No folders detected."}\n\n## Git Status\n\n${git.status === 0 ? git.stdout.trim() || "Clean working tree." : "Git status unavailable."}\n`; const path = join(workspaceRoot, "repo", "development.md"); writeFileSync(path, output, "utf8"); return path; }
-export function scaffoldSharedRepoContext(repoRoot: string): string { ensureSharedContext(repoRoot); return join(repoRoot, ".nerv-context", "repo.md"); }

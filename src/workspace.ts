@@ -1,17 +1,19 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, parse, resolve } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
 
-const DIRS = [".nerv", ".nerv/repo", ".nerv/agent", ".nerv/agent/active"] as const;
+const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
 const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
-type SkillSync = { status: "installed" | "current" | "updated" | "preserved"; message?: string };
-export type SharedContextSync = { created: string[]; legacy: string[] };
+type SkillSync = { status: "installed" | "current" | "preserved"; message?: string };
+export type SetupStatus = { path: string; established: boolean };
 const SHARED_CONTEXT_FILES = [
   ["product.md", "# Product\n\n## What it is\n\n## Users and problem\n\n## Core capabilities\n\n## Product invariants\n\n## Boundaries\n\n## Current direction\n"],
   ["repo.md", "# Repository\n\n## Stack\n\n## Architecture\n\n## Important paths\n\n## Development rules\n\n## Generated and local state\n\n## Validation\n\n## Repository invariants\n"],
 ] as const;
+export const CANONICAL_SETUP_PATHS = [".agents/skills/nerv/SKILL.md", ...SHARED_CONTEXT_FILES.map(([name]) => `.nerv-context/${name}`)] as const;
 
 export function findRepoRoot(start: string): string | null {
   let current = resolve(start);
@@ -29,39 +31,41 @@ export function getWorkspaceStatus(start: string): WorkspaceStatus {
   const databasePath = join(workspaceRoot, "nerv.db");
   return { repoRoot, workspaceRoot, databasePath, initialized: DIRS.every((dir) => isDirectory(join(repoRoot, dir))) && existsSync(databasePath) && hasRequiredSchema(databasePath) };
 }
-export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync; contextSync: SharedContextSync } {
+export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync; setup: SetupStatus[] } {
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db uses an unsupported generated schema; remove .nerv and run `nerv init` again");
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath);
-  ensureGitIgnore(repoRoot);
+  ensureLocalExclude(repoRoot);
   const skillSync = ensurePublicSkill(repoRoot);
-  const contextSync = ensureSharedContext(repoRoot);
-  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillSync, contextSync };
+  ensureSharedContext(repoRoot);
+  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillSync, setup: canonicalSetupStatus(repoRoot) };
 }
-export function ensureSharedContext(repoRoot: string): SharedContextSync {
+function ensureSharedContext(repoRoot: string): void {
   const directory = join(repoRoot, ".nerv-context");
   mkdirSync(directory, { recursive: true });
-  const created: string[] = [];
   for (const [name, content] of SHARED_CONTEXT_FILES) {
     const path = join(directory, name);
-    if (!existsSync(path)) { writeFileSync(path, content, "utf8"); created.push(name); }
+    if (!existsSync(path)) writeFileSync(path, content, "utf8");
   }
-  const legacy: string[] = [];
-  const legacyProduct = join(directory, "product");
-  if (existsSync(legacyProduct) && statSync(legacyProduct).isDirectory() && readdirSync(legacyProduct).some((entry) => entry.endsWith(".md"))) legacy.push(".nerv-context/product/");
-  if (existsSync(join(directory, "repo", "facts.md"))) legacy.push(".nerv-context/repo/facts.md");
-  return { created, legacy };
 }
-function ensureGitIgnore(repoRoot: string): void {
-  const path = join(repoRoot, ".gitignore");
-  if (!existsSync(path)) {
-    writeFileSync(path, ".nerv/\n");
-    return;
-  }
+function git(repoRoot: string, args: string[]): string { return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim(); }
+function gitSucceeds(repoRoot: string, args: string[]): boolean { try { git(repoRoot, args); return true; } catch { return false; } }
+export function ensureLocalExclude(repoRoot: string): void {
+  const resolved = git(repoRoot, ["rev-parse", "--git-path", "info/exclude"]);
+  const path = isAbsolute(resolved) ? resolved : resolve(repoRoot, resolved);
+  mkdirSync(dirname(path), { recursive: true });
+  if (!existsSync(path)) { writeFileSync(path, ".nerv/\n", "utf8"); return; }
   const content = readFileSync(path, "utf8");
   if (content.split(/\r?\n/).some((line) => [".nerv", ".nerv/", "/.nerv", "/.nerv/"].includes(line.trim()))) return;
   appendFileSync(path, `${content.endsWith("\n") || content.length === 0 ? "" : "\n"}.nerv/\n`);
+}
+export function canonicalSetupStatus(repoRoot: string): SetupStatus[] {
+  return CANONICAL_SETUP_PATHS.map((path) => ({ path, established: existsSync(join(repoRoot, path)) && gitSucceeds(repoRoot, ["ls-files", "--error-unmatch", "--", path]) && gitSucceeds(repoRoot, ["diff", "--quiet", "--cached", "HEAD", "--", path]) && gitSucceeds(repoRoot, ["diff", "--quiet", "HEAD", "--", path]) }));
+}
+export function assertCanonicalSetupEstablished(repoRoot: string): void {
+  const pending = canonicalSetupStatus(repoRoot).filter((entry) => !entry.established).map((entry) => entry.path);
+  if (pending.length) throw new Error(`Nerv repository setup/context must be committed before materializing a new Work: ${pending.join(", ")}.`);
 }
 function ensurePublicSkill(repoRoot: string): SkillSync {
   const destination = join(repoRoot, ".agents", "skills", "nerv", "SKILL.md");
@@ -75,11 +79,7 @@ function ensurePublicSkill(repoRoot: string): SkillSync {
   if (!statSync(destination).isFile()) throw new Error(`cannot install public Nerv skill: ${destination} is not a file`);
   const installed = readFileSync(destination, "utf8");
   if (installed === packaged) return { status: "current" };
-  if (isManagedSkill(installed)) {
-    writeFileSync(destination, packaged);
-    return { status: "updated" };
-  }
-  return { status: "preserved", message: `Public Nerv skill preserved at ${destination}: it is not a recognized unmodified Nerv-managed copy. Review its changes and replace it manually to update.` };
+  return { status: "preserved", message: `Public Nerv skill preserved at ${destination}; update it through approved repository work.` };
 }
 function isManagedSkill(content: string): boolean {
   const marker = content.match(SKILL_HASH_MARKER);

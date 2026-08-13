@@ -10,7 +10,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 - `src/repository.ts` and `src/database.ts` own SQLite operational persistence and schema.
 - `src/workspace.ts` owns local workspace setup and managed public-skill installation.
 - `src/work.ts` maintains temporary active Work context and lifecycle recommendations.
-- `src/context.ts`, `src/product.ts`, and `src/repo-context.ts` manage shared and generated context.
+- `src/context.ts` reports canonical shared context availability.
 
 ## Important paths
 
@@ -26,7 +26,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 
 ## Generated and local state
 
-`.nerv/` is ignored local operational state, generated repository observations, and temporary active context. `.nerv-context/` is tracked shared context; `product.md` and `repo.md` are its only canonical current-truth files.
+`.nerv/` is local operational state and temporary active context, excluded through Git's repository-local exclude mechanism. `.nerv-context/` is tracked shared context; `product.md` and `repo.md` are its only canonical current-truth files. Before every new Work, those files and the managed public skill must be committed and clean at `HEAD`.
 
 ## Validation
 
