@@ -25,6 +25,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 - Public package identity is `@edhutech/nerv`; the installed CLI binary remains `nerv`.
 - Support Node.js 22 and 24 LTS. Package builds run through `prepack`; `pnpm test:package` validates the generated tarball in an isolated installation.
 - `.github/workflows/ci.yml` uses read-only SHA-pinned GitHub Actions for Linux Node 22/24, macOS Node 24, and Windows Node 24. It runs package E2E once on Linux Node 24 and never publishes.
+- `.gitattributes` requires LF checkout content for the managed public skill so its strict content hash is cross-platform stable.
 - Do not edit generated `dist/` or local `.nerv/` state directly.
 
 ## Generated and local state

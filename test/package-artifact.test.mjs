@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -21,6 +21,18 @@ const expectedFiles = [
   "dist/workspace.js",
   "package.json",
 ];
+
+test("CI package scripts resolve from tracked source", () => {
+  const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
+  assert.match(workflow, /pnpm validate/);
+  assert.match(workflow, /pnpm test:package/);
+  for (const [name, source] of [["build", "scripts/build.mjs"], ["test:package", "scripts/package-test.mjs"]]) {
+    assert.match(packageJson.scripts[name], new RegExp(source.replace(".", "\\.")));
+    assert(existsSync(join(root, source)), `${name} source script is missing: ${source}`);
+    assert.equal(execFileSync("git", ["ls-files", "--error-unmatch", source], { cwd: root, encoding: "utf8" }).trim(), source, `${name} source script is not tracked`);
+  }
+});
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8", env: { ...process.env, npm_config_update_notifier: "false" } });

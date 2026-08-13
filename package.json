@@ -42,7 +42,7 @@
     "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.test.mjs",
-    "test:package": "node scripts/test-package.mjs",
+    "test:package": "node scripts/package-test.mjs",
     "validate": "pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
