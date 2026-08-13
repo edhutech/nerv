@@ -1,16 +1,19 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
+import { openRepository } from "../dist/repository.js";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const cli = join(root, "dist/index.js");
 const assert = (value, message) => { if (!value) throw new Error(message); };
 function run(cwd, args, expected = 0, env = {}) { const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...env } }); const output = `${result.stdout}${result.stderr}`; if (result.status !== expected) throw new Error(`${args.join(" ")}: ${output}`); return output; }
 function git(cwd, args) { return spawnSync("git", args, { cwd, encoding: "utf8" }); }
+const gitPath = spawnSync("which", ["git"], { encoding: "utf8" }).stdout.trim();
+const sqliteModule = join(root, "node_modules", "better-sqlite3");
 function setup(establish = true) { const repo = mkdtempSync(join(tmpdir(), "nerv-smoke-")); git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]); writeFileSync(join(repo, "README.md"), "base\n"); git(repo, ["add", "README.md"]); git(repo, ["commit", "-m", "initial"]); run(repo, ["init"]); if (establish) { git(repo, ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]); git(repo, ["commit", "-m", "establish nerv setup"]); } return repo; }
 const plan = (title = "Persist plan") => ({ title, intent: "approved intent", goal: "approved goal", scope: "approved scope", expected_touchpoints: "src/database.ts", out_of_scope: "Git hardening", acceptance_criteria: "contract persists", validation: "pnpm validate", tasks: [{ title: "Persist fields", objective: "Store the plan", implementation_approach: "Use direct columns", expected_touchpoints: "src/repository.ts", acceptance_criteria: "fields round trip", validation: "pnpm smoke" }, { title: "Recover fields", objective: "Expose the plan", implementation_approach: "Render from SQLite", expected_touchpoints: "src/index.ts", acceptance_criteria: "show is complete", validation: "pnpm smoke" }] });
 function materialize(repo, value = plan()) { const output = run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]); return /Stable ID: ([0-9a-f-]{36})/.exec(output)?.[1]; }
@@ -51,8 +54,9 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
 {
   const repo = setup(); try {
     materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "REWORK", remediation);
+    const recovery = run(repo, ["work", "show", "WORK-001"]); assert(recovery.includes("Persisted remediation proposal") && recovery.includes("Fix") && recovery.includes("Expected touchpoints: src/index.ts"), "fresh REWORK recovery omitted the persisted remediation contract");
     writeFileSync(join(repo, ".nerv-context/product.md"), "canonical drift\n");
-    run(repo, ["work", "materialize-rework", "WORK-001", "--tasks", JSON.stringify([plan().tasks[0]])]);
+    run(repo, ["work", "materialize-rework", "WORK-001"]);
     const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); const item = db.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get(); const tasks = db.prepare("SELECT position, status FROM tasks WHERE work_item_id=(SELECT id FROM work_items WHERE ref='WORK-001') ORDER BY position").all(); const count = db.prepare("SELECT COUNT(*) AS count FROM work_items").get().count; db.close();
     assert(item.status === "active" && count === 1 && JSON.stringify(tasks) === JSON.stringify([{ position: 1, status: "done" }, { position: 2, status: "done" }, { position: 3, status: "pending" }]) && readFileSync(join(repo, ".nerv-context/product.md"), "utf8") === "canonical drift\n", "canonical drift blocked or normalized same-Work remediation");
     finish(repo, 3, "fix.txt"); review(repo, "PASS"); run(repo, ["close", "WORK-001", "--message", "close rework"]);
@@ -64,10 +68,10 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
   const repo = setup(); try {
     const dbPath = join(repo, ".nerv/nerv.db"); const db = new Database(dbPath, { readonly: true });
     const taskColumns = db.prepare("PRAGMA table_info(tasks)").all().map((row) => row.name); const checkpointColumns = db.prepare("PRAGMA table_info(checkpoints)").all().map((row) => row.name); const reviewColumns = db.prepare("PRAGMA table_info(work_reviews)").all().map((row) => row.name); const indexes = db.prepare("PRAGMA index_list(work_items)").all().map((row) => row.name); const metadata = db.prepare("SELECT key FROM metadata").all().map((row) => row.key); db.close();
-    assert(taskColumns.includes("attribution_json") && !taskColumns.includes("block_reason") && checkpointColumns.join(",") === "id,work_item_id,task_id,summary,next_step,created_at" && reviewColumns.join(",") === "id,work_item_id,outcome,summary,findings,validation_evidence,git_fingerprint_json,verification_evidence,created_at" && indexes.includes("one_open_work_item") && !metadata.includes("product_context_updated_at") && !metadata.includes("repo_context_updated_at"), "schema is not the clean lifecycle baseline");
+    assert(taskColumns.includes("attribution_json") && !taskColumns.includes("block_reason") && checkpointColumns.join(",") === "id,work_item_id,task_id,summary,next_step,created_at" && reviewColumns.join(",") === "id,work_item_id,outcome,summary,findings,remediation_json,validation_evidence,git_fingerprint_json,verification_evidence,created_at" && indexes.includes("one_open_work_item") && !metadata.includes("product_context_updated_at") && !metadata.includes("repo_context_updated_at"), "schema is not the clean lifecycle baseline");
     assert(run(repo, ["init"]).includes("already initialized"), "current schema-v1 was not idempotently accepted");
     const failureDb = new Database(dbPath); failureDb.exec("CREATE TRIGGER fail_task_insert BEFORE INSERT ON tasks WHEN NEW.title = 'Fail inside transaction' BEGIN SELECT RAISE(ABORT, 'forced task insert failure'); END"); failureDb.close();
-    const failed = run(repo, ["work", "materialize", "--plan", JSON.stringify({ ...plan("failed transaction"), tasks: [{ ...plan().tasks[0], title: "Fail inside transaction" }] })], 1); const afterFailure = new Database(dbPath, { readonly: true }); assert(failed.includes("forced task insert failure") && afterFailure.prepare("SELECT COUNT(*) AS count FROM work_items").get().count === 0 && afterFailure.prepare("SELECT COUNT(*) AS count FROM tasks").get().count === 0 && afterFailure.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get() === undefined, "transactional failure left rows or consumed a Work reference"); afterFailure.close();
+    const repository = openRepository(dbPath); let failure; try { repository.materializePlan({ ...plan("failed transaction"), tasks: [{ ...plan().tasks[0], title: "Fail inside transaction" }], git_baseline_json: "{}" }); } catch (error) { failure = error; } finally { repository.close(); } const afterFailure = new Database(dbPath); assert(failure instanceof Error && failure.message.includes("forced task insert failure") && afterFailure.prepare("SELECT COUNT(*) AS count FROM work_items").get().count === 0 && afterFailure.prepare("SELECT COUNT(*) AS count FROM tasks").get().count === 0 && afterFailure.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get() === undefined, "transactional failure left rows or consumed a Work reference"); afterFailure.exec("DROP TRIGGER fail_task_insert"); afterFailure.close();
     const id = materialize(repo); assert(id, "first Work did not materialize"); const baseline = JSON.parse(new Database(dbPath, { readonly: true }).prepare("SELECT git_baseline_json FROM work_items WHERE ref='WORK-001'").get().git_baseline_json); assert(JSON.stringify(Object.keys(baseline).sort()) === JSON.stringify(["head", "protected_paths", "protected_tree"]) && !("dirty" in baseline), "activation baseline retains obsolete dirty state");
     const rejected = run(repo, ["work", "materialize", "--plan", JSON.stringify(plan("second"))], 1); const afterRejected = new Database(dbPath, { readonly: true }); assert(rejected.includes("already open") && afterRejected.prepare("SELECT COUNT(*) AS count FROM work_items").get().count === 1 && afterRejected.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get().value === "2", "open Work materialization was not atomic"); afterRejected.close();
     assert(run(repo, ["work", "task", "start", "WORK-001", "2"], 1).includes("cannot start"), "later pending Task started first");
@@ -80,7 +84,7 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
     assert(run(repo, ["work", "materialize", "--plan", JSON.stringify(plan("review blocked"))], 1).includes("already open"), "rework Work allowed another Work");
     assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "bad", "--validation-evidence", "full"], 1).includes("active Work"), "Review from rework accepted");
     assert(run(repo, ["checkpoint", "WORK-001", "--summary", "bad"], 1).includes("active Work"), "rework checkpoint accepted");
-     run(repo, ["work", "materialize-rework", "WORK-001", "--tasks", JSON.stringify([plan().tasks[0]])]); finish(repo, 3, "fix.txt"); review(repo, "PASS"); const reviewed = run(repo, ["work", "show", "WORK-001"]); for (const marker of ["Completion validation evidence: targeted passed", "Attribution:", "Latest review:", "ID: 2", "Outcome: PASS", "Summary: complete", "Validation evidence: full", "Git fingerprint:", "Created at:", "Latest checkpoint:", "Summary: task interruption"]) assert(reviewed.includes(marker), `review recovery omitted ${marker}`);
+     run(repo, ["work", "materialize-rework", "WORK-001"]); finish(repo, 3, "fix.txt"); review(repo, "PASS");
     assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "again", "--validation-evidence", "full"], 1).includes("Only REWORK"), "Review from review accepted");
     assert(run(repo, ["checkpoint", "WORK-001", "--summary", "bad"], 1).includes("active Work"), "PASS checkpoint accepted");
     assert(run(repo, ["work", "materialize", "--plan", JSON.stringify(plan("pass blocked"))], 1).includes("already open"), "PASS Work allowed another Work");
@@ -91,25 +95,19 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
   } finally { rmSync(repo, { recursive: true, force: true }); }
 }
 {
-  for (const [environment, message] of [[{ NERV_TEST_FAIL_COMMIT_CREATE: "1" }, "simulated commit creation failure"], [{ NERV_TEST_FAIL_PUBLICATION: "1" }, "simulated guarded publication failure"]]) {
-    const repo = setup(); try { materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS"); const baseline = git(repo, ["rev-parse", "HEAD"]).stdout.trim(); const failure = run(repo, ["close", "WORK-001", "--message", "injected failure"], 1, environment); assert(failure.includes(message) && git(repo, ["rev-parse", "HEAD"]).stdout.trim() === baseline && git(repo, ["diff", "--cached", "--name-only"]).stdout.trim() === "" && git(repo, ["status", "--porcelain"]).stdout.includes("one.txt"), `${message} was not safely recoverable`); const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(db.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get().status === "review", `${message} closed Work`); db.close(); run(repo, ["close", "WORK-001", "--message", "retry"]); } finally { rmSync(repo, { recursive: true, force: true }); }
-  }
-  const repo = setup(); try { materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS"); const beforeHead = git(repo, ["rev-parse", "HEAD"]).stdout.trim(); const failure = run(repo, ["close", "WORK-001", "--message", "consistency failure"], 1, { NERV_TEST_FAIL_CLOSE_PERSISTENCE: "1", NERV_TEST_EXTERNAL_REF_ADVANCE: "1", NERV_TEST_CAPTURE_BOUNDARY: "1" }); const boundary = JSON.parse(/NERV_TEST_BOUNDARY:(.+)/.exec(failure)?.[1] ?? "null"); const after = { ref: git(repo, ["rev-parse", "HEAD"]).stdout.trim(), index: git(repo, ["write-tree"]).stdout.trim(), status: Buffer.from(git(repo, ["status", "--porcelain=v1", "-z"]).stdout).toString("base64") }; assert(failure.includes("Git/Nerv consistency failure") && failure.includes(beforeHead) && failure.includes(boundary.ref) && boundary.ref !== beforeHead && JSON.stringify(after) === JSON.stringify(boundary), "compensation CAS mutated Git after the captured boundary"); const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(db.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get().status === "review", "consistency failure closed Work"); db.close(); } finally { rmSync(repo, { recursive: true, force: true }); }
-}
-{
   const repo = setup(); try {
-    materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS");
-    const baseline = git(repo, ["rev-parse", "HEAD"]).stdout.trim(); const failed = run(repo, ["close", "WORK-001", "--message", "durable failure"], 1, { NERV_TEST_FAIL_CLOSE_PERSISTENCE: "1" });
-    assert(failed.includes("simulated durable Close persistence failure"), "durable Close failure was not surfaced"); assert(git(repo, ["rev-parse", "HEAD"]).stdout.trim() === baseline, "durable Close failure did not compensate publication"); assert(git(repo, ["diff", "--cached", "--name-only"]).stdout.trim() === "", "durable Close failure retained Nerv staging"); assert(git(repo, ["status", "--porcelain"]).stdout.includes("one.txt"), "durable Close failure changed the working tree");
-    const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(db.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get().status === "review", "durable Close failure closed Work"); db.close();
-    run(repo, ["close", "WORK-001", "--message", "retry"]); assert(git(repo, ["rev-parse", "HEAD"]).stdout.trim() !== baseline, "Close retry did not publish after compensation");
+    materialize(repo); run(repo, ["work", "task", "start", "WORK-001", "1"]);
+    writeFileSync(join(repo, "binary.bin"), Buffer.from([0, 1, 2, 255])); writeFileSync(join(repo, "executable.sh"), "#!/bin/sh\nexit 0\n"); chmodSync(join(repo, "executable.sh"), 0o755); symlinkSync("missing-target", join(repo, "dangling-link"));
+    run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "Git identity preserved", "--files", "binary.bin", "executable.sh", "dangling-link"]); finish(repo, 2, "two.txt"); review(repo, "PASS"); run(repo, ["close", "WORK-001", "--message", "special Git entries"]);
+    assert(git(repo, ["ls-tree", "HEAD", "binary.bin"]).stdout.includes("100644") && git(repo, ["ls-tree", "HEAD", "executable.sh"]).stdout.includes("100755") && git(repo, ["ls-tree", "HEAD", "dangling-link"]).stdout.includes("120000"), "Git-native special file identity was not preserved");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 }
 {
-  for (const [table, statement, marker] of [["tasks", "ALTER TABLE tasks ADD COLUMN block_reason TEXT", "block_reason"], ["checkpoints", "ALTER TABLE checkpoints ADD COLUMN files TEXT", "files"], ["work_reviews", "ALTER TABLE work_reviews ADD COLUMN extra TEXT", "extra"]]) {
+  for (const [table, statement, marker] of [["metadata", "ALTER TABLE metadata ADD COLUMN legacy TEXT", "legacy"], ["tasks", "ALTER TABLE tasks ADD COLUMN block_reason TEXT", "block_reason"], ["checkpoints", "ALTER TABLE checkpoints ADD COLUMN files TEXT", "files"], ["work_reviews", "ALTER TABLE work_reviews ADD COLUMN extra TEXT", "extra"], ["extra_table", "CREATE TABLE extra_table (id TEXT)", "extra_table"], ["extra_index", "CREATE INDEX extra_index ON tasks(title)", "extra_index"], ["extra_view", "CREATE VIEW extra_view AS SELECT id FROM tasks", "extra_view"], ["extra_trigger", "CREATE TRIGGER extra_trigger AFTER INSERT ON tasks BEGIN SELECT 1; END", "extra_trigger"]]) {
     const repo = setup(); try { const dbPath = join(repo, ".nerv/nerv.db"); const db = new Database(dbPath); db.exec(statement); db.close(); const before = readFileSync(dbPath); assert(run(repo, ["init"], 1).includes("unsupported generated schema"), `stale ${table} schema was accepted`); assert(readFileSync(dbPath).equals(before), `stale ${table} schema was mutated`); } finally { rmSync(repo, { recursive: true, force: true }); }
   }
   const repo = setup(); try { const dbPath = join(repo, ".nerv/nerv.db"); const db = new Database(dbPath); db.exec("DROP INDEX one_open_work_item"); db.close(); const before = readFileSync(dbPath); assert(run(repo, ["init"], 1).includes("unsupported generated schema"), "missing one-open-Work index was accepted"); assert(readFileSync(dbPath).equals(before), "missing-index database was mutated"); } finally { rmSync(repo, { recursive: true, force: true }); }
+  const metadataRepo = setup(); try { const dbPath = join(metadataRepo, ".nerv/nerv.db"); const db = new Database(dbPath); db.prepare("INSERT INTO metadata VALUES ('obsolete', 'value', 'now')").run(); db.close(); assert(run(metadataRepo, ["init"], 1).includes("unsupported generated schema"), "obsolete metadata was accepted"); } finally { rmSync(metadataRepo, { recursive: true, force: true }); }
 }
 {
   const repo = setup(); try { materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); assert(run(repo, ["close", "WORK-001", "--message", "early"], 1).includes("not ready"), "Close did not require PASS"); review(repo, "PASS", ["--findings", JSON.stringify([{ severity: "low", finding: "minor" }])]); writeFileSync(join(repo, "unrelated.txt"), "unrelated\n"); run(repo, ["close", "WORK-001", "--message", "exact tree"]); assert(git(repo, ["show", "--format=", "--name-only", "HEAD"]).stdout.trim().split("\n").sort().join(",") === "one.txt,two.txt" && existsSync(join(repo, "unrelated.txt")), "Close did not commit the exact PASS-reviewed tree"); } finally { rmSync(repo, { recursive: true, force: true }); }
@@ -131,7 +129,7 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
       assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "invalid", "--validation-evidence", "full", "--findings", findings], 1).includes("PASS is not permitted"), `${severity} finding did not block PASS`);
       assert(run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "missing proposal", "--validation-evidence", "full", "--findings", findings], 1).includes("execution-ready remediation Task"), `${severity} REWORK accepted no proposal`);
       review(repo, "REWORK", ["--findings", findings, "--remediation-title", "Fix", "--remediation-objective", "Resolve issue", "--remediation-approach", "Change implementation", "--remediation-touchpoints", "src/index.ts", "--remediation-acceptance-criteria", "Issue resolved", "--remediation-validation", "pnpm smoke"]);
-      run(repo, ["work", "materialize-rework", "WORK-001", "--tasks", JSON.stringify([{ title: "Fix", objective: "Resolve issue", implementation_approach: "Change implementation", expected_touchpoints: "src/index.ts", acceptance_criteria: "Issue resolved", validation: "pnpm smoke" }])]);
+       run(repo, ["work", "materialize-rework", "WORK-001"]);
       finish(repo, 3, "fix.txt"); assert(review(repo, "PASS").includes("PASS"), `${severity} remediation did not return to Review`);
     } finally { rmSync(repo, { recursive: true, force: true }); }
   }
@@ -146,7 +144,60 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
   const repo = setup(); try { writeFileSync(join(repo, "README.md"), "preexisting change\n"); materialize(repo); run(repo, ["work", "task", "start", "WORK-001", "1"]); assert(run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "unsafe", "--files", "README.md"], 1).includes("Baseline-dirty"), "protected baseline path was attributable"); } finally { rmSync(repo, { recursive: true, force: true }); }
 }
 {
+  const repo = setup(); try {
+    mkdirSync(join(repo, "src")); writeFileSync(join(repo, "src", "protected.txt"), "dirty\n"); materialize(repo); run(repo, ["work", "task", "start", "WORK-001", "1"]);
+    assert(run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "unsafe", "--files", "src"], 1).includes("Invalid attributable"), "directory attribution swallowed protected path");
+    writeFileSync(join(repo, "src", "normal.txt"), "feature\n"); assert(run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "exact", "--files", "src/normal.txt"], 0).includes("Completed"), "exact nested file was rejected");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    materialize(repo); run(repo, ["work", "task", "start", "WORK-001", "1"]); writeFileSync(join(repo, "space name.txt"), "feature\n"); writeFileSync(join(repo, ":(glob)literal.txt"), "feature\n");
+    run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "exact paths", "--files", "space name.txt", ":(glob)literal.txt"]); finish(repo, 2, "two.txt"); review(repo, "PASS"); run(repo, ["close", "WORK-001", "--message", "literal paths"]);
+    assert(git(repo, ["show", "--format=", "--name-only", "HEAD"]).stdout.includes(":(glob)literal.txt"), "literal pathspec-like filename was not committed");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    writeFileSync(join(repo, "delete.txt"), "base\n"); git(repo, ["add", "delete.txt"]); git(repo, ["commit", "-m", "deletion base"]); materialize(repo); run(repo, ["work", "task", "start", "WORK-001", "1"]); rmSync(join(repo, "delete.txt")); run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "deletion", "--files", "delete.txt"]); finish(repo, 2, "two.txt"); review(repo, "PASS"); run(repo, ["close", "WORK-001", "--message", "deletion"]); assert(!existsSync(join(repo, "delete.txt")), "exact deletion was not committed");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    materialize(repo); run(repo, ["work", "task", "start", "WORK-001", "1"]); run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "no tracked change"]); run(repo, ["work", "task", "start", "WORK-001", "2"]); run(repo, ["work", "task", "done", "WORK-001", "2", "--evidence", "no tracked change"]); const before = git(repo, ["rev-parse", "HEAD"]).stdout.trim(); review(repo, "PASS"); run(repo, ["close", "WORK-001", "--message", "no diff"]); const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(git(repo, ["rev-parse", "HEAD"]).stdout.trim() === before && db.prepare("SELECT commit_hash FROM work_items WHERE ref='WORK-001'").get().commit_hash === null, "no-diff Close manufactured a commit"); db.close();
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
   const repo = setup(); try { materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS"); writeFileSync(join(repo, "one.txt"), "changed after PASS\n"); assert(run(repo, ["close", "WORK-001", "--message", "stale"], 1).includes("changed after PASS"), "Close accepted a changed PASS fingerprint"); assert(run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "mutated", "--validation-evidence", "full", ...remediation, "--verification-evidence", "external verification failed"], 1).includes("changed after PASS"), "mutated PASS downgraded to REWORK"); writeFileSync(join(repo, "one.txt"), "feature\n"); const downgrade = review(repo, "REWORK", [...remediation, "--verification-evidence", "external verification failed"]); assert(downgrade.includes("REWORK"), "verification could not downgrade PASS to REWORK"); assert(run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "again", "--validation-evidence", "full", ...remediation], 1).includes("active Work"), "REWORK was accepted without PASS verification evidence"); } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); const bin = mkdtempSync(join(tmpdir(), "nerv-git-race-")); try {
+    materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS");
+    writeFileSync(join(bin, "git"), `#!/bin/sh\nif [ "$1" = update-ref ] && [ ! -e .git/nerv-race-fired ]; then\n  touch .git/nerv-race-fired\n  ref="$2"; old="$4"\n  external=$(${gitPath} commit-tree "$(${gitPath} rev-parse \"$old^{tree}\")" -p "$old" -m "external ref advance")\n  ${gitPath} update-ref "$ref" "$external" "$old"\nfi\nexec ${gitPath} "$@"\n`); chmodSync(join(bin, "git"), 0o755);
+    const before = git(repo, ["rev-parse", "HEAD"]).stdout.trim(); const failed = run(repo, ["close", "WORK-001", "--message", "race"], 1, { PATH: `${bin}:${process.env.PATH}` }); const after = git(repo, ["rev-parse", "HEAD"]).stdout.trim();
+    assert(failed.includes("publication failed") && after !== before && git(repo, ["diff", "--cached", "--quiet"]).status === 0 && git(repo, ["status", "--porcelain"]).stdout.includes("one.txt"), "initial publication CAS loss mutated Git after external authority advanced");
+    const db = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(db.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get().status === "review", "initial CAS loss closed the Work"); db.close();
+  } finally { rmSync(bin, { recursive: true, force: true }); rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); const bin = mkdtempSync(join(tmpdir(), "nerv-git-durable-failure-")); try {
+    materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS");
+    const baseline = git(repo, ["rev-parse", "HEAD"]).stdout.trim(); writeFileSync(join(bin, "git"), `#!/bin/sh\nif [ "$1" = update-ref ] && [ ! -e .git/nerv-durable-failure-fired ]; then\n  touch .git/nerv-durable-failure-fired\n  ${gitPath} "$@" || exit $?\n  ${process.execPath} -e "const Database=require('${sqliteModule}'); const db=new Database('.nerv/nerv.db'); db.exec(\\\"CREATE TRIGGER fail_close BEFORE UPDATE ON work_items WHEN NEW.status = 'closed' BEGIN SELECT RAISE(ABORT, 'forced durable Close failure'); END\\\"); db.close()"\n  exit 0\nfi\nexec ${gitPath} "$@"\n`); chmodSync(join(bin, "git"), 0o755);
+    const failed = run(repo, ["close", "WORK-001", "--message", "durable failure"], 1, { PATH: `${bin}:${process.env.PATH}` });
+    assert(failed.includes("forced durable Close failure") && git(repo, ["rev-parse", "HEAD"]).stdout.trim() === baseline && git(repo, ["diff", "--cached", "--quiet"]).status === 0 && git(repo, ["status", "--porcelain"]).stdout.includes("one.txt"), "durable Close failure did not safely compensate publication");
+    const state = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(state.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get().status === "review", "successful compensation closed the Work"); state.close();
+  } finally { rmSync(bin, { recursive: true, force: true }); rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); const bin = mkdtempSync(join(tmpdir(), "nerv-git-compensation-race-")); try {
+    materialize(repo); finish(repo, 1, "one.txt"); finish(repo, 2, "two.txt"); review(repo, "PASS");
+    const boundary = join(bin, "boundary");
+    writeFileSync(join(bin, "git"), `#!/bin/sh\nif [ "$1" = update-ref ] && [ ! -e .git/nerv-compensation-race-fired ]; then\n  touch .git/nerv-compensation-race-fired\n  ${gitPath} "$@" || exit $?\n  ${process.execPath} -e "const Database=require('${sqliteModule}'); const db=new Database('.nerv/nerv.db'); db.exec(\\\"CREATE TRIGGER fail_close BEFORE UPDATE ON work_items WHEN NEW.status = 'closed' BEGIN SELECT RAISE(ABORT, 'forced durable Close failure'); END\\\"); db.close()"\n  ref="$2"; published="$3"\n  external=$(${gitPath} commit-tree "$(${gitPath} rev-parse \"$published^{tree}\")" -p "$published" -m "external ref advance")\n  ${gitPath} update-ref "$ref" "$external" "$published" || exit $?\n  printf '%s\\n%s\\n' "$(${gitPath} rev-parse "$ref")" "$(${gitPath} write-tree)" > "${boundary}"\n  ${gitPath} status --porcelain=v1 -z | base64 >> "${boundary}"\n  exit 0\nfi\nexec ${gitPath} "$@"\n`); chmodSync(join(bin, "git"), 0o755);
+    const failed = run(repo, ["close", "WORK-001", "--message", "compensation race"], 1, { PATH: `${bin}:${process.env.PATH}` });
+    const [ref, index, status] = readFileSync(boundary, "utf8").trimEnd().split("\n"); const after = { ref: git(repo, ["rev-parse", "HEAD"]).stdout.trim(), index: git(repo, ["write-tree"]).stdout.trim(), status: Buffer.from(git(repo, ["status", "--porcelain=v1", "-z"]).stdout).toString("base64") };
+    assert(failed.includes("Git/Nerv consistency failure") && JSON.stringify(after) === JSON.stringify({ ref, index, status }), "failed compensation mutated Git after external authority advanced");
+    const state = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }); assert(state.prepare("SELECT status FROM work_items WHERE ref='WORK-001'").get().status === "review", "compensation authority loss closed the Work"); state.close();
+  } finally { rmSync(bin, { recursive: true, force: true }); rmSync(repo, { recursive: true, force: true }); }
 }
 {
   const publicSkill = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8"); const marker = publicSkill.match(/^nerv_managed_sha256: "([a-f0-9]{64})"$/m); assert(!publicSkill.includes("Task scopes") && marker && marker[1] === createHash("sha256").update(publicSkill.replace(marker[0], "nerv_managed_sha256: \"\"")).digest("hex"), "public skill is invalid");
