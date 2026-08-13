@@ -34,4 +34,4 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 
 ## Repository invariants
 
-The runtime is agent agnostic and does not control agents. Work UUID identities and local `WORK-###` references are distinct; Tasks are positioned within their Work Item. Close selectively stages attributable paths only.
+The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `WORK-###` references are distinct; Tasks are positioned within their Work Item. SQLite allocates friendly refs while local state exists; fresh local state seeds only from valid paired Nerv trailers reachable from current `HEAD`. This is not distributed uniqueness, and no-diff Work refs cannot be reconstructed after local state is discarded. Close selectively stages attributable paths only.

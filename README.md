@@ -12,7 +12,7 @@ A Work Item is the governed unit of work. It contains one or more bounded Tasks.
 
 The normal flow is: relevant Product Context, plan preview, human approval, materialize, execute Tasks, validate, Work Review, optional user or external verification, then Git-safe close on request. Review rework adds approved remediation Tasks to the same Work Item. A Checkpoint is only for a genuine interruption.
 
-SQLite is the durable local operational source of truth. Each Work Item has a stable UUID and a local friendly `WORK-###` reference; Tasks have UUID identities and positions scoped within their Work Item, never global task references. Shared canonical context is tracked only in `.nerv-context/product.md` and `.nerv-context/repo.md`. `.nerv/` is local ignored state and temporary active context.
+SQLite is the durable local operational source of truth. Each Work Item has a stable UUID and a repository-local friendly `WORK-###` reference; Tasks have UUID identities and positions scoped within their Work Item, never global task references. On fresh local state, Nerv seeds friendly numbering from the highest valid paired Nerv trailer reachable from the current `HEAD`; existing SQLite allocation remains authoritative. Friendly references are not distributed identifiers: divergent or disconnected histories may reuse them, and no-diff Work refs cannot be recovered after local state is discarded because no commit records their trailers. Shared canonical context is tracked only in `.nerv-context/product.md` and `.nerv-context/repo.md`. `.nerv/` is local ignored state and temporary active context.
 
 ## Install
 

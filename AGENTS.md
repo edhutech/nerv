@@ -14,7 +14,7 @@
 - SQLite is the durable operational source of truth. Work Items govern work, Tasks belong to Work Items, and Markdown is only minimal temporary active context.
 - Shared current product truth is `.nerv-context/product.md`; shared durable repository truth is `.nerv-context/repo.md`. Generated Repo observations, operational state, and active Markdown remain local under `.nerv/`. Nerv does not own general-purpose memory, code intelligence, or discovery records.
 - The runtime CLI is agent agnostic. It must not launch, control, route, or require coding agents or models.
-- Work Items have UUID stable IDs and local `WORK-###` refs. Tasks have UUID identities and positions scoped to their Work Item, with no global `TASK-###` ref. Git trailers are `Nerv-Work` (UUID) and `Nerv-Work-Ref` (friendly ref). Do not derive work numbering from Git.
+- Work Items have UUID stable IDs and repository-local `WORK-###` refs. Tasks have UUID identities and positions scoped to their Work Item, with no global `TASK-###` ref. Git trailers are `Nerv-Work` (UUID) and `Nerv-Work-Ref` (friendly ref). SQLite allocates refs normally; a fresh `.nerv/` may seed its initial allocator from valid paired trailers reachable from current `HEAD`, without deriving identity from Git.
 - `.nerv/` is gitignored, generated workspace state. Create and access it through `workspace.ts` and repository helpers, never by assuming it exists or editing `dist/`.
 
 ## Lifecycle Boundaries

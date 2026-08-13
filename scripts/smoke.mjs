@@ -17,8 +17,10 @@ const sqliteModule = join(root, "node_modules", "better-sqlite3");
 function setup(establish = true) { const repo = mkdtempSync(join(tmpdir(), "nerv-smoke-")); git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]); writeFileSync(join(repo, "README.md"), "base\n"); git(repo, ["add", "README.md"]); git(repo, ["commit", "-m", "initial"]); run(repo, ["init"]); if (establish) { git(repo, ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]); git(repo, ["commit", "-m", "establish nerv setup"]); } return repo; }
 const plan = (title = "Persist plan") => ({ title, intent: "approved intent", goal: "approved goal", scope: "approved scope", expected_touchpoints: "src/database.ts", out_of_scope: "Git hardening", acceptance_criteria: "contract persists", validation: "pnpm validate", tasks: [{ title: "Persist fields", objective: "Store the plan", implementation_approach: "Use direct columns", expected_touchpoints: "src/repository.ts", acceptance_criteria: "fields round trip", validation: "pnpm smoke" }, { title: "Recover fields", objective: "Expose the plan", implementation_approach: "Render from SQLite", expected_touchpoints: "src/index.ts", acceptance_criteria: "show is complete", validation: "pnpm smoke" }] });
 function materialize(repo, value = plan()) { const output = run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]); return /Stable ID: ([0-9a-f-]{36})/.exec(output)?.[1]; }
+function materializedRef(repo, value = plan()) { return /Materialized (WORK-[0-9]+)/.exec(run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]))?.[1]; }
 function finish(repo, position, file, ref = "WORK-001") { run(repo, ["work", "task", "start", ref, String(position)]); writeFileSync(join(repo, file), "feature\n"); run(repo, ["work", "task", "done", ref, String(position), "--evidence", "targeted passed", "--files", file]); }
 function review(repo, outcome, extra = [], ref = "WORK-001") { return run(repo, ["review", ref, "--outcome", outcome, "--summary", "complete", "--validation-evidence", "full", ...extra]); }
+function historyWork(repo, ref, id = "123e4567-e89b-42d3-a456-426614174000") { git(repo, ["commit", "--allow-empty", "-m", `history\n\nNerv-Work: ${id}\nNerv-Work-Ref: ${ref}`]); }
 const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: "fix" }]), "--remediation-title", "Fix", "--remediation-objective", "Resolve", "--remediation-approach", "Change", "--remediation-touchpoints", "src/index.ts", "--remediation-acceptance-criteria", "Resolved", "--remediation-validation", "pnpm smoke"];
 
 {
@@ -27,6 +29,56 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
     assert(run(repo, ["work", "materialize", "--plan", JSON.stringify(plan())], 1).includes("setup/context must be committed"), "uncommitted setup materialized a Work");
     git(repo, ["add", ".nerv-context/product.md"]); assert(run(repo, ["work", "materialize", "--plan", JSON.stringify(plan())], 1).includes("setup/context must be committed"), "clean index bypassed untracked setup"); git(repo, ["reset", "--", ".nerv-context/product.md"]);
     git(repo, ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]); git(repo, ["commit", "-m", "establish nerv setup"]); assert(materialize(repo), "committed setup did not permit materialization without reinit");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = mkdtempSync(join(tmpdir(), "nerv-unborn-")); try {
+    git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]);
+    assert(run(repo, ["init"]).includes("Initialized Nerv"), "unborn repository init failed");
+    git(repo, ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]); git(repo, ["commit", "-m", "establish nervous setup"]);
+    assert(materializedRef(repo) === "WORK-001", "unborn repository did not seed WORK-001");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    git(repo, ["commit", "--allow-empty", "-m", "ordinary discussion mentions WORK-999 but has no Nerv trailers"]);
+    rmSync(join(repo, ".nerv"), { recursive: true, force: true }); run(repo, ["init"]);
+    assert(materializedRef(repo) === "WORK-001", "plain WORK text affected fresh sequence recovery");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    const first = materializedRef(repo); finish(repo, 1, "one.txt", first); finish(repo, 2, "two.txt", first); review(repo, "PASS", [], first); run(repo, ["close", first, "--message", "first"]);
+    const second = materializedRef(repo); finish(repo, 1, "three.txt", second); finish(repo, 2, "four.txt", second); review(repo, "PASS", [], second); run(repo, ["close", second, "--message", "second"]);
+    assert(materializedRef(repo) === "WORK-003", "persistent SQLite allocation did not continue through WORK-003");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    const first = materializedRef(repo); finish(repo, 1, "one.txt", first); finish(repo, 2, "two.txt", first); review(repo, "PASS", [], first); run(repo, ["close", first, "--message", "first"]);
+    const second = materializedRef(repo); finish(repo, 1, "three.txt", second); finish(repo, 2, "four.txt", second); review(repo, "PASS", [], second); run(repo, ["close", second, "--message", "second"]);
+    const third = materializedRef(repo); finish(repo, 1, "five.txt", third); finish(repo, 2, "six.txt", third); review(repo, "PASS", [], third); run(repo, ["close", third, "--message", "third"]);
+    rmSync(join(repo, ".nerv"), { recursive: true, force: true }); run(repo, ["init"]);
+    assert(materializedRef(repo) === "WORK-004", "fresh local state did not continue after committed Work history");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    for (const [number, ref] of [[1, "WORK-001"], [10, "WORK-010"], [11, "WORK-011"], [999, "WORK-999"], [1000, "WORK-1000"]]) historyWork(repo, ref, `123e4567-e89b-42d3-a456-42661417${String(number).padStart(4, "0")}`);
+    historyWork(repo, "WORK-001", "123e4567-e89b-42d3-a456-426614174999");
+    for (const ref of ["WORK-1", "WORK-01", "WORK-000", "WORK-0001", "WORK-0010", "WORK-+1", "WORK--1", "WORK-1.0", "WORK- 001", "WORK-001 ", "work-001", "WORK-09999"]) historyWork(repo, ref, "123e4567-e89b-42d3-a456-426614174998");
+    git(repo, ["commit", "--allow-empty", "-m", "arbitrary WORK-999\n\nNerv-Work: invalid\nNerv-Work-Ref: WORK-999"]);
+    git(repo, ["commit", "--allow-empty", "-m", "unpaired\n\nNerv-Work-Ref: WORK-998"]);
+    git(repo, ["commit", "--allow-empty", "-m", "malformed\n\nNerv-Work: 123e4567-e89b-42d3-a456-426614174000\nNerv-Work-Ref: WORK-000"]);
+    rmSync(join(repo, ".nerv"), { recursive: true, force: true }); run(repo, ["init"]);
+    const seeded = new Database(join(repo, ".nerv/nerv.db"), { readonly: true }).prepare("SELECT value FROM metadata WHERE key='next_work_number'").get().value; const recovered = materializedRef(repo); assert(recovered === "WORK-1001", `fresh state did not recover highest valid canonical HEAD trailer: ${recovered}; seed ${seeded}`);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+}
+{
+  const repo = setup(); try {
+    historyWork(repo, "WORK-003"); const branch = git(repo, ["branch", "--show-current"]).stdout.trim(); git(repo, ["checkout", "-b", "other"]); historyWork(repo, "WORK-999"); git(repo, ["checkout", branch]);
+    rmSync(join(repo, ".nerv"), { recursive: true, force: true }); run(repo, ["init"]);
+    assert(materializedRef(repo) === "WORK-004", "unreachable branch history affected sequence recovery");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 }
 {
@@ -71,7 +123,7 @@ const remediation = ["--findings", JSON.stringify([{ severity: "high", finding: 
     assert(taskColumns.includes("attribution_json") && !taskColumns.includes("block_reason") && checkpointColumns.join(",") === "id,work_item_id,task_id,summary,next_step,created_at" && reviewColumns.join(",") === "id,work_item_id,outcome,summary,findings,remediation_json,validation_evidence,git_fingerprint_json,verification_evidence,created_at" && indexes.includes("one_open_work_item") && !metadata.includes("product_context_updated_at") && !metadata.includes("repo_context_updated_at"), "schema is not the clean lifecycle baseline");
     assert(run(repo, ["init"]).includes("already initialized"), "current schema-v1 was not idempotently accepted");
     const failureDb = new Database(dbPath); failureDb.exec("CREATE TRIGGER fail_task_insert BEFORE INSERT ON tasks WHEN NEW.title = 'Fail inside transaction' BEGIN SELECT RAISE(ABORT, 'forced task insert failure'); END"); failureDb.close();
-    const repository = openRepository(dbPath); let failure; try { repository.materializePlan({ ...plan("failed transaction"), tasks: [{ ...plan().tasks[0], title: "Fail inside transaction" }], git_baseline_json: "{}" }); } catch (error) { failure = error; } finally { repository.close(); } const afterFailure = new Database(dbPath); assert(failure instanceof Error && failure.message.includes("forced task insert failure") && afterFailure.prepare("SELECT COUNT(*) AS count FROM work_items").get().count === 0 && afterFailure.prepare("SELECT COUNT(*) AS count FROM tasks").get().count === 0 && afterFailure.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get() === undefined, "transactional failure left rows or consumed a Work reference"); afterFailure.exec("DROP TRIGGER fail_task_insert"); afterFailure.close();
+    const repository = openRepository(dbPath); let failure; try { repository.materializePlan({ ...plan("failed transaction"), tasks: [{ ...plan().tasks[0], title: "Fail inside transaction" }], git_baseline_json: "{}" }); } catch (error) { failure = error; } finally { repository.close(); } const afterFailure = new Database(dbPath); assert(failure instanceof Error && failure.message.includes("forced task insert failure") && afterFailure.prepare("SELECT COUNT(*) AS count FROM work_items").get().count === 0 && afterFailure.prepare("SELECT COUNT(*) AS count FROM tasks").get().count === 0 && afterFailure.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get().value === "1", "transactional failure left rows or consumed a Work reference"); afterFailure.exec("DROP TRIGGER fail_task_insert"); afterFailure.close();
     const id = materialize(repo); assert(id, "first Work did not materialize"); const baseline = JSON.parse(new Database(dbPath, { readonly: true }).prepare("SELECT git_baseline_json FROM work_items WHERE ref='WORK-001'").get().git_baseline_json); assert(JSON.stringify(Object.keys(baseline).sort()) === JSON.stringify(["head", "protected_paths", "protected_tree"]) && !("dirty" in baseline), "activation baseline retains obsolete dirty state");
     const rejected = run(repo, ["work", "materialize", "--plan", JSON.stringify(plan("second"))], 1); const afterRejected = new Database(dbPath, { readonly: true }); assert(rejected.includes("already open") && afterRejected.prepare("SELECT COUNT(*) AS count FROM work_items").get().count === 1 && afterRejected.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get().value === "2", "open Work materialization was not atomic"); afterRejected.close();
     assert(run(repo, ["work", "task", "start", "WORK-001", "2"], 1).includes("cannot start"), "later pending Task started first");

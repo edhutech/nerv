@@ -16,7 +16,7 @@ const SIGNATURE = new Map(STATEMENTS.map((sql) => {
 }));
 const EXPECTED = new Set(SIGNATURE.keys());
 
-export function initializeDatabase(databasePath: string): void {
+export function initializeDatabase(databasePath: string, nextWorkNumber = 1): void {
   const database = new Database(databasePath);
   try {
     database.pragma("journal_mode = WAL");
@@ -25,7 +25,9 @@ export function initializeDatabase(databasePath: string): void {
     if (hasObjects && !matchesSchema(database)) throw new Error("existing .nerv/nerv.db uses an unsupported generated schema; remove .nerv and run `nerv init` again");
     if (!hasObjects) database.transaction(() => {
       for (const statement of STATEMENTS) database.exec(statement);
-      database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)").run(SCHEMA_VERSION, new Date().toISOString());
+      const timestamp = new Date().toISOString();
+      database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)").run(SCHEMA_VERSION, timestamp);
+      database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('next_work_number', ?, ?)").run(String(nextWorkNumber), timestamp);
     })();
   } finally { database.close(); }
 }

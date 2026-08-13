@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFil
 import { execFileSync } from "node:child_process";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
+import { workRef } from "./repository.js";
 
 const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
 const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
@@ -35,7 +36,7 @@ export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error("existing .nerv/nerv.db uses an unsupported generated schema; remove .nerv and run `nerv init` again");
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
-  initializeDatabase(databasePath);
+  initializeDatabase(databasePath, existsSync(databasePath) ? undefined : nextWorkNumber(repoRoot));
   ensureLocalExclude(repoRoot);
   const skillSync = ensurePublicSkill(repoRoot);
   ensureSharedContext(repoRoot);
@@ -51,6 +52,22 @@ function ensureSharedContext(repoRoot: string): void {
 }
 function git(repoRoot: string, args: string[]): string { return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim(); }
 function gitSucceeds(repoRoot: string, args: string[]): boolean { try { git(repoRoot, args); return true; } catch { return false; } }
+function nextWorkNumber(repoRoot: string): number {
+  let commits: string[];
+  try { commits = git(repoRoot, ["log", "--format=%H", "HEAD"]).split("\n").filter(Boolean); } catch { return 1; }
+  let highest = 0;
+  for (const commit of commits) {
+    const values = git(repoRoot, ["show", "-s", "--format=%(trailers:key=Nerv-Work,valueonly,unfold=true)%x1f%(trailers:key=Nerv-Work-Ref,valueonly,unfold=true)", commit]).split("\x1f");
+    const ids = values[0]?.split("\n").filter(Boolean) ?? [];
+    const refs = values[1]?.split("\n").filter(Boolean) ?? [];
+    if (ids.length !== 1 || refs.length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ids[0])) continue;
+    const match = /^WORK-([0-9]+)$/.exec(refs[0]);
+    if (!match) continue;
+    const value = Number(match[1]);
+    if (Number.isSafeInteger(value) && value > 0 && workRef(value) === refs[0]) highest = Math.max(highest, value);
+  }
+  return highest + 1;
+}
 export function ensureLocalExclude(repoRoot: string): void {
   const resolved = git(repoRoot, ["rev-parse", "--git-path", "info/exclude"]);
   const path = isAbsolute(resolved) ? resolved : resolve(repoRoot, resolved);
