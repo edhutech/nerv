@@ -1,7 +1,7 @@
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -11,7 +11,6 @@ export { chmodSync, createHash, Database, existsSync, join, mkdirSync, mkdtempSy
 
 export const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const cli = join(root, "dist/index.js");
-export const gitPath = spawnSync("which", ["git"], { encoding: "utf8" }).stdout.trim();
 export const sqliteModule = join(root, "node_modules", "better-sqlite3");
 
 export function assert(value, message) { if (!value) throw new Error(message); }
@@ -21,7 +20,52 @@ export function run(cwd, args, expected = 0, env = {}) {
   if (result.status !== expected) throw new Error(`${args.join(" ")}: ${output}`);
   return output;
 }
-export function git(cwd, args) { return spawnSync("git", args, { cwd, encoding: "utf8" }); }
+export function git(cwd, args, env = {}) { return spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...env } }); }
+function realGitPath() {
+  const names = process.platform === "win32" ? ["git.exe", "git.cmd", "git.bat"] : ["git"];
+  for (const directory of (process.env.PATH ?? "").split(delimiter)) for (const name of names) {
+    const candidate = join(directory, name);
+    try { accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK); return candidate; } catch { /* Try the next candidate. */ }
+  }
+  throw new Error("Unable to resolve the real Git executable.");
+}
+export function installGitRaceWrapper(directory) {
+  const wrapper = join(directory, "git-race-wrapper.mjs");
+  writeFileSync(wrapper, `import { existsSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+const [command, ...args] = process.argv.slice(2);
+const realGit = process.env.NERV_REAL_GIT;
+const call = (gitArgs, options = {}) => { const result = spawnSync(realGit, gitArgs, { cwd: process.cwd(), encoding: "buffer", ...options }); if (result.status !== 0) process.exit(result.status ?? 1); return result.stdout; };
+const text = (gitArgs) => call(gitArgs).toString("utf8").trim();
+const marker = ".git/nerv-race-fired";
+if (command === "update-ref" && !existsSync(marker)) {
+  writeFileSync(marker, "fired\\n");
+  if (process.env.NERV_GIT_RACE_SCENARIO === "initial") {
+    const [ref, , old] = args;
+    const external = text(["commit-tree", text(["rev-parse", old + "^{tree}"]), "-p", old, "-m", "external ref advance"]);
+    call(["update-ref", ref, external, old]);
+  } else {
+    call([command, ...args], { stdio: "inherit" });
+    const Database = createRequire(import.meta.url)(process.env.NERV_SQLITE_MODULE);
+    const db = new Database(".nerv/nerv.db");
+    try { db.exec("CREATE TRIGGER fail_close BEFORE UPDATE ON work_items WHEN NEW.status = 'closed' BEGIN SELECT RAISE(ABORT, 'forced durable Close failure'); END"); } finally { db.close(); }
+    if (process.env.NERV_GIT_RACE_SCENARIO === "compensation") {
+      const [ref, published] = args;
+      const external = text(["commit-tree", text(["rev-parse", published + "^{tree}"]), "-p", published, "-m", "external ref advance"]);
+      call(["update-ref", ref, external, published]);
+      writeFileSync(process.env.NERV_GIT_RACE_BOUNDARY, [text(["rev-parse", ref]), text(["write-tree"]), call(["status", "--porcelain=v1", "-z"]).toString("base64")].join("\\n"));
+    }
+    process.exit(0);
+  }
+}
+const result = spawnSync(realGit, [command, ...args], { stdio: "inherit" });
+process.exit(result.status ?? 1);
+`);
+  if (process.platform === "win32") writeFileSync(join(directory, "git.cmd"), `@"${process.execPath}" "${wrapper}" %*\r\n`);
+  else { writeFileSync(join(directory, "git"), `#!${process.execPath}\nimport "./git-race-wrapper.mjs";\n`); chmodSync(join(directory, "git"), 0o755); }
+  return { PATH: `${directory}${delimiter}${process.env.PATH}`, NERV_REAL_GIT: realGitPath(), NERV_SQLITE_MODULE: sqliteModule };
+}
 export function setup(establish = true) {
   const repo = mkdtempSync(join(tmpdir(), "nerv-smoke-"));
   git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]);
