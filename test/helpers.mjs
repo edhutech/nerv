@@ -1,4 +1,4 @@
-import { accessSync, chmodSync, constants, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { delimiter, join, resolve } from "node:path";
@@ -31,40 +31,64 @@ function realGitPath() {
 }
 export function installGitRaceWrapper(directory) {
   const wrapper = join(directory, "git-race-wrapper.mjs");
-  writeFileSync(wrapper, `import { existsSync, writeFileSync } from "node:fs";
+  writeFileSync(wrapper, `import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 const [command, ...args] = process.argv.slice(2);
 const realGit = process.env.NERV_REAL_GIT;
-const call = (gitArgs, options = {}) => { const result = spawnSync(realGit, gitArgs, { cwd: process.cwd(), encoding: "buffer", ...options }); if (result.status !== 0) process.exit(result.status ?? 1); return result.stdout; };
+const evidencePath = process.env.NERV_GIT_RACE_EVIDENCE;
+const evidence = existsSync(evidencePath) ? JSON.parse(readFileSync(evidencePath, "utf8")) : [];
+const record = (event, details = {}) => { evidence.push({ event, ...details }); writeFileSync(evidencePath, JSON.stringify(evidence)); };
+const call = (gitArgs, options = {}) => { record("delegating", { command: gitArgs[0] }); const result = spawnSync(realGit, gitArgs, { cwd: process.cwd(), encoding: "buffer", ...options }); record("delegated", { command: gitArgs[0], status: result.status }); if (result.status !== 0) process.exit(result.status ?? 1); return result.stdout; };
 const text = (gitArgs) => call(gitArgs).toString("utf8").trim();
 const marker = ".git/nerv-race-fired";
+record("entered", { command, shim: process.execPath, realGit });
 if (command === "update-ref" && !existsSync(marker)) {
   writeFileSync(marker, "fired\\n");
+  record("mutation-started", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
   if (process.env.NERV_GIT_RACE_SCENARIO === "initial") {
     const [ref, , old] = args;
     const external = text(["commit-tree", text(["rev-parse", old + "^{tree}"]), "-p", old, "-m", "external ref advance"]);
     call(["update-ref", ref, external, old]);
+    record("mutation-completed", { scenario: "initial" });
   } else {
     call([command, ...args], { stdio: "inherit" });
+    record("publication-succeeded", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
     const Database = createRequire(import.meta.url)(process.env.NERV_SQLITE_MODULE);
     const db = new Database(".nerv/nerv.db");
     try { db.exec("CREATE TRIGGER fail_close BEFORE UPDATE ON work_items WHEN NEW.status = 'closed' BEGIN SELECT RAISE(ABORT, 'forced durable Close failure'); END"); } finally { db.close(); }
+    record("durable-failure-injected", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
     if (process.env.NERV_GIT_RACE_SCENARIO === "compensation") {
-      const [ref, published] = args;
-      const external = text(["commit-tree", text(["rev-parse", published + "^{tree}"]), "-p", published, "-m", "external ref advance"]);
-      call(["update-ref", ref, external, published]);
-      writeFileSync(process.env.NERV_GIT_RACE_BOUNDARY, [text(["rev-parse", ref]), text(["write-tree"]), call(["status", "--porcelain=v1", "-z"]).toString("base64")].join("\\n"));
     }
+    record("mutation-completed", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
     process.exit(0);
   }
 }
+if (command === "update-ref" && process.env.NERV_GIT_RACE_SCENARIO === "compensation" && existsSync(marker)) {
+  const [ref, , published] = args;
+  record("compensation-reached");
+  const external = text(["commit-tree", text(["rev-parse", published + "^{tree}"]), "-p", published, "-m", "external ref advance"]);
+  call(["update-ref", ref, external, published]);
+  writeFileSync(process.env.NERV_GIT_RACE_BOUNDARY, [text(["rev-parse", ref]), text(["write-tree"]), call(["status", "--porcelain=v1", "-z"]).toString("base64")].join("\\n"));
+  record("compensation-authority-advanced");
+}
+record("delegating", { command });
 const result = spawnSync(realGit, [command, ...args], { stdio: "inherit" });
+record("delegated", { command, status: result.status });
 process.exit(result.status ?? 1);
 `);
-  if (process.platform === "win32") writeFileSync(join(directory, "git.cmd"), `@"${process.execPath}" "${wrapper}" %*\r\n`);
-  else { writeFileSync(join(directory, "git"), `#!${process.execPath}\nimport "./git-race-wrapper.mjs";\n`); chmodSync(join(directory, "git"), 0o755); }
-  return { PATH: `${directory}${delimiter}${process.env.PATH}`, NERV_REAL_GIT: realGitPath(), NERV_SQLITE_MODULE: sqliteModule };
+  const realGit = realGitPath(); const evidence = join(directory, "evidence.json");
+  if (process.platform === "win32") {
+    const preload = join(directory, "git-race-preload.cjs");
+    writeFileSync(preload, `const { spawnSync } = require("node:child_process");
+const { resolve } = require("node:path");
+if (resolve(process.execPath) === resolve(process.env.NERV_GIT_RACE_SHIM)) { const result = spawnSync(process.env.NERV_NODE_EXECUTABLE, [process.env.NERV_GIT_RACE_WRAPPER, ...process.argv.slice(2)], { stdio: "inherit", env: { ...process.env, NODE_OPTIONS: "" } }); process.exit(result.status ?? 1); }
+`);
+    copyFileSync(process.execPath, join(directory, "git.exe"));
+    return { PATH: `${directory}${delimiter}${process.env.PATH}`, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require "${preload}"`.trim(), NERV_GIT_RACE_SHIM: join(directory, "git.exe"), NERV_GIT_RACE_WRAPPER: wrapper, NERV_GIT_RACE_EVIDENCE: evidence, NERV_NODE_EXECUTABLE: process.execPath, NERV_REAL_GIT: realGit, NERV_SQLITE_MODULE: sqliteModule };
+  }
+  writeFileSync(join(directory, "git"), `#!${process.execPath}\nimport "./git-race-wrapper.mjs";\n`); chmodSync(join(directory, "git"), 0o755);
+  return { PATH: `${directory}${delimiter}${process.env.PATH}`, NERV_GIT_RACE_EVIDENCE: evidence, NERV_REAL_GIT: realGit, NERV_SQLITE_MODULE: sqliteModule };
 }
 export function setup(establish = true) {
   const repo = mkdtempSync(join(tmpdir(), "nerv-smoke-"));
