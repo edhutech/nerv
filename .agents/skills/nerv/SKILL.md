@@ -1,7 +1,7 @@
 ---
 name: nerv
 description: "Use an installed Nerv runtime to govern normal software development in a Git repository. Plan before materializing work, use canonical context, and close only reviewed Work Items safely. Do not use to develop Nerv itself."
-nerv_managed_sha256: "74e63c99adeec2f9724d2fc4132af360075bfb8a406ebc690dffc85884aed609"
+nerv_managed_sha256: "0e34be0a1afcc56df146b90677e7e354f33fe521bd6f342a94a1350c3a4b7b70"
 ---
 
 # Nerv
@@ -85,9 +85,9 @@ Do not invoke or simulate `nerv review`, record PASS or REWORK, proceed to optio
 
 `nerv review WORK-###` is accepted only from an active Work with every Task done. It evaluates intent, relevant product or repository context, project authority, approved boundaries, acceptance criteria, implementation, Git diff, validation, optional external evidence, regressions, and risks. A Nerv Review outcome exists only after this runtime command succeeds and persists it; narrative analysis alone is not a completed Nerv Review and must not recommend approval. Classify every finding as `critical`, `high`, `medium`, or `low`. Critical and high findings always require REWORK. Medium findings require REWORK unless the developer explicitly accepts them as durable residual risk. Low findings are residual by default. Review has one Work-level outcome only: PASS or REWORK.
 
-PASS is ready for optional user or external verification, then `nerv close WORK-###` on request. Show residual low findings and explicitly accepted medium risks, and state that they do not block Close. Every persisted REWORK, including a Review after remediation, first shows severity-labeled findings and which findings block PASS, then persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
+PASS persists a Git-native synthetic-tree fingerprint for the attributed paths and is ready for optional user or external verification, then `nerv close WORK-###` on request. Show residual low findings and explicitly accepted medium risks, and state that they do not block Close. A PASS may become REWORK only when supplied verification evidence identifies blocking findings. Every persisted REWORK, including after verification or remediation, first shows severity-labeled findings and which findings block PASS, then persists findings and proposes minimum remediation Tasks without materializing them. Each proposed remediation Task must use the same visible execution-ready structure before recommending approval. `nerv approve` adds approved remediation to the same Work Item and reactivates it; execution then stops before the next explicit Work Review.
 
-Close selectively stages Work-owned changes, inspects the staged diff, and blocks unsafe boundaries. Never use `git add -A`; one Work Item produces one reviewed atomic commit by default.
+Close requires the saved PASS fingerprint and an unchanged protected baseline. It commits that exact reviewed tree with Git plumbing, preserving unrelated working-tree changes without staging them. Never use `git add -A`; one Work Item produces one reviewed atomic commit by default.
 
 ## Deterministic Primitives
 

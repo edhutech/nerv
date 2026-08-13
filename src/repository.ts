@@ -7,9 +7,8 @@ export type WorkItem = { id: string; ref: string; title: string; status: WorkSta
 export type Task = { id: string; work_item_id: string; position: number; title: string; status: TaskStatus; objective: string; implementation_approach: string; expected_touchpoints: string; acceptance_criteria: string; validation: string; validation_evidence: string | null; attribution_json: string | null; created_at: string; updated_at: string };
 export type PlanTask = Pick<Task, "title" | "objective" | "implementation_approach" | "expected_touchpoints" | "acceptance_criteria" | "validation">;
 export type ApprovedPlan = Pick<WorkItem, "title" | "intent" | "goal" | "scope" | "expected_touchpoints" | "out_of_scope" | "acceptance_criteria" | "validation"> & { tasks: PlanTask[]; git_baseline_json: string };
-export type Review = { id: number; work_item_id: string; outcome: "PASS" | "REWORK"; summary: string; findings: string | null; validation_evidence: string; created_at: string };
+export type Review = { id: number; work_item_id: string; outcome: "PASS" | "REWORK"; summary: string; findings: string | null; validation_evidence: string; git_fingerprint_json: string | null; verification_evidence: string | null; created_at: string };
 export type Checkpoint = { id: number; work_item_id: string; task_id: string | null; summary: string; next_step: string | null; created_at: string };
-export type Attribution = { paths: Array<{ path: string; state: "present" | "deleted"; hash: string | null }>; ambiguousBaselinePaths?: string[] };
 const now = () => new Date().toISOString();
 
 export function openRepository(path: string): any {
@@ -47,8 +46,11 @@ export function openRepository(path: string): any {
     db.prepare("UPDATE tasks SET status='done', validation_evidence=?, attribution_json=?, updated_at=? WHERE id=?").run(evidence, attribution, now(), entry.id); return getTask(entry.id)!;
   });
   const createReview = db.transaction((input: Omit<Review, "id" | "created_at">) => {
-    const item = getWork(input.work_item_id); if (!item || item.status !== "active" || listTasks(item.id).some((task) => task.status !== "done")) throw new Error("Work Review requires an active Work Item with all Tasks done.");
-    const result = db.prepare("INSERT INTO work_reviews (work_item_id,outcome,summary,findings,validation_evidence,created_at) VALUES (?,?,?,?,?,?)").run(input.work_item_id, input.outcome, input.summary, input.findings, input.validation_evidence, now());
+    const item = getWork(input.work_item_id); const previous = item ? db.prepare("SELECT * FROM work_reviews WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(item.id) as Review | undefined : undefined;
+    const activeReview = item?.status === "active" && listTasks(item.id).every((task) => task.status === "done");
+    const verificationDowngrade = item?.status === "review" && previous?.outcome === "PASS" && input.outcome === "REWORK" && Boolean(input.verification_evidence?.trim());
+    if (!item || (!activeReview && !verificationDowngrade)) throw new Error("Work Review requires an active Work Item with all Tasks done, or PASS verification evidence for a REWORK downgrade.");
+    const result = db.prepare("INSERT INTO work_reviews (work_item_id,outcome,summary,findings,validation_evidence,git_fingerprint_json,verification_evidence,created_at) VALUES (?,?,?,?,?,?,?,?)").run(input.work_item_id, input.outcome, input.summary, input.findings, input.validation_evidence, input.git_fingerprint_json, input.verification_evidence, now());
     setWork(item, { status: input.outcome === "PASS" ? "review" : "rework", validation_evidence: input.validation_evidence });
     return db.prepare("SELECT * FROM work_reviews WHERE id=?").get(result.lastInsertRowid) as Review;
   });
