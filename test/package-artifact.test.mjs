@@ -44,9 +44,12 @@ function run(command, args, cwd) {
 test("packed artifact has the exact public surface and runs in isolation", { skip: process.env.NERV_PACKAGE_TEST !== "1", timeout: 120_000 }, () => {
   const temp = mkdtempSync(join(tmpdir(), "nerv-package-"));
   try {
+    const sourcePackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     const packOutput = run(npm, ["pack", "--json", "--pack-destination", temp], root);
     const packed = JSON.parse(packOutput.match(/\[\s*\{[\s\S]*\}\s*\]/)?.[0] ?? "")[0];
     const archive = join(temp, packed.filename);
+    assert.equal(packed.name, sourcePackage.name);
+    assert.equal(packed.version, sourcePackage.version);
     assert.deepEqual(packed.files.map((entry) => entry.path).sort(), expectedFiles);
     for (const forbidden of [".nerv/", ".nerv-context/", "test/", ".github/", "src/", "AGENTS.md"]) {
       assert(!packed.files.some((entry) => entry.path === forbidden || entry.path.startsWith(forbidden)), `archive includes ${forbidden}`);
@@ -66,8 +69,10 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
 
     const binary = join(temp, "node_modules", ".bin", process.platform === "win32" ? "nerv.cmd" : "nerv");
     assert.equal(run(binary, ["--version"], repo).trim(), packed.version);
+    assert.match(run(binary, ["--help"], repo), /Usage: nerv/);
     run(binary, ["init"], repo);
     for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
+    for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md"]) assert.equal(readFileSync(join(repo, path), "utf8"), readFileSync(join(root, path), "utf8"), `init did not install ${path}`);
     assert.equal(execFileSync("git", ["check-ignore", ".nerv/nerv.db"], { cwd: repo, encoding: "utf8" }).trim(), ".nerv/nerv.db");
     execFileSync("git", ["add", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
     execFileSync("git", ["commit", "-m", "establish nerv"], { cwd: repo });
