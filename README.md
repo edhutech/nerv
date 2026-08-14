@@ -90,7 +90,7 @@ The `CLAUDE.md` bridge contains no workflow rules; it only directs Claude Code t
 
 When an actual distribution is made, create an optional Git tag as `v<version>` such as `v0.1.0`; a GitHub Release may then be created from that tag. Pre-release identifiers are available for external testing. Nerv has no release subsystem or release automation.
 
-Npm publication and npm Trusted Publishing are intentional future release actions; they are not performed by normal CI.
+Npm publication is an explicit release action; it is not performed by normal CI.
 
 ## Development
 

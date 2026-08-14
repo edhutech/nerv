@@ -2,7 +2,7 @@
 
 ## Stack
 
-Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Build and validation use pnpm.
+Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Build and validation use pnpm.
 
 ## Architecture
 
