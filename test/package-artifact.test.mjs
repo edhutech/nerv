@@ -45,6 +45,10 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
   const temp = mkdtempSync(join(tmpdir(), "nerv-package-"));
   try {
     const sourcePackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    assert.equal(sourcePackage.bin.nerv, "dist/index.js");
+    const publishOutput = run(npm, ["publish", "--access", "public", "--dry-run"], root);
+    assert.doesNotMatch(publishOutput, /"bin\[nerv\]" script name .* was invalid and removed/);
+    assert.doesNotMatch(publishOutput, /"repository\.url" was normalized/);
     const packOutput = run(npm, ["pack", "--json", "--pack-destination", temp], root);
     const packed = JSON.parse(packOutput.match(/\[\s*\{[\s\S]*\}\s*\]/)?.[0] ?? "")[0];
     const archive = join(temp, packed.filename);
