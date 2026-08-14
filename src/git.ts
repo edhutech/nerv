@@ -10,8 +10,13 @@ export type GitBaseline = {
 };
 export type GitFingerprint = { head: string; paths: string[]; tree: string };
 export type PendingCommit = { commit: string; ref: string };
+function gitCommand(args: string[]): { command: string; args: string[] } {
+  const wrapper = process.env.NERV_TEST_GIT_WRAPPER;
+  return wrapper ? { command: process.execPath, args: [wrapper, ...args] } : { command: "git", args };
+}
 function git(root: string, args: string[], env?: NodeJS.ProcessEnv): string {
-  return execFileSync("git", args, {
+  const command = gitCommand(args);
+  return execFileSync(command.command, command.args, {
     cwd: root,
     encoding: "utf8",
     env: { ...process.env, ...env },
@@ -19,7 +24,8 @@ function git(root: string, args: string[], env?: NodeJS.ProcessEnv): string {
   }).trim();
 }
 function gitBuffer(root: string, args: string[], env?: NodeJS.ProcessEnv): Buffer {
-  return execFileSync("git", args, {
+  const command = gitCommand(args);
+  return execFileSync(command.command, command.args, {
     cwd: root,
     encoding: "buffer",
     env: { ...process.env, ...env },

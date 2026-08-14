@@ -16,42 +16,25 @@ function evidence(directory, name) {
 }
 
 function raceEvidence(directory, scenario, updateRefs) {
-  const bootstrapEvidence = evidence(directory, "bootstrap.json");
   const raceEvidence = evidence(directory, "evidence.json");
-  const bootstrap = bootstrapEvidence.events;
   const events = raceEvidence.events;
-  const shim = join(directory, process.platform === "win32" ? "git.exe" : "git");
-  const wrappers = bootstrap.filter((entry) => entry.event === "wrapper-entered" && entry.command === "update-ref");
-  const forwards = bootstrap.filter((entry) => entry.event === "forwarding" && entry.forwarded[0] === "update-ref");
   const entered = events.filter((event) => event.event === "entered" && event.command === "update-ref");
   const event = (name) => events.findIndex((entry) => entry.event === name);
   const compensation = scenario !== "compensation" || event("publication-succeeded") < event("durable-failure-injected") && event("durable-failure-injected") < event("compensation-reached") && event("compensation-reached") < event("compensation-authority-advanced") && events.some((entry) => entry.event === "delegated" && entry.command === "update-ref" && entry.status !== 0);
-  const forwarded = process.platform !== "win32" || forwards.length === updateRefs && forwards.every((entry, index) => JSON.stringify(entry.forwarded) === JSON.stringify(wrappers[index]?.argv.slice(2)));
-  const selected = process.platform !== "win32" || bootstrap.filter((entry) => entry.event === "identity-checked" && entry.shim && entry.canonicalShim).length === updateRefs;
-  assert(wrappers.length === updateRefs && wrappers.every((entry) => entry.realGit) && selected && forwarded && entered.length === updateRefs && events.filter((entry) => entry.event === "delegating" && entry.command === "update-ref").length >= updateRefs && events.filter((entry) => entry.event === "delegated" && entry.command === "update-ref" && entry.status === 0).length >= updateRefs && events.some((entry) => entry.event === "mutation-started" && entry.scenario === scenario) && events.some((entry) => entry.event === "mutation-completed" && entry.scenario === scenario) && compensation, `${scenario} race harness did not prove its own shim selection, preload identity, complete argv forwarding, direct update-ref interception, real-Git delegation, and required mutation ordering: ${JSON.stringify({ shim, bootstrapEvidence, raceEvidence })}`);
+  assert(entered.length === updateRefs && entered.every((entry) => entry.realGit && Array.isArray(entry.args)) && events.filter((entry) => entry.event === "delegating" && entry.command === "update-ref").length >= updateRefs && events.filter((entry) => entry.event === "delegated" && entry.command === "update-ref" && entry.status === 0).length >= updateRefs && events.some((entry) => entry.event === "mutation-started" && entry.scenario === scenario) && events.some((entry) => entry.event === "mutation-completed" && entry.scenario === scenario) && compensation, `${scenario} race harness did not prove complete argv forwarding, direct update-ref interception, real-Git delegation, and required mutation ordering: ${JSON.stringify({ raceEvidence })}`);
 }
 
-test("Git race shim bootstrap selects, forwards, and delegates safely", () => {
+test("Git race wrapper receives exact argv and delegates safely", () => {
   const repo = setup(); const bin = mkdtempSync(join(tmpdir(), "nerv-git-bootstrap-")); try {
     const env = installGitRaceWrapper(bin);
     const probe = ["rev-parse", "--is-inside-work-tree"];
-    const shim = env.NERV_GIT_RACE_SHIM ?? join(bin, "git");
     const effectiveEnv = childEnv(env);
     const report = (result) => ({ status: result.status, signal: result.signal, error: result.error?.message, stdout: result.stdout, stderr: result.stderr });
-    const diagnostics = () => ({ shim, realGit: env.NERV_REAL_GIT, path: effectiveEnv.PATH, pathKeys: Object.keys(effectiveEnv).filter((key) => key.toLowerCase() === "path"), nodeOptions: effectiveEnv.NODE_OPTIONS, bootstrapEvidence: evidence(bin, "bootstrap.json"), raceEvidence: evidence(bin, "evidence.json") });
-    const direct = spawnSync(shim, probe, { cwd: repo, encoding: "utf8", env: effectiveEnv });
+    const diagnostics = () => ({ wrapper: env.NERV_TEST_GIT_WRAPPER, realGit: env.NERV_REAL_GIT, raceEvidence: evidence(bin, "evidence.json") });
+    const direct = spawnSync(process.execPath, [env.NERV_TEST_GIT_WRAPPER, ...probe], { cwd: repo, encoding: "utf8", env: effectiveEnv });
     const directEvidence = diagnostics();
-    assert(direct.status === 0 && direct.stdout.trim() === "true" && directEvidence.bootstrapEvidence.events.some((event) => event.event === "wrapper-entered" && event.command === "rev-parse" && JSON.stringify(event.argv).includes("--is-inside-work-tree")) && directEvidence.raceEvidence.events.some((event) => event.event === "delegated" && event.command === "rev-parse" && event.status === 0), `Git shim direct launch did not enter and delegate the repository probe: ${JSON.stringify({ result: report(direct), ...directEvidence })}`);
-    const result = spawnSync("git", probe, { cwd: repo, encoding: "utf8", env: effectiveEnv });
-    const bareEvidence = diagnostics();
-    assert(result.status === 0 && result.stdout.trim() === "true" && bareEvidence.bootstrapEvidence.events.filter((event) => event.event === "wrapper-entered" && event.command === "rev-parse").length === 2 && bareEvidence.raceEvidence.events.filter((event) => event.event === "delegated" && event.command === "rev-parse" && event.status === 0).length === 2, `Git shim bare PATH selection did not enter and delegate the repository probe: ${JSON.stringify({ result: report(result), ...bareEvidence })}`);
-    const bootstrap = bareEvidence.bootstrapEvidence.events;
-    if (process.platform === "win32") {
-      assert(bootstrap.filter((event) => event.event === "preload-entered").length === 2 && bootstrap.filter((event) => event.event === "identity-checked" && event.shim).length === 2 && bootstrap.filter((event) => event.event === "forwarding" && JSON.stringify(event.forwarded) === JSON.stringify(probe)).length === 2, `Windows Git shim bootstrap identity or argv forwarding failed: ${JSON.stringify(bareEvidence)}`);
-      const status = run(repo, ["status"], 0, env);
-      const after = evidence(bin, "bootstrap.json").events;
-      assert(status.includes("Repository:") && after.some((event) => event.event === "preload-entered") && after.some((event) => event.event === "identity-checked" && !event.shim) && !after.some((event) => event.event === "forwarding" && event.forwarded[0] === "status") && !after.some((event) => event.event === "wrapper-entered" && event.command === "status"), `Windows preload hijacked normal Nerv CLI execution: ${JSON.stringify({ status, after })}`);
-    }
+    assert(direct.status === 0 && direct.stdout.trim() === "true" && directEvidence.raceEvidence.events.some((event) => event.event === "entered" && event.command === probe[0] && JSON.stringify(event.args) === JSON.stringify(probe.slice(1))) && directEvidence.raceEvidence.events.some((event) => event.event === "delegated" && event.command === "rev-parse" && event.status === 0), `Git wrapper direct launch did not preserve argv and delegate the repository probe: ${JSON.stringify({ result: report(direct), ...directEvidence })}`);
+    assert(!env.PATH && !env.NODE_OPTIONS, `Git race wrapper unexpectedly requires PATH interception or NODE_OPTIONS: ${JSON.stringify(env)}`);
   } finally { rmSync(bin, { recursive: true, force: true }); rmSync(repo, { recursive: true, force: true }); }
 });
 

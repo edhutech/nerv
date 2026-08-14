@@ -41,7 +41,7 @@
     "build": "node scripts/build.mjs",
     "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
     "test:package": "node scripts/package-test.mjs",
     "validate": "pnpm build && pnpm typecheck && pnpm test"
   },
