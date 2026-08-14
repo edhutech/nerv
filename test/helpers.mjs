@@ -14,13 +14,19 @@ export const cli = join(root, "dist/index.js");
 export const sqliteModule = join(root, "node_modules", "better-sqlite3");
 
 export function assert(value, message) { if (!value) throw new Error(message); }
+export function childEnv(overrides = {}) {
+  if (process.platform !== "win32") return { ...process.env, ...overrides };
+  const environment = { ...process.env };
+  for (const key of Object.keys(overrides)) for (const existing of Object.keys(environment)) if (existing.toLowerCase() === key.toLowerCase()) delete environment[existing];
+  return { ...environment, ...overrides };
+}
 export function run(cwd, args, expected = 0, env = {}) {
-  const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...env } });
+  const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: childEnv(env) });
   const output = `${result.stdout}${result.stderr}`;
   if (result.status !== expected) throw new Error(`${args.join(" ")}: ${output}`);
   return output;
 }
-export function gitResult(cwd, args, env = {}) { return spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...env } }); }
+export function gitResult(cwd, args, env = {}) { return spawnSync("git", args, { cwd, encoding: "utf8", env: childEnv(env) }); }
 export function git(cwd, args, env = {}) {
   const result = gitResult(cwd, args, env);
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed with status ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
