@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
@@ -6,7 +5,6 @@ import { hasRequiredSchema, initializeDatabase } from "./database.js";
 import { workRef } from "./repository.js";
 
 const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
-const SKILL_HASH_MARKER = /^nerv_managed_sha256: "([a-f0-9]{64})"$/m;
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 type SkillSync = { status: "installed" | "current" | "preserved"; message?: string };
 export type SetupStatus = { path: string; established: boolean };
@@ -87,7 +85,6 @@ export function assertCanonicalSetupEstablished(repoRoot: string): void {
 function ensurePublicSkill(repoRoot: string): SkillSync {
   const destination = join(repoRoot, ".agents", "skills", "nerv", "SKILL.md");
   const packaged = readFileSync(new URL("../.agents/skills/nerv/SKILL.md", import.meta.url), "utf8");
-  if (!isManagedSkill(packaged)) throw new Error("packaged public Nerv skill has an invalid managed content hash");
   if (!existsSync(destination)) {
     mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, packaged);
@@ -98,9 +95,4 @@ function ensurePublicSkill(repoRoot: string): SkillSync {
   if (installed === packaged) return { status: "current" };
   return { status: "preserved", message: `Public Nerv skill preserved at ${destination}; update it through approved repository work.` };
 }
-function isManagedSkill(content: string): boolean {
-  const marker = content.match(SKILL_HASH_MARKER);
-  return marker !== null && marker[1] === contentHash(content.replace(marker[0], "nerv_managed_sha256: \"\""));
-}
-function contentHash(content: string): string { return createHash("sha256").update(content).digest("hex"); }
 function isDirectory(path: string): boolean { return existsSync(path) && statSync(path).isDirectory(); }

@@ -47,7 +47,7 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     const packed = JSON.parse(packOutput.match(/\[\s*\{[\s\S]*\}\s*\]/)?.[0] ?? "")[0];
     const archive = join(temp, packed.filename);
     assert.deepEqual(packed.files.map((entry) => entry.path).sort(), expectedFiles);
-    for (const forbidden of [".nerv/", ".nerv-context/", ".agents/skills/nerv-development/", "test/", ".github/", "src/", "AGENTS.md"]) {
+    for (const forbidden of [".nerv/", ".nerv-context/", "test/", ".github/", "src/", "AGENTS.md"]) {
       assert(!packed.files.some((entry) => entry.path === forbidden || entry.path.startsWith(forbidden)), `archive includes ${forbidden}`);
     }
 
