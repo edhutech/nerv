@@ -13,7 +13,7 @@ export function workRef(number: number): string {
   return `WORK-${String(number).padStart(3, "0")}`;
 }
 export type Repository = {
-  close(): void; getWork(reference: string): WorkItem | null; getTask(id: string): Task | null; materializePlan(plan: ApprovedPlan): WorkItem; materializeRework(workId: string): WorkItem; startTask(workId: string, position: number): Task; completeTask(taskId: string, evidence: string, attribution: string): Task; createReview(input: Omit<Review, "id" | "created_at">): Review; createCheckpoint(input: Omit<Checkpoint, "id" | "created_at">): Checkpoint; closeWork(workId: string, commitHash: string | null): WorkItem; listWork(): WorkItem[]; listTasks(workId: string): Task[]; getTaskAt(workId: string, position: number): Task | null; latestReview(workId: string): Review | null; latestCheckpoint(workId: string): Checkpoint | null;
+  close(): void; getWork(reference: string): WorkItem | null; getTask(id: string): Task | null; materializePlan(plan: ApprovedPlan): WorkItem; materializeRework(workId: string): WorkItem; completeTask(taskId: string, evidence: string, attribution: string): Task; createReview(input: Omit<Review, "id" | "created_at">): Review; createCheckpoint(input: Omit<Checkpoint, "id" | "created_at">): Checkpoint; closeWork(workId: string, commitHash: string | null): WorkItem; listWork(): WorkItem[]; listTasks(workId: string): Task[]; getTaskAt(workId: string, position: number): Task | null; latestReview(workId: string): Review | null; latestCheckpoint(workId: string): Checkpoint | null;
 };
 const now = () => new Date().toISOString();
 
@@ -42,7 +42,7 @@ function createRepository(db: Database.Database): Repository {
       id: randomUUID(),
       work_item_id: workId,
       position: first + index,
-      status: "pending",
+       status: index === 0 ? "active" : "pending",
       validation_evidence: null,
       attribution_json: null,
       created_at: timestamp,
@@ -90,17 +90,6 @@ function createRepository(db: Database.Database): Repository {
     setWork(item, { status: "active" });
     return getWork(item.id)!;
   });
-  const startTask = db.transaction((workId: string, position: number) => {
-    const item = getWork(workId);
-    const tasks = item ? listTasks(item.id) : [];
-    const entry = tasks.find((task) => task.position === position);
-    const earliest = tasks.find((task) => task.status === "pending");
-    if (!item || item.status !== "active" || !entry || entry.status !== "pending" || !earliest || earliest.id !== entry.id || tasks.some((task) => task.status === "active")) {
-      throw new Error(`Task ${position} cannot start.`);
-    }
-    db.prepare("UPDATE tasks SET status='active', updated_at=? WHERE id=?").run(now(), entry.id);
-    return getTask(entry.id)!;
-  });
   const completeTask = db.transaction((taskId: string, evidence: string, attribution: string) => {
     const entry = getTask(taskId);
     const item = entry ? getWork(entry.work_item_id) : null;
@@ -108,6 +97,8 @@ function createRepository(db: Database.Database): Repository {
       throw new Error("Only an active Task may be completed.");
     }
     db.prepare("UPDATE tasks SET status='done', validation_evidence=?, attribution_json=?, updated_at=? WHERE id=?").run(evidence, attribution, now(), entry.id);
+    const next = listTasks(item.id).find((task) => task.status === "pending");
+    if (next) db.prepare("UPDATE tasks SET status='active', updated_at=? WHERE id=?").run(now(), next.id);
     return getTask(entry.id)!;
   });
   const createReview = db.transaction((input: Omit<Review, "id" | "created_at">) => { const item = getWork(input.work_item_id); const previous = item ? db.prepare("SELECT * FROM work_reviews WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(item.id) as Review | undefined : undefined; const activeReview = item?.status === "active" && listTasks(item.id).every((task) => task.status === "done"); const verificationDowngrade = item?.status === "review" && previous?.outcome === "PASS" && input.outcome === "REWORK" && Boolean(input.verification_evidence?.trim()); if (!item || (!activeReview && !verificationDowngrade)) throw new Error("Work Review requires an active Work Item with all Tasks done, or PASS verification evidence for a REWORK downgrade."); const result = db.prepare("INSERT INTO work_reviews (work_item_id,outcome,summary,findings,remediation_json,validation_evidence,git_fingerprint_json,verification_evidence,created_at) VALUES (?,?,?,?,?,?,?,?,?)").run(input.work_item_id, input.outcome, input.summary, input.findings, input.remediation_json, input.validation_evidence, input.git_fingerprint_json, input.verification_evidence, now()); setWork(item, { status: input.outcome === "PASS" ? "review" : "rework", validation_evidence: input.validation_evidence }); return db.prepare("SELECT * FROM work_reviews WHERE id=?").get(result.lastInsertRowid) as Review; });
@@ -121,5 +112,5 @@ function createRepository(db: Database.Database): Repository {
     setWork(item, { status: "closed", closed_at: now(), commit_hash: commitHash });
     return getWork(item.id)!;
   });
-  return { close: () => db.close(), getWork, getTask, materializePlan, materializeRework, startTask, completeTask, createReview, createCheckpoint, closeWork, listWork: () => db.prepare("SELECT * FROM work_items ORDER BY ref").all() as WorkItem[], listTasks, getTaskAt: (workId: string, position: number) => (db.prepare("SELECT * FROM tasks WHERE work_item_id = ? AND position = ?").get(workId, position) as Task | undefined) ?? null, latestReview: (workId: string) => (db.prepare("SELECT * FROM work_reviews WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Review | undefined) ?? null, latestCheckpoint: (workId: string) => (db.prepare("SELECT * FROM checkpoints WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Checkpoint | undefined) ?? null };
+  return { close: () => db.close(), getWork, getTask, materializePlan, materializeRework, completeTask, createReview, createCheckpoint, closeWork, listWork: () => db.prepare("SELECT * FROM work_items ORDER BY ref").all() as WorkItem[], listTasks, getTaskAt: (workId: string, position: number) => (db.prepare("SELECT * FROM tasks WHERE work_item_id = ? AND position = ?").get(workId, position) as Task | undefined) ?? null, latestReview: (workId: string) => (db.prepare("SELECT * FROM work_reviews WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Review | undefined) ?? null, latestCheckpoint: (workId: string) => (db.prepare("SELECT * FROM checkpoints WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Checkpoint | undefined) ?? null };
 }

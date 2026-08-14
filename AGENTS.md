@@ -6,6 +6,7 @@
 - Run `pnpm validate` for full verification; its required order is build, typecheck, then test.
 - `pnpm test` exercises built `dist/index.js`; run `pnpm build` first when invoking it alone.
 - There is intentionally no `lint` script.
+- Use Conventional Commit subjects for Nerv commits; scopes are optional when useful.
 
 ## Architecture
 

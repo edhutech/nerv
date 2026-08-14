@@ -5,7 +5,6 @@ test("active context is a compact handoff and work show retains durable detail",
   const repo = setup();
   try {
     materialize(repo, plan());
-    run(repo, ["work", "task", "start", "WORK-001", "1"]);
     const activePath = join(repo, ".nerv/agent/active/WORK-001.md");
     const active = readFileSync(activePath, "utf8");
     assert(active.includes("## Current Task\n\nTask 1 - Persist fields") && active.includes("Implementation approach:\nUse direct columns"), "active Task contract was omitted");

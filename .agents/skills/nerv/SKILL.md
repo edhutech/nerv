@@ -38,13 +38,13 @@ Acceptance criteria: <Work-level conditions>
 Full validation: <checks>
 ```
 
-Keep fields concise, but include every applicable Work and Task field. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict.
+Require Work title, goal, scope, acceptance criteria, and validation; require Task title, objective, acceptance criteria, and validation. Include other fields only when useful. Use one Task by default; add more only for a real dependency, ownership, recovery, or validation boundary. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict.
 
 After explicit approval, atomically materialize the complete Work, every Task, and its activation baseline. For REWORK, materialize only the persisted remediation proposal. Use `nerv --help` solely for exact primitive arguments.
 
 ### Execute
 
-Continue approved Tasks in order without approval between normal Tasks. Only the earliest pending Task may start and only the active Task may finish. Record targeted validation and attributable paths. A genuine interruption may record a checkpoint; it is not a new lifecycle state.
+The first Task activates at materialization; each completion activates the next. Record targeted validation and every new Work-owned path. New unattributed changes block Review rather than becoming Work-owned. A genuine interruption may record a checkpoint; it is not a new lifecycle state.
 
 Unless asked to stop, complete execution and full validation in the same interaction, then stop before Review:
 
@@ -66,7 +66,7 @@ Classify findings as critical, high, medium, or low. Critical/high require REWOR
 
 PASS saves the reviewed-tree fingerprint. Show residual low findings and accepted medium risks. Optional local or user verification may occur before Close; remote CI, push, deployment, and provider access are outside this lifecycle. Supplied verification evidence can later require REWORK.
 
-Close requires PASS, validation evidence, and the developer's request. It commits only the exact reviewed attributable tree, preserves unrelated changes, and never stages indiscriminately. One Work normally produces one reviewed atomic commit; a verified no-diff result closes without an empty commit.
+Close requires PASS, validation evidence, and the developer's request. `nerv close WORK-###` uses the Work title by default; an agent may supply a repository-compliant subject when repository authority requires one. It commits only the exact reviewed attributable tree, preserves unrelated changes, and never stages indiscriminately. One Work normally produces one reviewed atomic commit; a verified no-diff result closes without an empty commit.
 
 ## Guardrails
 

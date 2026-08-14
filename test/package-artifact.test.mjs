@@ -72,7 +72,6 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     execFileSync("git", ["commit", "-m", "establish nerv"], { cwd: repo });
     const plan = { title: "Packaged lifecycle", intent: "test", goal: "test installed runtime", scope: "test", expected_touchpoints: "README.md", out_of_scope: "none", acceptance_criteria: "works", validation: "installed CLI", tasks: [{ title: "Run", objective: "exercise runtime", implementation_approach: "invoke installed CLI", expected_touchpoints: "README.md", acceptance_criteria: "task completes", validation: "installed CLI" }] };
     run(binary, ["work", "materialize", "--plan", JSON.stringify(plan)], repo);
-    run(binary, ["work", "task", "start", "WORK-001", "1"], repo);
     writeFileSync(join(repo, "change.txt"), "packaged\n");
     run(binary, ["work", "task", "done", "WORK-001", "1", "--evidence", "installed runtime passed", "--files", "change.txt"], repo);
     assert(run(binary, ["review", "WORK-001", "--outcome", "PASS", "--summary", "complete", "--validation-evidence", "installed runtime"], repo).includes("PASS"));

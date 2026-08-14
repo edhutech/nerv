@@ -74,6 +74,13 @@ export function canonicalPath(root: string, input: string): string {
   }
   const tracked = nulPaths(gitBuffer(root, ["ls-files", "-z", "--", path], { GIT_LITERAL_PATHSPECS: "1" }));
   if (tracked.some((entry) => entry.startsWith(`${path}/`))) throw new Error(`Invalid attributable path: ${input}`);
+  if (path.includes(",")) {
+    const exists = (() => { try { lstatSync(resolve(root, path)); return true; } catch { return false; } })();
+    const candidates = path.split(",");
+    if (!exists && candidates.length > 1 && candidates.every((candidate) => { try { return lstatSync(resolve(root, candidate)).isFile(); } catch { return false; } })) {
+      throw new Error(`Invalid attributable path: ${input}; pass each path separately.`);
+    }
+  }
   return path;
 }
 function workingPaths(root: string, headId: string): string[] {
@@ -123,11 +130,18 @@ export function assertProtectedBaseline(root: string, baseline: GitBaseline): vo
     throw new Error("Baseline-dirty paths changed during this Work; Nerv cannot establish the reviewed boundary.");
   }
 }
+export function assertAttributionComplete(root: string, baseline: GitBaseline, paths: string[]): void {
+  const owned = new Set(paths.map((path) => canonicalPath(root, path)));
+  const protectedPaths = new Set(baseline.protected_paths);
+  const unattributed = workingPaths(root, baseline.head).filter((path) => !protectedPaths.has(path) && !owned.has(path));
+  if (unattributed.length) throw new Error(`Unattributed changes prevent Review: ${unattributed.join(", ")}.`);
+}
 export function workFingerprint(root: string, baseline: GitBaseline, paths: string[]): GitFingerprint {
   const canonical = [...new Set(paths.map((path) => canonicalPath(root, path)))].sort();
   if (canonical.some((path) => baseline.protected_paths.some((protectedPath) => path === protectedPath || path.startsWith(`${protectedPath}/`) || protectedPath.startsWith(`${path}/`)))) {
     throw new Error("Baseline-dirty paths cannot be Work-owned.");
   }
+  assertAttributionComplete(root, baseline, canonical);
   return { head: baseline.head, paths: canonical, tree: treeForPaths(root, baseline.head, canonical) };
 }
 export function headTree(root: string, headId: string): string {
