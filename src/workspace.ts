@@ -37,6 +37,7 @@ export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync
   initializeDatabase(databasePath, existsSync(databasePath) ? undefined : nextWorkNumber(repoRoot));
   ensureLocalExclude(repoRoot);
   const skillSync = ensurePublicSkill(repoRoot);
+  ensureClaudeBridge(repoRoot);
   ensureSharedContext(repoRoot);
   return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillSync, setup: canonicalSetupStatus(repoRoot) };
 }
@@ -85,14 +86,22 @@ export function assertCanonicalSetupEstablished(repoRoot: string): void {
 function ensurePublicSkill(repoRoot: string): SkillSync {
   const destination = join(repoRoot, ".agents", "skills", "nerv", "SKILL.md");
   const packaged = readFileSync(new URL("../.agents/skills/nerv/SKILL.md", import.meta.url), "utf8");
+  return ensureManagedFile(destination, packaged, "Public Nerv skill");
+}
+function ensureClaudeBridge(repoRoot: string): SkillSync {
+  const destination = join(repoRoot, "CLAUDE.md");
+  const packaged = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
+  return ensureManagedFile(destination, packaged, "Claude Code bridge");
+}
+function ensureManagedFile(destination: string, packaged: string, label: string): SkillSync {
   if (!existsSync(destination)) {
     mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, packaged);
     return { status: "installed" };
   }
-  if (!statSync(destination).isFile()) throw new Error(`cannot install public Nerv skill: ${destination} is not a file`);
+  if (!statSync(destination).isFile()) throw new Error(`cannot install ${label}: ${destination} is not a file`);
   const installed = readFileSync(destination, "utf8");
   if (installed === packaged) return { status: "current" };
-  return { status: "preserved", message: `Public Nerv skill preserved at ${destination}; update it through approved repository work.` };
+  return { status: "preserved", message: `${label} preserved at ${destination}; update it through approved repository work.` };
 }
 function isDirectory(path: string): boolean { return existsSync(path) && statSync(path).isDirectory(); }

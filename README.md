@@ -27,7 +27,7 @@ In the Git repository you want Nerv to govern:
 ```bash
 cd path/to/repository
 nerv init
-git add .agents/skills/nerv/SKILL.md .nerv-context/product.md .nerv-context/repo.md
+git add .agents/skills/nerv/SKILL.md CLAUDE.md .nerv-context/product.md .nerv-context/repo.md
 git commit -m "Establish Nerv setup"
 ```
 
@@ -70,6 +70,19 @@ Plan Previews distinguish Work-level Expected touchpoints, which describe the Wo
 Nerv governs work; it is not an agent memory or code-intelligence system. Shared Product Context and shared Repo Context are tracked in `.nerv-context/`; `.nerv/` operational state remains local. The low-level `work` commands are deterministic implementation primitives; use `nerv --help` when an agent needs their exact arguments.
 
 `.agents/skills/nerv/SKILL.md` is the single Nerv workflow skill. Repository-specific development rules belong in normal repository authority such as `AGENTS.md` and `.nerv-context/`.
+
+## Agent Compatibility
+
+Nerv's runtime is agent-agnostic: every host uses the same local CLI and SQLite Work state. Instruction discovery is host-specific; it never changes Nerv lifecycle behavior.
+
+| Host | Instructions | Canonical skill | Discovery |
+| --- | --- | --- | --- |
+| OpenCode | `AGENTS.md` | `.agents/skills/nerv/SKILL.md` | Native |
+| Codex | `AGENTS.md` | `.agents/skills/nerv/SKILL.md` | Native |
+| Claude Code | `CLAUDE.md` bridge imports `AGENTS.md` | Canonical skill read on demand | Minimal bridge |
+| Cursor | `AGENTS.md` | `.agents/skills/nerv/SKILL.md` | Native |
+
+The `CLAUDE.md` bridge contains no workflow rules; it only directs Claude Code to the shared authority and canonical skill. Supporting a future host should normally require discovery integration only, never runtime lifecycle changes.
 
 ## Releases
 

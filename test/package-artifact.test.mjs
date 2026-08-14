@@ -10,6 +10,7 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const expectedFiles = [
   ".agents/skills/nerv/SKILL.md",
+  "CLAUDE.md",
   "LICENSE",
   "README.md",
   "dist/context.js",
@@ -66,9 +67,9 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     const binary = join(temp, "node_modules", ".bin", process.platform === "win32" ? "nerv.cmd" : "nerv");
     assert.equal(run(binary, ["--version"], repo).trim(), packed.version);
     run(binary, ["init"], repo);
-    for (const path of [".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
+    for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
     assert.equal(execFileSync("git", ["check-ignore", ".nerv/nerv.db"], { cwd: repo, encoding: "utf8" }).trim(), ".nerv/nerv.db");
-    execFileSync("git", ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
+    execFileSync("git", ["add", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
     execFileSync("git", ["commit", "-m", "establish nerv"], { cwd: repo });
     const plan = { title: "Packaged lifecycle", intent: "test", goal: "test installed runtime", scope: "test", expected_touchpoints: "README.md", out_of_scope: "none", acceptance_criteria: "works", validation: "installed CLI", tasks: [{ title: "Run", objective: "exercise runtime", implementation_approach: "invoke installed CLI", expected_touchpoints: "README.md", acceptance_criteria: "task completes", validation: "installed CLI" }] };
     run(binary, ["work", "materialize", "--plan", JSON.stringify(plan)], repo);

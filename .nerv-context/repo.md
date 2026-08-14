@@ -15,6 +15,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 ## Important paths
 
 - `.agents/skills/nerv/SKILL.md`: managed public Nerv skill.
+- `CLAUDE.md`: minimal Claude Code bridge to `AGENTS.md` and the canonical skill.
 - `test/`: focused built-CLI regression coverage in temporary Git repositories.
 
 ## Development rules
@@ -24,6 +25,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through better-sqlite3. Bu
 - Public package identity is `@edhutech/nerv`; the installed CLI binary remains `nerv`.
 - Support Node.js 22 and 24 LTS. Package builds run through `prepack`; `pnpm test:package` validates the generated tarball in an isolated installation.
 - Nerv commits use Conventional Commit subjects; this is repository authority, not runtime policy.
+- OpenCode, Codex, and Cursor natively discover `AGENTS.md` and `.agents/skills`; Claude Code uses the managed bridge. No host affects runtime state or lifecycle.
 - `.github/workflows/ci.yml` uses read-only SHA-pinned GitHub Actions for Linux Node 22/24, macOS Node 24, and Windows Node 24. It runs package E2E once on Linux Node 24 and never publishes.
 - Do not edit generated `dist/` or local `.nerv/` state directly.
 

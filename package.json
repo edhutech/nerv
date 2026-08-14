@@ -26,6 +26,7 @@
   "files": [
     "dist",
     "README.md",
+    "CLAUDE.md",
     "LICENSE",
     ".agents/skills/nerv/SKILL.md"
   ],
