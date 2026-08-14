@@ -18,7 +18,7 @@ test("tasks activate and progress automatically through rework", () => {
   try {
     const dbPath = join(repo, ".nerv/nerv.db");
     materialize(repo);
-    const statuses = () => { const db = new Database(dbPath, { readonly: true }); const value = db.prepare("SELECT position, status FROM tasks WHERE work_item_id=(SELECT id FROM work_items WHERE ref='WORK-001') ORDER BY position").all(); db.close(); return value; };
+    const statuses = () => { const db = new Database(dbPath, { readOnly: true }); const value = db.prepare("SELECT position, status FROM tasks WHERE work_item_id=(SELECT id FROM work_items WHERE ref='WORK-001') ORDER BY position").all(); db.close(); return value; };
     assert(JSON.stringify(statuses()) === JSON.stringify([{ position: 1, status: "active" }, { position: 2, status: "pending" }]), "first Task was not activated on materialization");
     assert(run(repo, ["work", "task", "done", "WORK-001", "2", "--evidence", "bad"], 1).includes("active Task"), "pending Task completed out of order");
     run(repo, ["checkpoint", "WORK-001", "--summary", "interruption", "--task", "1", "--next-step", "continue"]);

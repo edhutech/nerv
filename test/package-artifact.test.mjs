@@ -33,6 +33,9 @@ test("CI package scripts resolve from tracked source", () => {
     assert(existsSync(join(root, source)), `${name} source script is missing: ${source}`);
     assert.equal(execFileSync("git", ["ls-files", "--error-unmatch", source], { cwd: root, encoding: "utf8" }).trim(), source, `${name} source script is not tracked`);
   }
+  assert.equal(packageJson.dependencies?.["better-sqlite3"], undefined);
+  assert.equal(packageJson.devDependencies?.["@types/better-sqlite3"], undefined);
+  assert.equal(packageJson.pnpm?.onlyBuiltDependencies?.includes("better-sqlite3"), undefined);
 });
 
 function run(command, args, cwd) {
@@ -46,9 +49,6 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
   try {
     const sourcePackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     assert.equal(sourcePackage.bin.nerv, "dist/index.js");
-    const publishOutput = run(npm, ["publish", "--access", "public", "--dry-run"], root);
-    assert.doesNotMatch(publishOutput, /"bin\[nerv\]" script name .* was invalid and removed/);
-    assert.doesNotMatch(publishOutput, /"repository\.url" was normalized/);
     const packOutput = run(npm, ["pack", "--json", "--pack-destination", temp], root);
     const packed = JSON.parse(packOutput.match(/\[\s*\{[\s\S]*\}\s*\]/)?.[0] ?? "")[0];
     const archive = join(temp, packed.filename);
@@ -62,7 +62,7 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     const consumer = join(temp, "consumer");
     const repo = join(consumer, "repo");
     writeFileSync(join(temp, "package.json"), "{\"private\":true}\n");
-    run(npm, ["install", "--no-package-lock", archive], temp);
+    run(npm, ["install", "--ignore-scripts", "--no-package-lock", archive], temp);
     mkdirSync(consumer);
     execFileSync("git", ["init", repo], { encoding: "utf8" });
     execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repo });

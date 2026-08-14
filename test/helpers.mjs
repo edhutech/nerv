@@ -4,14 +4,13 @@ import { spawnSync } from "node:child_process";
 import { delimiter, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import Database from "better-sqlite3";
+import { DatabaseSync as Database } from "node:sqlite";
 import { openRepository } from "../dist/repository.js";
 
 export { chmodSync, createHash, Database, existsSync, join, mkdirSync, mkdtempSync, openRepository, readFileSync, rmSync, spawnSync, symlinkSync, tmpdir, writeFileSync };
 
 export const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const cli = join(root, "dist/index.js");
-export const sqliteModule = join(root, "node_modules", "better-sqlite3");
 
 export function assert(value, message) { if (!value) throw new Error(message); }
 export function childEnv(overrides = {}) {
@@ -44,7 +43,7 @@ export function installGitRaceWrapper(directory) {
   const wrapper = join(directory, "git-race-wrapper.mjs");
   writeFileSync(wrapper, `import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
 const [command, ...args] = process.argv.slice(2);
 const realGit = process.env.NERV_REAL_GIT;
 const evidencePath = process.env.NERV_GIT_RACE_EVIDENCE;
@@ -65,8 +64,7 @@ if (command === "update-ref" && !existsSync(marker)) {
   } else {
     call([command, ...args], { stdio: "inherit" });
     record("publication-succeeded", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
-    const Database = createRequire(import.meta.url)(process.env.NERV_SQLITE_MODULE);
-    const db = new Database(".nerv/nerv.db");
+    const db = new DatabaseSync(".nerv/nerv.db");
     try { db.exec("CREATE TRIGGER fail_close BEFORE UPDATE ON work_items WHEN NEW.status = 'closed' BEGIN SELECT RAISE(ABORT, 'forced durable Close failure'); END"); } finally { db.close(); }
     record("durable-failure-injected", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
     if (process.env.NERV_GIT_RACE_SCENARIO === "compensation") {
@@ -89,7 +87,7 @@ record("delegated", { command, status: result.status });
 process.exit(result.status ?? 1);
 `);
   const realGit = realGitPath(); const evidence = join(directory, "evidence.json");
-  return { NERV_TEST_GIT_WRAPPER: wrapper, NERV_GIT_RACE_EVIDENCE: evidence, NERV_REAL_GIT: realGit, NERV_SQLITE_MODULE: sqliteModule };
+  return { NERV_TEST_GIT_WRAPPER: wrapper, NERV_GIT_RACE_EVIDENCE: evidence, NERV_REAL_GIT: realGit };
 }
 export function setup(establish = true) {
   const repo = mkdtempSync(join(tmpdir(), "nerv-smoke-"));

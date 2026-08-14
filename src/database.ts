@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import { existsSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 
 export const SCHEMA_VERSION = "1";
 const STATEMENTS = [
@@ -17,22 +18,34 @@ const SIGNATURE = new Map(STATEMENTS.map((sql) => {
 const EXPECTED = new Set(SIGNATURE.keys());
 
 export function initializeDatabase(databasePath: string, nextWorkNumber = 1): void {
-  const database = new Database(databasePath);
+  const database = new DatabaseSync(databasePath);
   try {
-    database.pragma("journal_mode = WAL");
-    database.pragma("foreign_keys = ON");
+    database.exec("PRAGMA journal_mode = WAL");
+    database.exec("PRAGMA foreign_keys = ON");
     const hasObjects = Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get());
     if (hasObjects && !matchesSchema(database)) throw new Error("existing .nerv/nerv.db uses an unsupported generated schema; remove .nerv and run `nerv init` again");
-    if (!hasObjects) database.transaction(() => {
+    if (!hasObjects) transaction(database, () => {
       for (const statement of STATEMENTS) database.exec(statement);
       const timestamp = new Date().toISOString();
       database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)").run(SCHEMA_VERSION, timestamp);
       database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('next_work_number', ?, ?)").run(String(nextWorkNumber), timestamp);
-    })();
+    });
   } finally { database.close(); }
 }
 
-function matchesSchema(database: Database.Database): boolean {
+function transaction<T>(database: DatabaseSync, operation: () => T): T {
+  database.exec("BEGIN");
+  try {
+    const result = operation();
+    database.exec("COMMIT");
+    return result;
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function matchesSchema(database: DatabaseSync): boolean {
   try {
     const objects = database.prepare("SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger') AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string | null }[];
     if (objects.length !== EXPECTED.size || objects.some((object) => !EXPECTED.has(object.name) || normalize(object.sql ?? "") !== SIGNATURE.get(object.name))) return false;
@@ -43,7 +56,8 @@ function matchesSchema(database: Database.Database): boolean {
 
 export function hasRequiredSchema(databasePath: string): boolean {
   try {
-    const database = new Database(databasePath, { readonly: true, fileMustExist: true });
+    if (!existsSync(databasePath)) return false;
+    const database = new DatabaseSync(databasePath, { readOnly: true });
     try { return matchesSchema(database); } finally { database.close(); }
   } catch { return false; }
 }
