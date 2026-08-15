@@ -28,6 +28,7 @@ test("CI package scripts resolve from tracked source", () => {
   const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
   assert.match(workflow, /pnpm validate/);
   assert.match(workflow, /pnpm test:package/);
+  assert.match(workflow, /os: ubuntu-latest\s+node: 22\.14\.0\s+package_artifact: false/);
   for (const [name, source] of [["build", "scripts/build.mjs"], ["test:package", "scripts/package-test.mjs"]]) {
     assert.match(packageJson.scripts[name], new RegExp(source.replace(".", "\\.")));
     assert(existsSync(join(root, source)), `${name} source script is missing: ${source}`);
@@ -75,8 +76,9 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     assert.equal(run(binary, ["--version"], repo).trim(), packed.version);
     assert.match(run(binary, ["--help"], repo), /Usage: nerv/);
     run(binary, ["init"], repo);
-    for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
+    for (const path of ["AGENTS.md", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
     for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md"]) assert.equal(readFileSync(join(repo, path), "utf8"), readFileSync(join(root, path), "utf8"), `init did not install ${path}`);
+    assert.equal(readFileSync(join(repo, "AGENTS.md"), "utf8"), "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n");
     assert.equal(execFileSync("git", ["check-ignore", ".nerv/nerv.db"], { cwd: repo, encoding: "utf8" }).trim(), ".nerv/nerv.db");
     execFileSync("git", ["add", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
     execFileSync("git", ["commit", "-m", "establish nerv"], { cwd: repo });

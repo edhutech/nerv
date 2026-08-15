@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
 export const SCHEMA_VERSION = "1";
+const UNSUPPORTED_SCHEMA = "existing .nerv/nerv.db uses an unsupported generated schema; use a compatible/current Nerv version, or back up .nerv before intentionally discarding it";
 const STATEMENTS = [
   "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)",
   "CREATE TABLE work_items (id TEXT PRIMARY KEY, ref TEXT NOT NULL UNIQUE, title TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('active', 'review', 'rework', 'closed')), intent TEXT NOT NULL, goal TEXT NOT NULL, scope TEXT NOT NULL, expected_touchpoints TEXT NOT NULL, out_of_scope TEXT NOT NULL, acceptance_criteria TEXT NOT NULL, validation TEXT NOT NULL, validation_evidence TEXT, git_baseline_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, closed_at TEXT, commit_hash TEXT)",
@@ -23,7 +24,7 @@ export function initializeDatabase(databasePath: string, nextWorkNumber = 1): vo
     database.exec("PRAGMA journal_mode = WAL");
     database.exec("PRAGMA foreign_keys = ON");
     const hasObjects = Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get());
-    if (hasObjects && !matchesSchema(database)) throw new Error("existing .nerv/nerv.db uses an unsupported generated schema; remove .nerv and run `nerv init` again");
+    if (hasObjects && !matchesSchema(database)) throw new Error(UNSUPPORTED_SCHEMA);
     if (!hasObjects) transaction(database, () => {
       for (const statement of STATEMENTS) database.exec(statement);
       const timestamp = new Date().toISOString();

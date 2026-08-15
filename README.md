@@ -27,7 +27,7 @@ In the Git repository you want Nerv to govern:
 ```bash
 cd path/to/repository
 nerv init
-git add .agents/skills/nerv/SKILL.md CLAUDE.md .nerv-context/product.md .nerv-context/repo.md
+git add AGENTS.md CLAUDE.md .agents/skills/nerv/SKILL.md .nerv-context/product.md .nerv-context/repo.md
 git commit -m "Establish Nerv setup"
 ```
 
@@ -39,19 +39,19 @@ Run `nerv` from the target repository. The public workflow is deliberately small
 
 ```text
 intent
-  -> nerv plan "<intent>"
-  -> nerv approve
+  -> Plan Preview (agent protocol)
+  -> human approval (agent protocol)
   -> execution
   -> nerv review WORK-###
   -> optional local or user verification
   -> nerv close WORK-###
 ```
 
-`nerv plan` and `nerv approve` are agent-facing protocol operations, not commands an agent should blindly execute in a shell. Planning requires Work title, goal, scope, acceptance criteria, and validation, plus Task title, objective, acceptance criteria, and validation; other fields are shown only when useful. Use one Task by default. Approval atomically materializes the approved Work, all approved Tasks, and its activation baseline through deterministic `work` primitives. The first Task activates automatically and completion activates the next. Record targeted validation and every new Work-owned path; Review blocks ambiguous new unattributed changes. REWORK remediation is persisted with Review and approval materializes that exact proposal. `nerv review` and `nerv close` are literal runtime commands. The runtime remains agent agnostic and never calls an AI API.
+Plan Preview and human approval are agent-facing protocol operations, not `nerv` CLI commands. Planning requires Work title, goal, scope, acceptance criteria, and validation, plus Task title, objective, acceptance criteria, and validation; other fields are shown only when useful. Use one Task by default. Approval atomically materializes the approved Work, all approved Tasks, and its activation baseline through deterministic `work` primitives. The first Task activates automatically and completion activates the next. Record targeted validation and every new Work-owned path; Review blocks ambiguous new unattributed changes. REWORK remediation is persisted with Review and approval materializes that exact proposal. `nerv review` and `nerv close` are literal runtime commands. The runtime remains agent agnostic and never calls an AI API.
 
 Execution implements the approved Tasks, records targeted validation and attributable paths, and stops for Work Review. Stop execution only for an explicit developer request, a material scope or context conflict, a genuine block, or an exceptional checkpoint; incidental implementation differences inside the approved outcome do not create ceremony.
 
-`nerv review WORK-###` evaluates the integrated result against intent, relevant Product/Repo Context, relevant project authority, the approved boundaries, implementation, diff, validation, and supplied external evidence. A Review outcome exists only after this runtime command succeeds and persists it; narrative analysis alone is not a completed Nerv Review and must not recommend approval. Findings are `critical`, `high`, `medium`, or `low`: critical and high always require REWORK; medium requires REWORK unless the developer explicitly accepts it as residual risk; low is residual by default. Review still records one Work-level outcome. PASS shows any residual findings and makes the Work Item ready for optional verification. Every persisted REWORK, including after remediation, requires findings, identifies the blockers, and presents a minimum execution-ready remediation preview before recommending approval; `nerv approve` adds approved remediation to the same Work Item without materializing it first.
+`nerv review WORK-###` evaluates the integrated result against intent, relevant Product/Repo Context, relevant project authority, the approved boundaries, implementation, diff, validation, and supplied external evidence. A Review outcome exists only after this runtime command succeeds and persists it; narrative analysis alone is not a completed Nerv Review and must not recommend approval. Findings are `critical`, `high`, `medium`, or `low`: critical and high always require REWORK; medium requires REWORK unless the developer explicitly accepts it as residual risk; low is residual by default. Review still records one Work-level outcome. PASS shows any residual findings and makes the Work Item ready for optional verification. Every persisted REWORK, including after remediation, requires findings, identifies the blockers, and presents a minimum execution-ready remediation preview before human approval materializes it through deterministic Work primitives.
 
 `nerv close WORK-###` is Git-safe: it requires PASS and validation evidence, uses the Work title as its default subject, stages only attributable Work Item changes, and blocks when new unattributed changes make the boundary ambiguous. An agent may supply a subject that follows repository authority; Nerv does not impose a commit style. It does not push, inspect remote CI, or require provider access. One Work Item produces one reviewed atomic commit by default; a verified clean no-diff outcome closes without manufacturing an empty commit.
 
@@ -61,7 +61,7 @@ Execution implements the approved Tasks, records targeted validation and attribu
 
 `product.md` holds compact current product truth: what is being built, for whom, core capabilities, product invariants, boundaries, and current direction. `repo.md` holds compact durable repository truth: stack, architecture, important paths, development rules, generated/local state, validation, and repository invariants. Planning and Review use only relevant portions, not the entire context surface by default.
 
-`nerv init` creates local `.nerv/` state and adds `.nerv/` to Git's repository-local exclude file. It creates absent tracked setup files: the managed public skill plus minimal `product.md` and `repo.md` headings. Commit that setup before materializing a Work. Before every new Work, Nerv verifies those canonical paths exist, are tracked, and exactly match `HEAD`; unrelated dirty paths remain protected baseline state. Init does not inspect the repository, invent facts, or run a wizard. Plan may inspect context and propose updates, but only approved execution may change it as scoped, task-attributed Work-owned tracked changes.
+`nerv init` creates local `.nerv/` state and adds `.nerv/` to Git's repository-local exclude file. It creates absent tracked setup files: the managed public skill plus minimal `product.md` and `repo.md` headings. It also creates minimal `AGENTS.md` and `CLAUDE.md` discovery bridges only when absent; existing bridges are left byte-for-byte unchanged and are not Nerv-managed setup. Commit desired setup files before materializing a Work. Before every new Work, Nerv verifies only the canonical skill and context paths exist, are tracked, and exactly match `HEAD`; unrelated dirty paths remain protected baseline state. Init does not inspect the repository, invent facts, or run a wizard. Plan may inspect context and propose updates, but only approved execution may change it as scoped, task-attributed Work-owned tracked changes.
 
 Planning uses this precedence: the developer's current decision, Product Context, relevant authoritative project or domain guidance, then generic external guidance. Surface only material conflicts. Skills, MCPs, plugins, and specialized tools can assist when relevant, but cannot bypass Plan Preview, approval, Work boundaries, Work Review, or Git-safe Close.
 
@@ -79,10 +79,10 @@ Nerv's runtime is agent-agnostic: every host uses the same local CLI and SQLite 
 | --- | --- | --- | --- |
 | OpenCode | `AGENTS.md` | `.agents/skills/nerv/SKILL.md` | Native |
 | Codex | `AGENTS.md` | `.agents/skills/nerv/SKILL.md` | Native |
-| Claude Code | `CLAUDE.md` bridge imports `AGENTS.md` | Canonical skill read on demand | Minimal bridge |
+| Claude Code | `CLAUDE.md` bridge, optionally following `AGENTS.md` | Canonical skill read on demand | Minimal bridge |
 | Cursor | `AGENTS.md` | `.agents/skills/nerv/SKILL.md` | Native |
 
-The `CLAUDE.md` bridge contains no workflow rules; it only directs Claude Code to the shared authority and canonical skill. Supporting a future host should normally require discovery integration only, never runtime lifecycle changes.
+The discovery bridges contain no workflow rules; they direct agents to existing repository authority when available and the canonical skill. Supporting a future host should normally require discovery integration only, never runtime lifecycle changes.
 
 ## Releases
 

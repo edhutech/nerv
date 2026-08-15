@@ -18,17 +18,23 @@ test("init installs, recognizes, and preserves the managed public skill", () => 
   }
 });
 
-test("init installs and preserves the minimal Claude Code bridge", () => {
+test("init installs idempotent discovery bridges and preserves custom instructions", () => {
   const repo = setup(false);
+  const agents = join(repo, "AGENTS.md");
   const bridge = join(repo, "CLAUDE.md");
   try {
+    rmSync(agents);
     rmSync(bridge);
     run(repo, ["init"]);
     const packaged = readFileSync(join(process.cwd(), "CLAUDE.md"), "utf8");
-    assert(readFileSync(bridge, "utf8") === packaged && packaged.includes("@AGENTS.md") && packaged.includes(".agents/skills/nerv/SKILL.md"), "init did not install a canonical Claude bridge");
-    writeFileSync(bridge, "# Local Claude instructions\n");
+    const installedAgents = readFileSync(agents, "utf8");
+    assert(installedAgents === "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n" && readFileSync(bridge, "utf8") === packaged && packaged.includes("Follow `AGENTS.md` when it exists.") && packaged.includes(".agents/skills/nerv/SKILL.md"), "init did not install minimal self-contained discovery bridges");
     run(repo, ["init"]);
-    assert(readFileSync(bridge, "utf8") === "# Local Claude instructions\n", "init overwrote a modified Claude bridge");
+    assert(readFileSync(agents, "utf8") === installedAgents && readFileSync(bridge, "utf8") === packaged, "init changed an existing discovery bridge");
+    writeFileSync(agents, "# Local agent instructions\r\n");
+    writeFileSync(bridge, "# Local Claude instructions\r\n");
+    run(repo, ["init"]);
+    assert(readFileSync(agents, "utf8") === "# Local agent instructions\r\n" && readFileSync(bridge, "utf8") === "# Local Claude instructions\r\n", "init overwrote custom discovery instructions");
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
