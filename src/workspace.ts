@@ -8,7 +8,6 @@ const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
 const AGENTS_BRIDGE = "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n";
 const UNSUPPORTED_SCHEMA = "existing .nerv/nerv.db uses an unsupported generated schema; use a compatible/current Nerv version, or back up .nerv before intentionally discarding it";
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
-type SkillSync = { status: "installed" | "current" | "preserved"; message?: string };
 export type SetupStatus = { path: string; established: boolean };
 const SHARED_CONTEXT_FILES = [
   ["product.md", "# Product\n\n## What it is\n\n## Users and problem\n\n## Core capabilities\n\n## Product invariants\n\n## Boundaries\n\n## Current direction\n"],
@@ -32,17 +31,17 @@ export function getWorkspaceStatus(start: string): WorkspaceStatus {
   const databasePath = join(workspaceRoot, "nerv.db");
   return { repoRoot, workspaceRoot, databasePath, initialized: DIRS.every((dir) => isDirectory(join(repoRoot, dir))) && existsSync(databasePath) && hasRequiredSchema(databasePath) };
 }
-export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillSync: SkillSync; setup: SetupStatus[] } {
+export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillMessage: string | undefined; setup: SetupStatus[] } {
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error(UNSUPPORTED_SCHEMA);
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath, existsSync(databasePath) ? undefined : nextWorkNumber(repoRoot));
   ensureLocalExclude(repoRoot);
-  const skillSync = ensurePublicSkill(repoRoot);
+  const skillMessage = ensurePublicSkill(repoRoot);
   ensureAgentsBridge(repoRoot);
   ensureClaudeBridge(repoRoot);
   ensureSharedContext(repoRoot);
-  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillSync, setup: canonicalSetupStatus(repoRoot) };
+  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillMessage, setup: canonicalSetupStatus(repoRoot) };
 }
 function ensureSharedContext(repoRoot: string): void {
   const directory = join(repoRoot, ".nerv-context");
@@ -87,28 +86,28 @@ export function assertCanonicalSetupEstablished(repoRoot: string): void {
   const pending = canonicalSetupStatus(repoRoot).filter((entry) => !entry.established).map((entry) => entry.path);
   if (pending.length) throw new Error(`Nerv repository setup/context must be committed before materializing a new Work: ${pending.join(", ")}.`);
 }
-function ensurePublicSkill(repoRoot: string): SkillSync {
+function ensurePublicSkill(repoRoot: string): string | undefined {
   const destination = join(repoRoot, ".agents", "skills", "nerv", "SKILL.md");
   const packaged = readFileSync(new URL("../.agents/skills/nerv/SKILL.md", import.meta.url), "utf8");
   return ensureManagedFile(destination, packaged, "Public Nerv skill");
 }
-function ensureAgentsBridge(repoRoot: string): SkillSync {
+function ensureAgentsBridge(repoRoot: string): string | undefined {
   return ensureManagedFile(join(repoRoot, "AGENTS.md"), AGENTS_BRIDGE, "Agent discovery bridge");
 }
-function ensureClaudeBridge(repoRoot: string): SkillSync {
+function ensureClaudeBridge(repoRoot: string): string | undefined {
   const destination = join(repoRoot, "CLAUDE.md");
   const packaged = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
   return ensureManagedFile(destination, packaged, "Claude Code bridge");
 }
-function ensureManagedFile(destination: string, packaged: string, label: string): SkillSync {
+function ensureManagedFile(destination: string, packaged: string, label: string): string | undefined {
   if (!existsSync(destination)) {
     mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, packaged);
-    return { status: "installed" };
+    return;
   }
   if (!statSync(destination).isFile()) throw new Error(`cannot install ${label}: ${destination} is not a file`);
   const installed = readFileSync(destination, "utf8");
-  if (installed === packaged) return { status: "current" };
-  return { status: "preserved", message: `${label} preserved at ${destination}; update it through approved repository work.` };
+  if (installed === packaged) return;
+  return `${label} preserved at ${destination}; update it through approved repository work.`;
 }
 function isDirectory(path: string): boolean { return existsSync(path) && statSync(path).isDirectory(); }

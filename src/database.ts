@@ -16,7 +16,6 @@ const SIGNATURE = new Map(STATEMENTS.map((sql) => {
   const match = /(?:TABLE|INDEX) (?:IF NOT EXISTS )?([a-z_]+)/i.exec(sql);
   return [match![1], normalize(sql)];
 }));
-const EXPECTED = new Set(SIGNATURE.keys());
 
 export function initializeDatabase(databasePath: string, nextWorkNumber = 1): void {
   const database = new DatabaseSync(databasePath);
@@ -49,7 +48,7 @@ function transaction<T>(database: DatabaseSync, operation: () => T): T {
 function matchesSchema(database: DatabaseSync): boolean {
   try {
     const objects = database.prepare("SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger') AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string | null }[];
-    if (objects.length !== EXPECTED.size || objects.some((object) => !EXPECTED.has(object.name) || normalize(object.sql ?? "") !== SIGNATURE.get(object.name))) return false;
+    if (objects.length !== SIGNATURE.size || objects.some((object) => !SIGNATURE.has(object.name) || normalize(object.sql ?? "") !== SIGNATURE.get(object.name))) return false;
     const metadata = database.prepare("SELECT key, value FROM metadata").all() as { key: string; value: string }[];
     return metadata.every((entry) => entry.key === "schema_version" || entry.key === "next_work_number") && metadata.find((entry) => entry.key === "schema_version")?.value === SCHEMA_VERSION;
   } catch { return false; }
