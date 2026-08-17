@@ -30,6 +30,6 @@ export function nextOperation(work: WorkItem, tasks: Task[], review: Review | nu
   const pending = tasks.find((task) => task.status === "pending");
   if (work.status === "active" && pending) return `Continue with Task ${pending.position}.`;
   if (work.status === "active") return `nerv review ${work.ref}`;
-  if (work.status === "review" && review?.outcome === "PASS") return `Optional local or user verification may happen first; then nerv close ${work.ref}.`;
+  if (work.status === "review" && review?.outcome === "PASS") return `Optional additional local or user inspection may happen first; required outcome verification was part of Review; then nerv close ${work.ref}.`;
   return `nerv review ${work.ref}`;
 }

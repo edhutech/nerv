@@ -25,7 +25,7 @@ test("active context is a compact handoff and work show retains durable detail",
     finish(repo, 3, "fix.txt");
     review(repo, "PASS");
     const pass = readFileSync(activePath, "utf8");
-    assert(pass.includes("Optional local or user verification") && !pass.includes("external verification"), "PASS handoff suggests external verification");
+    assert(pass.includes("Optional additional local or user inspection") && pass.includes("required outcome verification was part of Review") && !pass.includes("external verification"), "PASS handoff treated required outcome verification as optional");
     run(repo, ["close", "WORK-001", "--message", "close"]);
     assert(!existsSync(activePath), "Close did not remove active context");
   } finally {
