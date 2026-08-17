@@ -22,3 +22,23 @@ test("rich approved plans retain optional details", () => {
     rmSync(repo, { recursive: true, force: true });
   }
 });
+
+test("materialize help exposes a parser-valid typed plan contract", () => {
+  const repo = setup();
+  const example = { title: "Add status", goal: "Expose context state", scope: "Read-only status output", acceptance_criteria: "Status reports context state", validation: "pnpm test", tasks: [{ title: "Report state", objective: "Render context state", acceptance_criteria: "Status output is clear", validation: "pnpm test" }] };
+  try {
+    const help = run(repo, ["work", "materialize", "--help"]);
+    for (const expected of [
+      "Work object required string fields: title, goal, scope, acceptance_criteria, validation.",
+      "Optional Work string fields: intent, expected_touchpoints, out_of_scope.",
+      "Required tasks field: non-empty array of Task objects.",
+      "Task object required string fields: title, objective, acceptance_criteria, validation.",
+      "Optional Task string fields: implementation_approach, expected_touchpoints.",
+      JSON.stringify(example),
+    ]) assert(help.includes(expected), `materialize help omitted ${expected}`);
+    materialize(repo, example);
+    assert(run(repo, ["work", "show", "WORK-001"]).includes("Add status"), "documented materialize example was not accepted");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});

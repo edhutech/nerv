@@ -17,9 +17,15 @@ End governed interactions with one recommended next operation: `nerv approve` af
 
 ### Plan
 
-Inspect only relevant Product Context, Repo Context, repository evidence, and authority. Precedence is developer decision, Product Context, authoritative project/domain context, then generic guidance. Do not infer product strategy. Skills and tools may assist but never replace governance.
+Inspect only relevant Product Context, Repo Context, repository evidence, and authority. Use `nerv status` to distinguish missing, scaffold, and established canonical context; established means only that non-template content exists, not that it is sufficient for this Work. Precedence is developer decision, Product Context, authoritative project/domain context, then generic guidance. Do not infer product strategy.
 
-Plan is non-durable. Propose canonical-context changes but persist them only during approved, scoped, task-attributed execution. Show an execution-ready preview before changing Work records:
+Plan is non-durable. When reliable evidence exists, propose the minimum durable context missing from scaffold or insufficient context: derive Repo Context only from authoritative repository evidence; derive Product Context only from explicit developer statements, authoritative product documentation, or confirmed behavior. Do not infer Product strategy. Persist context only during approved, scoped, task-attributed execution, replacing outdated current truth rather than appending history.
+
+Shape the Work from intent, relevant context, artifact type, and relevant engineering expectations. Make acceptance criteria describe the requested outcome as well as technical correctness: passing builds, tests, and checks are evidence, not proof by themselves that the requested outcome is complete. Infer safe defaults when confidence is high; ask only an unresolved high-impact question whose answer would materially change the result.
+
+Skills, plugins, MCPs, code-intelligence or memory systems, and domain tools may assist execution or provide evidence. They cannot bypass approval, redefine approved scope, advance the lifecycle, substitute Work Review, or Close Work. Attribute and review every repository mutation they make normally.
+
+Show an execution-ready preview before changing Work records:
 
 ```text
 Proposed Work Item: <title>
@@ -58,9 +64,11 @@ Recommended next operation: nerv review WORK-###
 
 Stop for an explicit request, material scope or authority conflict, architecture change, or genuine block. Recover from SQLite, relevant canonical context, compact active context, and Git state, not conversation history.
 
+When outcome judgment would be useful before Close, hand off the result in the execution or PASS response: provide the relevant local preview URL, artifact path, reproducible command, or focused verification instruction. This is optional evidence for the developer, not a new lifecycle state or a web-specific requirement.
+
 ### Review And Close
 
-Review only an active Work with all Tasks done. Evaluate the approved result, relevant authority, diff, validation, risks, and supplied evidence. Persist exactly one outcome: PASS or REWORK. Narrative review is not an outcome.
+Review only an active Work with all Tasks done. Evaluate the approved result, relevant authority, diff, validation, risks, and supplied evidence. Select concerns relevant to the Work rather than applying a universal checklist: for example authorization, API contracts, database integrity, testing, accessibility, frontend behavior, performance, and error handling only when the artifact, scope, or diff makes them applicable. Confirm outcome acceptance criteria separately from technical validation. Persist exactly one outcome: PASS or REWORK. Narrative review is not an outcome.
 
 Classify findings as critical, high, medium, or low. Critical/high require REWORK; medium requires REWORK unless explicitly accepted as durable residual risk; low is residual. REWORK remains in the same Work: show blockers and a minimum execution-ready remediation proposal, then await approval.
 
@@ -74,3 +82,7 @@ Close requires PASS, validation evidence, and the developer's request. `nerv clo
 - Do not add standalone Task governance, Runs, Builds, Intake, Proposal, Task Review, or Task Close.
 - Keep active Markdown temporary and minimal; SQLite is operational truth.
 - Keep Product and Repo Context compact current truth, not history or general-purpose memory.
+
+## Response Presentation
+
+Use a consistent semantic Markdown hierarchy for every developer-facing Nerv response: Plan, materialization, execution handoff, PASS, REWORK, remediation, verification handoff, and Close. Use a heading for the lifecycle stage or major response block, subordinate headings for Tasks, findings, or remediation Tasks, and bold labels for relevant metadata such as Goal, Scope, Objective, Outcome, Evidence, Acceptance criteria, Validation, or Result. Use inline code for commands, paths, Work references, IDs, and technical literals. Use lists for findings, touchpoints, acceptance criteria, or artifacts when they improve scanning. Keep responses compact and omit irrelevant sections. Meaning must remain clear without relying on host-specific colors, themes, or rendering behavior.

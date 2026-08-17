@@ -10,6 +10,22 @@ test("init establishes local exclusions and gates uncommitted setup", () => {
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
+test("status deterministically distinguishes missing, scaffold, and established canonical context", () => {
+  const repo = setup(false);
+  try {
+    assert(run(repo, ["status"]).includes("Product Context: scaffold\nRepo Context: scaffold"), "untouched scaffolds were not reported");
+    rmSync(join(repo, ".nerv-context/product.md"));
+    assert(run(repo, ["status"]).includes("Product Context: missing\nRepo Context: scaffold"), "missing Product Context was not reported independently");
+    run(repo, ["init"]);
+    writeFileSync(join(repo, ".nerv-context/product.md"), "# Product\n\nConfirmed behavior.\n");
+    assert(run(repo, ["status"]).includes("Product Context: established\nRepo Context: scaffold"), "non-template Product Context was not established");
+    writeFileSync(join(repo, ".nerv-context/repo.md"), "# Repository\n\nConfirmed stack.\n");
+    assert(run(repo, ["status"]).includes("Product Context: established\nRepo Context: established"), "non-template Repo Context was not established");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test("init supports unborn repositories and linked worktree exclusions", () => {
   const repo = mkdtempSync(join(tmpdir(), "nerv-unborn-")); try { git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]); assert(run(repo, ["init"]).includes("Initialized Nerv"), "unborn repository init failed"); assert(readFileSync(join(repo, "AGENTS.md"), "utf8").includes(".agents/skills/nerv/SKILL.md") && readFileSync(join(repo, "CLAUDE.md"), "utf8").includes("Follow `AGENTS.md` when it exists."), "unborn repository received a broken discovery bridge"); git(repo, ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]); git(repo, ["commit", "-m", "establish nervous setup"]); assert(materializedRef(repo) === "WORK-001", "unborn repository did not seed WORK-001"); } finally { rmSync(repo, { recursive: true, force: true }); }
   const linked = setup(); const worktree = join(linked, "../nerv-linked-worktree"); try { rmSync(worktree, { recursive: true, force: true }); git(linked, ["worktree", "add", "-b", "smoke-linked", worktree]); run(worktree, ["init"]); assert(gitResult(worktree, ["check-ignore", "-v", ".nerv/nerv.db"]).status === 0, "Git-resolved linked-worktree exclusion did not ignore .nerv"); } finally { git(linked, ["worktree", "remove", "--force", worktree]); rmSync(linked, { recursive: true, force: true }); }

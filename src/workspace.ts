@@ -9,9 +9,13 @@ const AGENTS_BRIDGE = "# Agent Instructions\n\nFor Nerv-governed work, read `.ag
 const UNSUPPORTED_SCHEMA = "existing .nerv/nerv.db uses an unsupported generated schema; use a compatible/current Nerv version, or back up .nerv before intentionally discarding it";
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 export type SetupStatus = { path: string; established: boolean };
+export const CANONICAL_CONTEXT_SCAFFOLDS = {
+  product: "# Product\n\n## What it is\n\n## Users and problem\n\n## Core capabilities\n\n## Product invariants\n\n## Boundaries\n\n## Current direction\n",
+  repo: "# Repository\n\n## Stack\n\n## Architecture\n\n## Important paths\n\n## Development rules\n\n## Generated and local state\n\n## Validation\n\n## Repository invariants\n",
+} as const;
 const SHARED_CONTEXT_FILES = [
-  ["product.md", "# Product\n\n## What it is\n\n## Users and problem\n\n## Core capabilities\n\n## Product invariants\n\n## Boundaries\n\n## Current direction\n"],
-  ["repo.md", "# Repository\n\n## Stack\n\n## Architecture\n\n## Important paths\n\n## Development rules\n\n## Generated and local state\n\n## Validation\n\n## Repository invariants\n"],
+  ["product.md", CANONICAL_CONTEXT_SCAFFOLDS.product],
+  ["repo.md", CANONICAL_CONTEXT_SCAFFOLDS.repo],
 ] as const;
 export const CANONICAL_SETUP_PATHS = [".agents/skills/nerv/SKILL.md", ...SHARED_CONTEXT_FILES.map(([name]) => `.nerv-context/${name}`)] as const;
 

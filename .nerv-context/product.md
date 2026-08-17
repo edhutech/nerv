@@ -28,6 +28,6 @@ Nerv governs work; it is not an agent memory or code-intelligence system. Nerv h
 
 ## Current direction
 
-Keep durable context compact and current, and use only the relevant context and evidence for planning and Review.
+Keep durable context compact and current, use only relevant context and evidence for planning and Review, and make the agent-facing governance contract clear enough to shape, verify, and present Work consistently without adding lifecycle ceremony.
 
 Nerv follows Semantic Versioning during pre-1.0 development. `package.json` is the single version source; completing a Work Item does not automatically change the version.
