@@ -50,7 +50,7 @@ After explicit approval, atomically materialize the complete Work, every Task, a
 
 ### Execute
 
-The first Task activates at materialization; each completion activates the next. Record targeted validation and every new Work-owned path. New unattributed changes block Review rather than becoming Work-owned. A genuine interruption may record a checkpoint; it is not a new lifecycle state.
+The first Task activates at materialization; each completion activates the next. Record targeted validation and every new Work-owned path. New unattributed changes block PASS rather than becoming Work-owned. Review them as blocking findings and persist REWORK with a remediation proposal; do not hide them through local Git exclusions or mutate the repository during Review. A genuine interruption may record a checkpoint; it is not a new lifecycle state.
 
 Unless asked to stop, complete execution and full validation in the same interaction, then stop before Review:
 
@@ -70,7 +70,7 @@ When outcome judgment would be useful before Close, hand off the result in the e
 
 Review only an active Work with all Tasks done. Evaluate the approved result, relevant authority, diff, validation, risks, and supplied evidence. Select concerns relevant to the Work rather than applying a universal checklist: for example authorization, API contracts, database integrity, testing, accessibility, frontend behavior, performance, and error handling only when the artifact, scope, or diff makes them applicable. Confirm outcome acceptance criteria separately from technical validation. Persist exactly one outcome: PASS or REWORK. Narrative review is not an outcome.
 
-Classify findings as critical, high, medium, or low. Critical/high require REWORK; medium requires REWORK unless explicitly accepted as durable residual risk; low is residual. REWORK remains in the same Work: show blockers and a minimum execution-ready remediation proposal, then await approval.
+Classify findings as critical, high, medium, or low. Critical/high require REWORK; medium requires REWORK unless explicitly accepted as durable residual risk; low is residual. A tree that cannot produce a trustworthy PASS fingerprint is also a blocking finding. REWORK remains in the same Work: show blockers and a minimum execution-ready remediation proposal, then await approval.
 
 PASS saves the reviewed-tree fingerprint. Show residual low findings and accepted medium risks. Optional local or user verification may occur before Close; remote CI, push, deployment, and provider access are outside this lifecycle. Supplied verification evidence can later require REWORK.
 

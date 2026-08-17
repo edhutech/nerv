@@ -87,7 +87,7 @@ function workingPaths(root: string, headId: string): string[] {
   return [
     ...new Set([
       ...nulPaths(gitBuffer(root, ["diff", "--name-only", "-z", headId])),
-      ...nulPaths(gitBuffer(root, ["ls-files", "--others", "--exclude-standard", "-z"])),
+      ...nulPaths(gitBuffer(root, ["ls-files", "--others", "--exclude-per-directory=.gitignore", "-z"])),
     ]),
   ].filter((path) => path !== ".nerv" && !path.startsWith(".nerv/")).sort();
 }
