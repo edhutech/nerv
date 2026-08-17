@@ -8,16 +8,30 @@ test("public workflow contract governs context enrichment, outcome review, tool 
     "missing, scaffold, and established canonical context",
     "derive Repo Context only from authoritative repository evidence",
     "derive Product Context only from explicit developer statements, authoritative product documentation, or confirmed behavior",
+    "Keep Product Context authority-backed",
+    "an implementation decision is not a product fact",
+    "speculative copy, unsupported assumptions, temporary mock content, or other implementation inventions must not be persisted as durable product truth",
     "passing builds, tests, and checks are evidence, not proof by themselves",
     "Validation intent must be coherent with the acceptance criteria",
     "Distinguish technical validation from outcome verification.",
     "Reconcile every material Work-level acceptance criterion with evidence proportional to that criterion",
     "Static source inspection and an HTTP response may inform review but do not prove runtime behavior or visual correctness.",
+    "Review also protects product authority",
+    "a material product fact that conflicts with, exceeds, or is not grounded in available developer or Product Context authority is a focused blocking finding",
+    "Do not treat Plan approval alone as authority for such a fact.",
     "If material evidence is failed, contradictory, or absent when verification is reasonably possible",
     "record a focused blocking finding and route corrective work through REWORK",
     "Infer safe defaults when confidence is genuinely high; ask only when the answer would materially change the result.",
+    "Distinguish implementation decisions from product facts.",
+    "a declared technical default such as React + Vite is an implementation decision, not product authority.",
+    "Claims about the real product, business, customers, or organization require sufficient authority",
+    "When product information is missing, use native judgment to choose an appropriate path",
+    "clearly label temporary placeholder or demo content",
+    "Approval of a Plan records approved work boundaries; it does not make an unsupported product assumption authoritative.",
     "Select concerns relevant to the Work rather than applying a universal checklist",
     "They cannot bypass approval, redefine approved scope, advance the lifecycle, substitute Work Review, or Close Work.",
+    "Fabricated testimonials, customers, metrics, certifications, awards, contacts, or similar social proof must never be presented as real",
+    "keep it out of canonical Product Context",
     "local preview URL, artifact path, reproducible command, or focused verification instruction",
     "observed local preview URL",
     "report the URL actually observed for the current execution rather than assuming a conventional address",
@@ -33,6 +47,8 @@ test("public workflow contract governs context enrichment, outcome review, tool 
 test("planning and multilingual interaction preserve agent intelligence and canonical protocol", () => {
   const spanishGreenfieldRequest = "Quiero crear una aplicación para organizar recetas familiares.";
   assert(!/Nerv|Work|Task|Review|lifecycle|nerv\s/.test(spanishGreenfieldRequest), "Spanish greenfield fixture is not a natural unguided request");
+  const spanishLandingPagePlan = "Para este landing page greenfield, propongo React + Vite como default técnico; los hechos del producto requieren autoridad.";
+  assert(spanishLandingPagePlan.includes("React + Vite") && spanishLandingPagePlan.includes("default técnico") && spanishLandingPagePlan.includes("hechos del producto requieren autoridad"), "Spanish greenfield fixture did not preserve the implementation-authority distinction");
   for (const expected of [
     "Nerv governs boundaries, not agent intelligence.",
     "Natural user requests need not name Nerv, Work, Tasks, Review, lifecycle commands, or repository instructions before this contract applies.",
