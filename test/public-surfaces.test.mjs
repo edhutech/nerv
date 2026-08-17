@@ -40,7 +40,8 @@ test("community templates provide focused reporting routes", () => {
   const security = readFileSync(resolve(root, "SECURITY.md"), "utf8");
   const conduct = readFileSync(resolve(root, "CODE_OF_CONDUCT.md"), "utf8");
   assert.match(security, /GitHub Private Vulnerability Reporting/);
-  assert.match(conduct, /dedicated private reporting channel must be configured/);
+  assert.match(conduct, /nerv-conduct@edhutech\.com/);
+  assert.match(conduct, /Do not submit reports through public GitHub Issues or Discussions/);
   assert(existsSync(resolve(root, ".github", "PULL_REQUEST_TEMPLATE.md")));
   for (const file of ["CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", ".github/social-preview.md"]) {
     assert(existsSync(resolve(root, file)), `${file} is missing`);
