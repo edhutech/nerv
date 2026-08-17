@@ -5,4 +5,4 @@ contact_links:
     about: Ask questions and share usage experience in GitHub Discussions.
   - name: Security vulnerability
     url: https://github.com/edhutech/nerv/security/advisories/new
-    about: Report security vulnerabilities privately. Use the contact in SECURITY.md if private reporting is unavailable.
+    about: Report security vulnerabilities through GitHub Private Vulnerability Reporting.
