@@ -9,6 +9,8 @@ Use this skill for Nerv-governed development, including Nerv itself. Repository 
 
 Nerv is local-first, agent/provider/host agnostic, and does not call AI APIs or control agents. Use deterministic runtime primitives to persist approved work; do not create another lifecycle or operational store.
 
+Nerv governs boundaries, not agent intelligence. Preserve the host agent's native reasoning, planning, clarification, exploration, tool use, and implementation capabilities; use them to produce the best approved result rather than replacing them with a Nerv-specific procedure.
+
 ## Workflow
 
 The lifecycle vocabulary is `plan`, `approve`, `execute`, `review`, and `close`. `plan` and `approve` are agent protocols, not shell commands to probe or blindly run. `review` and `close` invoke their runtime commands. `status` is read-only; `checkpoint` is exceptional recovery evidence.
@@ -17,11 +19,13 @@ End governed interactions with one recommended next operation: `nerv approve` af
 
 ### Plan
 
+Natural user requests need not name Nerv, Work, Tasks, Review, lifecycle commands, or repository instructions before this contract applies.
+
 Inspect only relevant Product Context, Repo Context, repository evidence, and authority. Use `nerv status` to distinguish missing, scaffold, and established canonical context; established means only that non-template content exists, not that it is sufficient for this Work. Precedence is developer decision, Product Context, authoritative project/domain context, then generic guidance. Do not infer product strategy.
 
 Plan is non-durable. When reliable evidence exists, propose the minimum durable context missing from scaffold or insufficient context: derive Repo Context only from authoritative repository evidence; derive Product Context only from explicit developer statements, authoritative product documentation, or confirmed behavior. Do not infer Product strategy. Persist context only during approved, scoped, task-attributed execution, replacing outdated current truth rather than appending history.
 
-Shape the Work from intent, relevant context, artifact type, and relevant engineering expectations. Make acceptance criteria describe the requested outcome as well as technical correctness: passing builds, tests, and checks are evidence, not proof by themselves that the requested outcome is complete. Infer safe defaults when confidence is high; ask only an unresolved high-impact question whose answer would materially change the result.
+Shape the Work from intent, relevant context, artifact type, and relevant engineering expectations. Make acceptance criteria describe the requested outcome as well as technical correctness: passing builds, tests, and checks are evidence, not proof by themselves that the requested outcome is complete. Before approval, resolve through native clarification, explicitly declare as a proposed decision/default, or safely infer any material implementation choice that would meaningfully change the approved result. Infer safe defaults when confidence is genuinely high; ask only when the answer would materially change the result. Do not impose a fixed questionnaire or suppress ordinary agent exploration and planning.
 
 Skills, plugins, MCPs, code-intelligence or memory systems, and domain tools may assist execution or provide evidence. They cannot bypass approval, redefine approved scope, advance the lifecycle, substitute Work Review, or Close Work. Attribute and review every repository mutation they make normally.
 
@@ -44,7 +48,7 @@ Acceptance criteria: <Work-level conditions>
 Full validation: <checks>
 ```
 
-Require Work title, goal, scope, acceptance criteria, and validation; require Task title, objective, acceptance criteria, and validation. Include other fields only when useful. Use one Task by default; add more only for a real dependency, ownership, recovery, or validation boundary. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict.
+Require Work title, goal, scope, acceptance criteria, and validation; require Task title, objective, acceptance criteria, and validation. Include material implementation decisions and proposed defaults when they make the Plan execution-ready. Include other fields only when useful. Use one Task by default; add more only for a real dependency, ownership, recovery, or validation boundary. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict. End every Plan Preview with `Recommended next operation: nerv approve`.
 
 After explicit approval, atomically materialize the complete Work, every Task, and its activation baseline. For REWORK, materialize only the persisted remediation proposal. Use `nerv --help` solely for exact primitive arguments.
 
@@ -85,4 +89,4 @@ Close requires PASS, validation evidence, and the developer's request. `nerv clo
 
 ## Response Presentation
 
-Use a consistent semantic Markdown hierarchy for every developer-facing Nerv response: Plan, materialization, execution handoff, PASS, REWORK, remediation, verification handoff, and Close. Use a heading for the lifecycle stage or major response block, subordinate headings for Tasks, findings, or remediation Tasks, and bold labels for relevant metadata such as Goal, Scope, Objective, Outcome, Evidence, Acceptance criteria, Validation, or Result. Use inline code for commands, paths, Work references, IDs, and technical literals. Use lists for findings, touchpoints, acceptance criteria, or artifacts when they improve scanning. Keep responses compact and omit irrelevant sections. Meaning must remain clear without relying on host-specific colors, themes, or rendering behavior.
+Use a consistent semantic Markdown hierarchy for every developer-facing Nerv response: Plan, materialization, execution handoff, PASS, REWORK, remediation, verification handoff, and Close. Follow the user's language for human-facing Plans, clarification questions, findings, explanations, Review summaries, remediation proposals, and handoffs when practical; English and Spanish are supported initially. Keep commands, command arguments, IDs, lifecycle outcomes, and technical literals canonical, including `nerv approve`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`. Use a heading for the lifecycle stage or major response block, subordinate headings for Tasks, findings, or remediation Tasks, and bold labels for relevant metadata such as Goal, Scope, Objective, Outcome, Evidence, Acceptance criteria, Validation, or Result. Use inline code for commands, paths, Work references, IDs, and technical literals. Use lists for findings, touchpoints, acceptance criteria, or artifacts when they improve scanning. Keep responses compact and omit irrelevant sections. Meaning must remain clear without relying on host-specific colors, themes, or rendering behavior.

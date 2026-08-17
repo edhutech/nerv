@@ -18,9 +18,11 @@ Developers need compact durable work context across sessions without historical 
 
 - Local-first, agent-agnostic, provider-agnostic, and host-agnostic.
 - The runtime does not call AI APIs or launch, route, or control coding agents.
+- Nerv governs work boundaries, not agent intelligence; it preserves native agent reasoning, planning, clarification, exploration, tool use, and implementation capabilities.
 - Human approval precedes durable Work and remediation Tasks.
 - Work Review is required before Close; REWORK remains in the same Work Item.
 - One Work Item normally closes as one Git-safe reviewed atomic commit; a verified no-diff outcome closes without an empty commit.
+- Human-facing interaction may follow the user's language when practical while commands, IDs, lifecycle outcomes, and other technical protocol remain canonical.
 
 ## Boundaries
 
