@@ -31,7 +31,8 @@
     ".agents/skills/nerv/SKILL.md"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "build": "node scripts/build.mjs",

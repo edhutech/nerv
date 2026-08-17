@@ -1,0 +1,33 @@
+name: Agent compatibility problem
+description: Report an instruction discovery or host compatibility problem.
+title: "compatibility: "
+labels: [agent-compatibility]
+body:
+  - type: input
+    id: host
+    attributes:
+      label: Coding-agent host and version
+      placeholder: OpenCode 1.2.3
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What did the host do?
+      description: Describe the expected Nerv instruction discovery or behavior and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Include the smallest repository setup and steps. Remove private content.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Nerv version
+      placeholder: nerv --version
+    validations:
+      required: true

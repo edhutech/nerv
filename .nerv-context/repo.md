@@ -27,6 +27,8 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 - Nerv commits use Conventional Commit subjects; this is repository authority, not runtime policy.
 - OpenCode, Codex, and Cursor natively discover `AGENTS.md` and `.agents/skills`; Claude Code uses its optional bridge. No host affects runtime state or lifecycle.
 - `.github/workflows/ci.yml` uses read-only SHA-pinned GitHub Actions for Linux Node 22/24, macOS Node 24, and Windows Node 24. It runs package E2E once on Linux Node 24 and never publishes.
+- `README.md` is the developer landing page; detailed product documentation belongs to a future dedicated documentation experience, while this repository keeps onboarding and maintenance material close to the code.
+- `.github/workflows/publish.yml` publishes only from a published GitHub Release, after package validation, through npm Trusted Publishing with OIDC and provenance. npmjs.com is the public registry.
 - Do not edit generated `dist/` or local `.nerv/` state directly.
 
 ## Generated and local state
