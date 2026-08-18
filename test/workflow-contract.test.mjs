@@ -2,6 +2,7 @@ import test from "node:test";
 import { assert, join, readFileSync } from "./helpers.mjs";
 
 const skill = readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8");
+const repoContext = readFileSync(join(process.cwd(), ".nerv-context/repo.md"), "utf8");
 
 test("public workflow contract governs context enrichment, outcome review, tool composition, and presentation", () => {
   for (const expected of [
@@ -57,7 +58,7 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "Infer safe defaults when confidence is genuinely high; ask only when the answer would materially change the result.",
     "Do not impose a fixed questionnaire or suppress ordinary agent exploration and planning.",
     "Include material implementation decisions and proposed defaults when they make the Plan execution-ready.",
-    "recommended next action: `approve`",
+    "Recommended next action: `approve`",
     "Follow the user's language for human-facing Plans, clarification questions, findings, explanations, Review summaries, remediation proposals, and handoffs when practical; English and Spanish are supported initially.",
     "`nerv approve`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`",
     "`review` after execution and full validation",
@@ -65,7 +66,7 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",
     "When a Work is in REWORK, present its persisted remediation proposal before requesting approval",
     "persisted remediation proposal's objective, approach, expected touchpoints, acceptance criteria, and validation",
-    "Do not recommend `nerv approve` before this compact preview has been presented.",
+    "Do not recommend `approve` before this compact preview has been presented.",
     "The original Work Plan need not be repeated.",
   ]) assert(skill.includes(expected), `planning or multilingual contract omitted: ${expected}`);
 });
@@ -115,6 +116,23 @@ test("lifecycle intent is semantic and execution topology remains native", () =>
   const spanishNegative = "todavía no lo apruebes";
   const spanishConditional = "antes de cerrar quiero revisar otra cosa";
   assert(skill.includes(spanishPositive) && skill.includes(spanishNegative) && skill.includes(spanishConditional), "Spanish lifecycle intent distinctions were not documented");
+});
+
+test("preferred handoffs and repository commit authority remain coherent", () => {
+  for (const expected of [
+    "Recommended next action: `approve`",
+    "Recommended next action: review",
+    "`close` after PASS",
+    "Before Close, inspect authoritative Repo Context for a repository commit convention.",
+    "the agent must construct a compliant explicit subject",
+    "`nerv close WORK-### --message <subject>`",
+    "valid Conventional Commit subjects include `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, `refactor: ...`, `chore: ...`, `ci: ...`, and `build: ...`",
+    "When no authoritative convention exists, the generic runtime may continue using the Work title by default",
+    "Nerv does not impose Conventional Commits globally.",
+  ]) assert(skill.includes(expected), `handoff or commit-authority contract omitted: ${expected}`);
+  assert(!skill.includes("Recommended next operation:"), "public skill retained a stale normal-handoff label");
+  assert(repoContext.includes("Nerv commits use Conventional Commit subjects; this is repository authority, not runtime policy."), "Repo Context no longer states the repository commit authority");
+  assert(skill.includes("`nerv review WORK-###`") && skill.includes("`nerv close WORK-###`"), "explicit canonical lifecycle commands were not preserved");
 });
 
 test("explicit temporary opt-out is scoped developer authority, not a runtime mode", () => {

@@ -54,7 +54,7 @@ test("local cli script ignores PATH nerv and runs the repository build", () => {
     const fake = join(temp, process.platform === "win32" ? "nerv.cmd" : "nerv");
     writeFileSync(fake, process.platform === "win32" ? "@echo FAKE_GLOBAL_NERV\r\n" : "#!/bin/sh\nprintf FAKE_GLOBAL_NERV\n");
     if (process.platform !== "win32") chmodSync(fake, 0o755);
-    const result = spawnSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["cli", "--", "--help"], { cwd: root, encoding: "utf8", env: { ...process.env, PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
+    const result = spawnSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["cli", "--", "--help"], { cwd: root, encoding: "utf8", shell: process.platform === "win32", env: { ...process.env, PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
     assert.equal(result.status, 0, `pnpm cli failed:\n${result.stdout}${result.stderr}`);
     assert.match(`${result.stdout}${result.stderr}`, /Usage: nerv/);
     assert.doesNotMatch(`${result.stdout}${result.stderr}`, /FAKE_GLOBAL_NERV/);
