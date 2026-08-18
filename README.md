@@ -36,17 +36,17 @@ nerv uninstall
 
 Global package removal is separate: `npm uninstall -g @edhutech/nerv`. Repository uninstall refuses when local Nerv state cannot be inspected or unresolved Work exists, and does not stage or commit changes.
 
-Then ask your coding agent to prepare a Nerv Plan Preview for the change you want. Review it, explicitly approve it, and let the agent execute the approved Tasks.
+After setup, ask your compatible coding agent for the software change you actually want. Nerv is discovered automatically; the agent presents a governed Plan, you approve it, and execution continues automatically. When execution and validation finish, the agent stops and hands off `review`; after a PASS Review, request `close` to create the reviewed Git change.
 
 ## How Nerv Works
 
 Nerv governs a Work Item, which contains one or more bounded Tasks. The workflow is deliberately small:
 
 ```text
-intent -> Plan Preview -> approval -> execution -> review -> close
+  request -> Plan -> approve -> automatic execution -> review -> close
 ```
 
-Planning and approval are agent-facing protocols, not commands you run yourself. Nerv persists the approved work through deterministic local primitives; `nerv review WORK-###` records the integrated result, and `nerv close WORK-###` creates the reviewed Git change when you request it.
+Planning and approval are agent-facing protocols, not commands you run yourself. The agent translates approval into the deterministic materialization primitives, then stops after execution and validation for `review`; `nerv review WORK-###` records the integrated result, and `nerv close WORK-###` creates the reviewed Git change when you request it.
 
 ## Why Nerv
 
@@ -61,11 +61,11 @@ Nerv's runtime is agent-, provider-, and host-agnostic. OpenCode, Codex, Cursor,
 
 ## A Small Example
 
-After setup, tell a compatible coding agent:
+After setup, tell a compatible coding agent what to build:
 
-> Prepare a Nerv Plan Preview to add CSV export. Keep the scope to the export command, tests, and user documentation.
+> Add CSV export. Keep the scope to the export command, tests, and user documentation.
 
-The agent inspects only relevant repository context, presents the bounded plan, and waits for your approval. After execution and validation, it runs Work Review; you can then request close when the result passes.
+The agent inspects only relevant repository context, presents the bounded Plan, and waits for your approval. Execution continues automatically after approval. When validation finishes, the agent hands off `review`; request `close` only after the result passes.
 
 ## Detailed Documentation
 

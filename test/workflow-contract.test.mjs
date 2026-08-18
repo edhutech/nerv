@@ -60,7 +60,7 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "Include material implementation decisions and proposed defaults when they make the Plan execution-ready.",
     "Recommended next action: `approve`",
     "Follow the user's language for human-facing Plans, clarification questions, findings, explanations, Review summaries, remediation proposals, and handoffs when practical; English and Spanish are supported initially.",
-    "`nerv approve`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`",
+    "`nerv work materialize --plan <json>`, `nerv work materialize-rework WORK-###`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`",
     "`review` after execution and full validation",
     "After Close, no further lifecycle operation is required.",
     "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",
@@ -82,10 +82,10 @@ test("lifecycle shorthand is an unambiguous agent intent over canonical protocol
     "If no applicable Work or transition exists, explain that instead of guessing.",
     "Equivalent natural-language intent in the developer's language",
     "Explicit `nerv ...` forms remain valid",
-    "nerv approve",
     "nerv review WORK-###",
     "nerv close WORK-###",
   ]) assert(skill.includes(expected), `lifecycle shorthand contract omitted: ${expected}`);
+  assert(!skill.includes("nerv approve"), "public skill refers to a nonexistent approve command");
   assert(!source.includes('program.command("approve")'), "conversation-only approve became a CLI command");
   assert(source.includes('program.command("review").argument("<workRef>")') && source.includes('program.command("close").argument("<workRef>")'), "canonical explicit review/close commands were removed");
 });
@@ -116,7 +116,7 @@ test("lifecycle intent is semantic and execution topology remains native", () =>
   const spanishNegative = "todavía no lo apruebes";
   const spanishConditional = "antes de cerrar quiero revisar otra cosa";
   assert(skill.includes(spanishPositive) && skill.includes(spanishNegative) && skill.includes(spanishConditional), "Spanish lifecycle intent distinctions were not documented");
-  assert(skill.includes("Execution is performed automatically by the agent after approval") && skill.includes("do not ask the developer to execute a Task or wait for another lifecycle command"), "automatic post-approval execution contract was omitted");
+  assert(skill.includes("execution then continues automatically") && skill.includes("do not ask the developer to execute a Task or wait for another lifecycle command"), "automatic post-approval execution contract was omitted");
   const source = readFileSync(join(process.cwd(), "src/index.ts"), "utf8");
   assert(!source.includes('program.command("execute")'), "an execute CLI command was introduced");
 });

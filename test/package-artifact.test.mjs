@@ -30,6 +30,7 @@ test("CI package scripts resolve from tracked source", () => {
   assert.match(workflow, /pnpm validate/);
   assert.match(workflow, /pnpm test:package/);
   assert.match(workflow, /os: ubuntu-latest\s+node: 22\.14\.0\s+package_artifact: false/);
+  assert.equal(packageJson.engines?.node, ">=22.14.0 <23 || >=24.0.0 <25");
   for (const [name, source] of [["build", "scripts/build.mjs"], ["test:package", "scripts/package-test.mjs"]]) {
     assert.match(packageJson.scripts[name], new RegExp(source.replace(".", "\\.")));
     assert(existsSync(join(root, source)), `${name} source script is missing: ${source}`);
@@ -100,13 +101,26 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md"]) assert.equal(readFileSync(join(repo, path), "utf8"), readFileSync(join(root, path), "utf8"), `init did not install ${path}`);
     assert.match(readFileSync(join(repo, "AGENTS.md"), "utf8"), /Nerv managed discovery bridge/);
     assert.equal(execFileSync("git", ["check-ignore", ".nerv/nerv.db"], { cwd: repo, encoding: "utf8" }).trim(), ".nerv/nerv.db");
-    execFileSync("git", ["add", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
+    execFileSync("git", ["add", "AGENTS.md", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
     execFileSync("git", ["commit", "-m", "establish nerv"], { cwd: repo });
     const plan = { title: "Packaged lifecycle", intent: "test", goal: "test installed runtime", scope: "test", expected_touchpoints: "README.md", out_of_scope: "none", acceptance_criteria: "works", validation: "installed CLI", tasks: [{ title: "Run", objective: "exercise runtime", implementation_approach: "invoke installed CLI", expected_touchpoints: "README.md", acceptance_criteria: "task completes", validation: "installed CLI" }] };
-    run(binary, ["work", "materialize", "--plan", JSON.stringify(plan)], repo);
+    const materialized = run(binary, ["work", "materialize", "--plan", JSON.stringify(plan)], repo);
+    const workId = materialized.match(/Stable ID: ([0-9a-f-]{36})/)?.[1];
+    assert(workId, "packaged lifecycle did not expose a Work identity");
     writeFileSync(join(repo, "change.txt"), "packaged\n");
     run(binary, ["work", "task", "done", "WORK-001", "1", "--evidence", "installed runtime passed", "--files", "change.txt"], repo);
     assert(run(binary, ["review", "WORK-001", "--outcome", "PASS", "--summary", "complete", "--validation-evidence", "installed runtime"], repo).includes("PASS"));
+    run(binary, ["close", "WORK-001", "--message", "fix: packaged lifecycle"], repo);
+    const committedFiles = execFileSync("git", ["show", "--format=", "--name-only", "HEAD"], { cwd: repo, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+    assert.deepEqual(committedFiles, ["change.txt"], "packed lifecycle committed more than the reviewed diff");
+    const message = execFileSync("git", ["log", "-1", "--format=%B", "HEAD"], { cwd: repo, encoding: "utf8" });
+    assert.equal(message.split(/\r?\n/).filter((line) => line === `Nerv-Work: ${workId}`).length, 1, "Nerv-Work trailer was not canonical");
+    assert.equal(message.split(/\r?\n/).filter((line) => line === "Nerv-Work-Ref: WORK-001").length, 1, "Nerv-Work-Ref trailer was not canonical");
+    assert.match(run(binary, ["work", "show", "WORK-001"], repo), /State: closed/);
+    writeFileSync(join(repo, "developer.txt"), "developer content\n");
+    run(binary, ["uninstall"], repo);
+    assert(readFileSync(join(repo, "README.md"), "utf8") === "base\n" && readFileSync(join(repo, "developer.txt"), "utf8") === "developer content\n", "packaged uninstall removed developer content");
+    assert(!existsSync(join(repo, ".nerv")) && !existsSync(join(repo, ".agents/skills/nerv/SKILL.md")), "packaged uninstall retained Nerv setup");
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }

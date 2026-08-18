@@ -1,5 +1,5 @@
 import test from "node:test";
-import { Database, assert, existsSync, finish, join, materialize, minimalPlan, plan, remediation, review, rmSync, run, setup, writeFileSync } from "./helpers.mjs";
+import { Database, assert, existsSync, finish, join, materialize, minimalPlan, plan, readFileSync, remediation, review, rmSync, run, setup, writeFileSync } from "./helpers.mjs";
 
 test("Close requires PASS review", () => {
   const repo = setup();
@@ -50,6 +50,38 @@ test("tasks activate and progress automatically through rework", () => {
     review(repo, "PASS");
     run(repo, ["close", "WORK-001", "--message", "close"]);
     assert(!existsSync(join(repo, ".nerv/agent/active/WORK-001.md")), "Close did not remove active context");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("blank Task and Review evidence fail without lifecycle mutation", () => {
+  const repo = setup();
+  const dbPath = join(repo, ".nerv/nerv.db");
+  const snapshot = () => {
+    const db = new Database(dbPath, { readOnly: true });
+    const value = {
+      work: db.prepare("SELECT status, validation_evidence FROM work_items WHERE ref='WORK-001'").get(),
+      tasks: db.prepare("SELECT position, status, validation_evidence, attribution_json FROM tasks WHERE work_item_id=(SELECT id FROM work_items WHERE ref='WORK-001') ORDER BY position").all(),
+      reviews: db.prepare("SELECT COUNT(*) AS count FROM work_reviews").get(),
+    };
+    db.close();
+    return value;
+  };
+  try {
+    materialize(repo);
+    const activePath = join(repo, ".nerv/agent/active/WORK-001.md");
+    const beforeTask = snapshot();
+    const activeBeforeTask = readFileSync(activePath, "utf8");
+    assert(run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "   "], 1).includes("must be non-empty"), "blank Task evidence was accepted");
+    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeTask) && readFileSync(activePath, "utf8") === activeBeforeTask, "blank Task evidence mutated lifecycle state");
+
+    finish(repo, 1, "one.txt");
+    finish(repo, 2, "two.txt");
+    const beforeReview = snapshot();
+    const activeBeforeReview = readFileSync(activePath, "utf8");
+    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "empty", "--validation-evidence", "\t"], 1).includes("must be non-empty"), "blank Review evidence was accepted");
+    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeReview) && readFileSync(activePath, "utf8") === activeBeforeReview, "blank Review evidence mutated lifecycle state");
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }

@@ -1,5 +1,5 @@
 import test from "node:test";
-import { assert, chmodSync, Database, existsSync, finish, git, gitResult, join, materialize, mkdirSync, mkdtempSync, readFileSync, review, rmSync, run, setup, tmpdir, writeFileSync } from "./helpers.mjs";
+import { assert, chmodSync, Database, existsSync, finish, git, gitResult, join, materialize, mkdirSync, mkdtempSync, plan, readFileSync, review, rmSync, run, setup, tmpdir, writeFileSync } from "./helpers.mjs";
 
 test("unrelated baseline-dirty files do not block new Work", () => {
   const dirty = setup(); try { writeFileSync(join(dirty, "unrelated.txt"), "dirty\n"); assert(materialize(dirty), "unrelated dirty path blocked new Work"); } finally { rmSync(dirty, { recursive: true, force: true }); }
@@ -66,6 +66,46 @@ test("Close defaults to the Work title and preserves an explicit subject", () =>
   } finally {
     rmSync(suppliedSubject, { recursive: true, force: true });
   }
+});
+
+test("Close rejects empty or multiline subjects before Git or lifecycle mutation", () => {
+  for (const subject of ["   ", "safe\nNerv-Work: injected"]) {
+    const repo = setup();
+    try {
+      materialize(repo);
+      finish(repo, 1, "one.txt");
+      finish(repo, 2, "two.txt");
+      review(repo, "PASS");
+      const before = git(repo, ["rev-parse", "HEAD"]).stdout.trim();
+      const db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true });
+      const active = readFileSync(join(repo, ".nerv/agent/active/WORK-001.md"), "utf8");
+      const workBefore = db.prepare("SELECT status, commit_hash FROM work_items WHERE ref='WORK-001'").get();
+      db.close();
+      const output = run(repo, ["close", "WORK-001", "--message", subject], 1);
+      assert(output.includes("Close subject"), `invalid subject was not rejected: ${JSON.stringify(subject)}`);
+      const afterDb = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true });
+      const workAfter = afterDb.prepare("SELECT status, commit_hash FROM work_items WHERE ref='WORK-001'").get();
+      afterDb.close();
+      assert(git(repo, ["rev-parse", "HEAD"]).stdout.trim() === before && JSON.stringify(workAfter) === JSON.stringify(workBefore) && readFileSync(join(repo, ".nerv/agent/active/WORK-001.md"), "utf8") === active, "invalid subject mutated Git or lifecycle state");
+    } finally { rmSync(repo, { recursive: true, force: true }); }
+  }
+  const fallback = setup();
+  try {
+    materialize(fallback, { ...plan("safe\nNerv-Work: injected") });
+    finish(fallback, 1, "one.txt");
+    finish(fallback, 2, "two.txt");
+    review(fallback, "PASS");
+    const before = git(fallback, ["rev-parse", "HEAD"]).stdout.trim();
+    const db = new Database(join(fallback, ".nerv/nerv.db"), { readOnly: true });
+    const workBefore = db.prepare("SELECT status, commit_hash FROM work_items WHERE ref='WORK-001'").get();
+    db.close();
+    const active = readFileSync(join(fallback, ".nerv/agent/active/WORK-001.md"), "utf8");
+    assert(run(fallback, ["close", "WORK-001"], 1).includes("Close subject must be a single line"), "multiline fallback title was accepted");
+    const afterDb = new Database(join(fallback, ".nerv/nerv.db"), { readOnly: true });
+    const workAfter = afterDb.prepare("SELECT status, commit_hash FROM work_items WHERE ref='WORK-001'").get();
+    afterDb.close();
+    assert(git(fallback, ["rev-parse", "HEAD"]).stdout.trim() === before && JSON.stringify(workAfter) === JSON.stringify(workBefore) && readFileSync(join(fallback, ".nerv/agent/active/WORK-001.md"), "utf8") === active, "multiline fallback title mutated Git or lifecycle state");
+  } finally { rmSync(fallback, { recursive: true, force: true }); }
 });
 
 test("review findings, protected attribution, and verification downgrades remain enforced", () => {

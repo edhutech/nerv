@@ -5,7 +5,7 @@ import { knownIdentity, MANAGED_IDENTITIES, normalizedText, textIdentity } from 
 test("managed skill policy separates current identity from supported release identities", () => {
   const policy = MANAGED_IDENTITIES[".agents/skills/nerv/SKILL.md"];
   const packaged = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8");
-  assert(policy.current === "d32fc9e7dd40f1e25f23477da8d11a028ecab38d8c0216225a66894806841b6f", "packaged skill current identity changed unexpectedly");
+  assert(policy.current === "473fc4791dd090372f7ae6b28519f3ec3977e38f74c5eb668b55ba2a3561c4f9", "packaged skill current identity changed unexpectedly");
   assert(knownIdentity(".agents/skills/nerv/SKILL.md", packaged) === "current", "packaged skill is not registered as current");
   assert(policy.legacy.length === 1 && policy.legacy[0] === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "supported v0.2.0 identity was lost from the legacy policy");
   assert(!policy.legacy.includes("f47fd908766574bc5ef6dae4594c26fa3ad5480928ad2edbdabde7a6ea1f5d89"), "unreleased development identity became runtime compatibility");
