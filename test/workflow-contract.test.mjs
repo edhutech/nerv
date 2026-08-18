@@ -116,6 +116,9 @@ test("lifecycle intent is semantic and execution topology remains native", () =>
   const spanishNegative = "todavía no lo apruebes";
   const spanishConditional = "antes de cerrar quiero revisar otra cosa";
   assert(skill.includes(spanishPositive) && skill.includes(spanishNegative) && skill.includes(spanishConditional), "Spanish lifecycle intent distinctions were not documented");
+  assert(skill.includes("Execution is performed automatically by the agent after approval") && skill.includes("do not ask the developer to execute a Task or wait for another lifecycle command"), "automatic post-approval execution contract was omitted");
+  const source = readFileSync(join(process.cwd(), "src/index.ts"), "utf8");
+  assert(!source.includes('program.command("execute")'), "an execute CLI command was introduced");
 });
 
 test("preferred handoffs and repository commit authority remain coherent", () => {

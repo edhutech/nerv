@@ -13,7 +13,7 @@ Nerv governs boundaries, not agent intelligence. Preserve the host agent's nativ
 
 ## Workflow
 
-The lifecycle vocabulary is `plan`, `approve`, `execute`, `review`, and `close`. `plan` and `approve` are agent protocols, not shell commands to probe or blindly run. `review` and `close` invoke their runtime commands. `status` is read-only; `checkpoint` is exceptional recovery evidence.
+The developer-facing lifecycle is `plan`, `approve`, `review`, and `close`. `plan` and `approve` are agent protocols, not shell commands to probe or blindly run. Execution is performed automatically by the agent after approval; `review` and `close` invoke their runtime commands. `status` is read-only; `checkpoint` is exceptional recovery evidence.
 
 End governed interactions with one recommended next action: `approve` after a Plan or persisted remediation proposal, `review` after execution and full validation, and `close` after PASS and any optional local/user verification. These are conversational agent intents, not shell commands. When explicitness is useful, the agent continues to execute the canonical `nerv approve`, `nerv review WORK-###`, and `nerv close WORK-###` protocol internally. After Close, no further lifecycle operation is required.
 
@@ -61,6 +61,8 @@ Full validation: <checks>
 Require Work title, goal, scope, acceptance criteria, and validation; require Task title, objective, acceptance criteria, and validation. Include material implementation decisions and proposed defaults when they make the Plan execution-ready. Include other fields only when useful. Use one Task by default; add more only for a real dependency, ownership, recovery, or validation boundary. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict. End every Plan Preview with Recommended next action: `approve`.
 
 After explicit approval, atomically materialize the complete Work, every Task, and its activation baseline. For REWORK, materialize only the persisted remediation proposal. Use `nerv --help` solely for exact primitive arguments.
+
+After successful materialization, continue execution automatically using the native agent workflow. The first Task is active operational state, not a developer action: do not ask the developer to execute a Task or wait for another lifecycle command before implementation. Complete each active Task, allow completion to activate the next Task, run full validation, and then hand off `review`.
 
 ### Execute
 

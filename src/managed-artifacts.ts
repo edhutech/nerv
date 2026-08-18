@@ -14,7 +14,7 @@ export function textIdentity(value: string): string {
 // These are exact public artifacts from the current package and v0.2.0.
 export const MANAGED_IDENTITIES: Record<string, readonly string[]> = {
   ".agents/skills/nerv/SKILL.md": [
-    "f47fd908766574bc5ef6dae4594c26fa3ad5480928ad2edbdabde7a6ea1f5d89",
+    "d32fc9e7dd40f1e25f23477da8d11a028ecab38d8c0216225a66894806841b6f",
     "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd",
   ],
   "CLAUDE.md": ["08c99e7cb82cc9a0520a8b3195f9583f6acc0089c6e84340fb36e5be0e4dbff5", "baf0ecc33ac0416d1cabf88d3c3b63b06695722fe3a144c8bd9f99c64e08a26f"],

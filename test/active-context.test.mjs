@@ -4,10 +4,11 @@ import { assert, existsSync, finish, join, materialize, plan, readFileSync, reme
 test("active context is a compact handoff and work show retains durable detail", () => {
   const repo = setup();
   try {
-    materialize(repo, plan());
+    const materializeOutput = run(repo, ["work", "materialize", "--plan", JSON.stringify(plan())]);
+    assert(materializeOutput.includes("Execution: Task 1 is active; completing it activates the next Task.") && !materializeOutput.includes("Recommended next action") && !materializeOutput.includes("Continue with Task"), "materialization exposed an active Task as a developer action");
     const activePath = join(repo, ".nerv/agent/active/WORK-001.md");
     const active = readFileSync(activePath, "utf8");
-    assert(active.includes("## Current Task\n\nTask 1 - Persist fields") && active.includes("Implementation approach:\nUse direct columns"), "active Task contract was omitted");
+    assert(active.includes("## Current Task\n\nTask 1 - Persist fields") && active.includes("Implementation approach:\nUse direct columns") && active.includes("## Execution\n\nTask 1 is active; completing it activates the next Task.") && !active.includes("Continue with Task"), "active Task operational contract was omitted or presented as a developer action");
     assert(active.includes("## Pending\n\n- Task 2 - Recover fields") && !active.includes("### Task 2"), "pending Task was not compact");
     assert(!active.includes("## Intent") && !active.includes("Persisted Remediation Proposal") && !active.includes("## Checkpoint"), "active context mirrors durable Work state");
     const shown = run(repo, ["work", "show", "WORK-001"]);

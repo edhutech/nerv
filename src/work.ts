@@ -22,9 +22,10 @@ export function syncActiveContext(workspaceRoot: string, work: WorkItem, tasks: 
   const activeDetails = active ? [`Task ${active.position} - ${active.title}`, `Objective:\n${active.objective}`, active.implementation_approach && `Implementation approach:\n${active.implementation_approach}`, active.expected_touchpoints && `Expected touchpoints:\n${active.expected_touchpoints}`, `Acceptance criteria:\n${active.acceptance_criteria}`, `Targeted validation:\n${active.validation}`].filter(Boolean).join("\n\n") : "None";
   const checkpointSection = checkpoint ? `\n\n## Checkpoint\n\n${checkpoint.summary}${checkpoint.next_step ? `\n\nNext step: ${checkpoint.next_step}` : ""}` : "";
   const remediationSection = work.status === "rework" && remediationPreview(review) ? `\n\n## Remediation proposal\n\n${remediationPreview(review)}` : "";
-  const next = nextOperation(work, tasks, review);
+  const handoff = developerHandoff(work, tasks, review);
+  const execution = executionStatus(tasks);
   const verification = work.status === "review" && review?.outcome === "PASS" ? "\n\nOptional additional local or user inspection may happen first; required outcome verification was part of Review." : "";
-  const content = `# ${work.ref} - ${work.title}\n\nState: ${work.status}\n\n## Goal\n\n${work.goal}\n\n## Current Task\n\n${activeDetails}\n\n## Completed\n\n${taskList("done")}\n\n## Pending\n\n${taskList("pending")}${checkpointSection}${remediationSection}\n\n## Next\n\n${next}${verification}\n`;
+  const content = `# ${work.ref} - ${work.title}\n\nState: ${work.status}\n\n## Goal\n\n${work.goal}\n\n## Current Task\n\n${activeDetails}\n\n## Completed\n\n${taskList("done")}\n\n## Pending\n\n${taskList("pending")}${checkpointSection}${remediationSection}\n\n## Execution\n\n${execution}\n\n## Next\n\n${handoff ?? "Execution continues automatically; review follows after all Tasks and validation."}${verification}\n`;
   const path = activePath(workspaceRoot, work.ref);
   writeFileSync(path, content, "utf8");
   return path;
@@ -35,14 +36,20 @@ export function removeActiveContext(workspaceRoot: string, workRef: string) {
     rmSync(path);
   }
 }
-export function nextOperation(work: WorkItem, tasks: Task[], review: Review | null): string {
+export function developerHandoff(work: WorkItem, tasks: Task[], review: Review | null): string | null {
   if (work.status === "closed") return "No further Nerv lifecycle operation is required.";
   if (work.status === "rework") return "approve";
   const active = tasks.find((task) => task.status === "active");
-  if (active) return `Continue with Task ${active.position}.`;
+  if (active) return null;
   const pending = tasks.find((task) => task.status === "pending");
-  if (work.status === "active" && pending) return `Continue with Task ${pending.position}.`;
+  if (work.status === "active" && pending) return null;
   if (work.status === "active") return "review";
   if (work.status === "review" && review?.outcome === "PASS") return "close";
   return "review";
+}
+export function executionStatus(tasks: Task[]): string {
+  const active = tasks.find((task) => task.status === "active");
+  if (active) return `Task ${active.position} is active; completing it activates the next Task.`;
+  if (tasks.some((task) => task.status === "pending")) return "Task execution continues automatically.";
+  return "All Tasks are complete; full validation precedes Review.";
 }
