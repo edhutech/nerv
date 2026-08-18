@@ -23,7 +23,8 @@ export function syncActiveContext(workspaceRoot: string, work: WorkItem, tasks: 
   const checkpointSection = checkpoint ? `\n\n## Checkpoint\n\n${checkpoint.summary}${checkpoint.next_step ? `\n\nNext step: ${checkpoint.next_step}` : ""}` : "";
   const remediationSection = work.status === "rework" && remediationPreview(review) ? `\n\n## Remediation proposal\n\n${remediationPreview(review)}` : "";
   const next = nextOperation(work, tasks, review);
-  const content = `# ${work.ref} - ${work.title}\n\nState: ${work.status}\n\n## Goal\n\n${work.goal}\n\n## Current Task\n\n${activeDetails}\n\n## Completed\n\n${taskList("done")}\n\n## Pending\n\n${taskList("pending")}${checkpointSection}${remediationSection}\n\n## Next\n\n${next}\n`;
+  const verification = work.status === "review" && review?.outcome === "PASS" ? "\n\nOptional additional local or user inspection may happen first; required outcome verification was part of Review." : "";
+  const content = `# ${work.ref} - ${work.title}\n\nState: ${work.status}\n\n## Goal\n\n${work.goal}\n\n## Current Task\n\n${activeDetails}\n\n## Completed\n\n${taskList("done")}\n\n## Pending\n\n${taskList("pending")}${checkpointSection}${remediationSection}\n\n## Next\n\n${next}${verification}\n`;
   const path = activePath(workspaceRoot, work.ref);
   writeFileSync(path, content, "utf8");
   return path;
@@ -36,12 +37,12 @@ export function removeActiveContext(workspaceRoot: string, workRef: string) {
 }
 export function nextOperation(work: WorkItem, tasks: Task[], review: Review | null): string {
   if (work.status === "closed") return "No further Nerv lifecycle operation is required.";
-  if (work.status === "rework") return "nerv approve";
+  if (work.status === "rework") return "approve";
   const active = tasks.find((task) => task.status === "active");
   if (active) return `Continue with Task ${active.position}.`;
   const pending = tasks.find((task) => task.status === "pending");
   if (work.status === "active" && pending) return `Continue with Task ${pending.position}.`;
-  if (work.status === "active") return `nerv review ${work.ref}`;
-  if (work.status === "review" && review?.outcome === "PASS") return `Optional additional local or user inspection may happen first; required outcome verification was part of Review; then nerv close ${work.ref}.`;
-  return `nerv review ${work.ref}`;
+  if (work.status === "active") return "review";
+  if (work.status === "review" && review?.outcome === "PASS") return "close";
+  return "review";
 }

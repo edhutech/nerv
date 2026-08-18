@@ -15,7 +15,9 @@ Nerv governs boundaries, not agent intelligence. Preserve the host agent's nativ
 
 The lifecycle vocabulary is `plan`, `approve`, `execute`, `review`, and `close`. `plan` and `approve` are agent protocols, not shell commands to probe or blindly run. `review` and `close` invoke their runtime commands. `status` is read-only; `checkpoint` is exceptional recovery evidence.
 
-End governed interactions with one recommended next operation: `nerv approve` after a plan or remediation proposal, `nerv review WORK-###` after execution and full validation, and `nerv close WORK-###` after PASS and any optional local/user verification. After Close, no further lifecycle operation is required.
+End governed interactions with one recommended next action: `approve` after a Plan or persisted remediation proposal, `review` after execution and full validation, and `close` after PASS and any optional local/user verification. These are conversational agent intents, not shell commands. When explicitness is useful, the agent continues to execute the canonical `nerv approve`, `nerv review WORK-###`, and `nerv close WORK-###` protocol internally. After Close, no further lifecycle operation is required.
+
+Human-facing lifecycle shorthand is resolved only when the current workspace identifies exactly one applicable Work and valid transition. `approve` means approval of the presented Plan or persisted REWORK remediation; `review` means Review of the current Work after all Tasks are done; and `close` means Close of the current Work after PASS. If no applicable Work or transition exists, explain that instead of guessing. Preserve `WORK-###`, Task numbers, `PASS`, and `REWORK` in the surrounding handoff. Equivalent natural-language intent in the developer's language, such as "apruébalo", "haz el review", or "ciérralo", may express the same action; do not require exact-phrase matching or add runtime natural-language parsing. Explicit `nerv ...` forms remain valid, and this workspace-scoped rule does not assume future parallel Work support.
 
 ### Developer Authority And Temporary Opt-Out
 

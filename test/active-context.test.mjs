@@ -18,17 +18,17 @@ test("active context is a compact handoff and work show retains durable detail",
     finish(repo, 2, "two.txt");
     const reworkOutput = review(repo, "REWORK", remediation);
     const rework = readFileSync(activePath, "utf8");
-    assert(reworkOutput.includes("Remediation proposal:") && reworkOutput.includes("Objective: Resolve") && reworkOutput.includes("Implementation approach: Change") && reworkOutput.includes("Expected touchpoints: src/index.ts") && reworkOutput.includes("Acceptance criteria: Resolved") && reworkOutput.includes("Validation: pnpm test") && reworkOutput.includes("Recommended next operation: nerv approve"), "REWORK output omitted the persisted remediation preview before approval");
+    assert(reworkOutput.includes("Remediation proposal:") && reworkOutput.includes("Objective: Resolve") && reworkOutput.includes("Implementation approach: Change") && reworkOutput.includes("Expected touchpoints: src/index.ts") && reworkOutput.includes("Acceptance criteria: Resolved") && reworkOutput.includes("Validation: pnpm test") && reworkOutput.includes("Recommended next action: approve"), "REWORK output omitted the persisted remediation preview before approval");
     assert(rework.includes("State: rework") && rework.includes("## Remediation proposal") && rework.includes("Objective: Resolve") && rework.includes("Validation: pnpm test") && !rework.includes("approved intent"), "rework context did not present the compact persisted remediation preview");
     const status = run(repo, ["work", "status", "WORK-001"]);
-    assert(status.includes("Remediation proposal:") && status.includes("Objective: Resolve") && status.includes("Recommended next operation: nerv approve"), "rework status omitted persisted remediation before approval");
+    assert(status.includes("Remediation proposal:") && status.includes("Objective: Resolve") && status.includes("Recommended next action: approve"), "rework status omitted persisted remediation before approval");
     assert(run(repo, ["work", "show", "WORK-001"]).includes("Persisted remediation proposal") && run(repo, ["work", "show", "WORK-001"]).includes("Fix"), "rework recovery omitted persisted remediation");
 
     run(repo, ["work", "materialize-rework", "WORK-001"]);
     finish(repo, 3, "fix.txt");
     review(repo, "PASS");
     const pass = readFileSync(activePath, "utf8");
-    assert(pass.includes("Optional additional local or user inspection") && pass.includes("required outcome verification was part of Review") && !pass.includes("external verification"), "PASS handoff treated required outcome verification as optional");
+    assert(pass.includes("\n\n## Next\n\nclose\n") && pass.includes("Optional additional local or user inspection") && pass.includes("required outcome verification was part of Review") && !pass.includes("external verification"), "PASS handoff did not preserve close action and required outcome verification");
     run(repo, ["close", "WORK-001", "--message", "close"]);
     assert(!existsSync(activePath), "Close did not remove active context");
   } finally {

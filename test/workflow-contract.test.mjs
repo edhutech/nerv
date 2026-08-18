@@ -57,10 +57,10 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "Infer safe defaults when confidence is genuinely high; ask only when the answer would materially change the result.",
     "Do not impose a fixed questionnaire or suppress ordinary agent exploration and planning.",
     "Include material implementation decisions and proposed defaults when they make the Plan execution-ready.",
-    "Recommended next operation: nerv approve",
+    "recommended next action: `approve`",
     "Follow the user's language for human-facing Plans, clarification questions, findings, explanations, Review summaries, remediation proposals, and handoffs when practical; English and Spanish are supported initially.",
     "`nerv approve`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`",
-    "Recommended next operation: nerv review WORK-###",
+    "`review` after execution and full validation",
     "After Close, no further lifecycle operation is required.",
     "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",
     "When a Work is in REWORK, present its persisted remediation proposal before requesting approval",
@@ -68,6 +68,25 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "Do not recommend `nerv approve` before this compact preview has been presented.",
     "The original Work Plan need not be repeated.",
   ]) assert(skill.includes(expected), `planning or multilingual contract omitted: ${expected}`);
+});
+
+test("lifecycle shorthand is an unambiguous agent intent over canonical protocol", () => {
+  const source = readFileSync(join(process.cwd(), "src/index.ts"), "utf8");
+  for (const expected of [
+    "These are conversational agent intents, not shell commands.",
+    "current workspace identifies exactly one applicable Work and valid transition",
+    "`approve` means approval of the presented Plan or persisted REWORK remediation",
+    "`review` means Review of the current Work after all Tasks are done",
+    "`close` means Close of the current Work after PASS",
+    "If no applicable Work or transition exists, explain that instead of guessing.",
+    "Equivalent natural-language intent in the developer's language",
+    "Explicit `nerv ...` forms remain valid",
+    "nerv approve",
+    "nerv review WORK-###",
+    "nerv close WORK-###",
+  ]) assert(skill.includes(expected), `lifecycle shorthand contract omitted: ${expected}`);
+  assert(!source.includes('program.command("approve")'), "conversation-only approve became a CLI command");
+  assert(source.includes('program.command("review").argument("<workRef>")') && source.includes('program.command("close").argument("<workRef>")'), "canonical explicit review/close commands were removed");
 });
 
 test("explicit temporary opt-out is scoped developer authority, not a runtime mode", () => {
