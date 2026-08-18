@@ -145,6 +145,32 @@ test("Plan presentation uses current lifecycle terminology", () => {
   assert(!skill.includes("Plan Preview"), "public skill retained stale Plan Preview terminology");
 });
 
+test("REWORK presentation is structured, durable, and approval-oriented", () => {
+  for (const expected of [
+    "For a developer-facing REWORK response, present this compact hierarchy",
+    "Work: WORK-###",
+    "Outcome: REWORK",
+    "Severity: <severity>",
+    "Why it blocks PASS: <blocking rationale>",
+    "Evidence: <relevant persisted Review evidence or finding evidence>",
+    "Affected Work-level acceptance criterion: <criterion or approved outcome boundary>",
+    "Medium residual-risk decision:",
+    "Task: <persisted remediation Task title>",
+    "Objective: <persisted objective>",
+    "Implementation approach: <persisted approach>",
+    "Expected touchpoints: <persisted touchpoints, when available>",
+    "Acceptance criteria: <persisted Task criteria>",
+    "Validation: <persisted Task validation>",
+    "### Scope continuity",
+    "persisted remediation remains within the approved Work boundary",
+    "latest Review outcome/findings/validation evidence",
+    "Do not rely on conversation history or invent rationale, evidence, acceptance criteria, or scope facts",
+    "A REWORK response has exactly one final handoff: `Recommended next action: approve`",
+    "never recommend Task execution",
+  ]) assert(skill.includes(expected), `REWORK presentation contract omitted: ${expected}`);
+  assert(skill.includes("The original Work Plan need not be repeated."), "REWORK presentation requires repeating the original Plan");
+});
+
 test("explicit temporary opt-out is scoped developer authority, not a runtime mode", () => {
   const englishTaskOptOut = "Do not use Nerv for this task.";
   const englishSessionOptOut = "Do not use Nerv for this session.";

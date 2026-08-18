@@ -19,10 +19,10 @@ test("active context is a compact handoff and work show retains durable detail",
     finish(repo, 2, "two.txt");
     const reworkOutput = review(repo, "REWORK", remediation);
     const rework = readFileSync(activePath, "utf8");
-    assert(reworkOutput.includes("Remediation proposal:") && reworkOutput.includes("Objective: Resolve") && reworkOutput.includes("Implementation approach: Change") && reworkOutput.includes("Expected touchpoints: src/index.ts") && reworkOutput.includes("Acceptance criteria: Resolved") && reworkOutput.includes("Validation: pnpm test") && reworkOutput.includes("Recommended next action: approve"), "REWORK output omitted the persisted remediation preview before approval");
-    assert(rework.includes("State: rework") && rework.includes("## Remediation proposal") && rework.includes("Objective: Resolve") && rework.includes("Validation: pnpm test") && !rework.includes("approved intent"), "rework context did not present the compact persisted remediation preview");
+    assert(reworkOutput.includes("Remediation proposal:") && reworkOutput.includes("Task: Fix") && reworkOutput.includes("Objective: Resolve") && reworkOutput.includes("Implementation approach: Change") && reworkOutput.includes("Expected touchpoints: src/index.ts") && reworkOutput.includes("Acceptance criteria: Resolved") && reworkOutput.includes("Validation: pnpm test") && reworkOutput.includes("Recommended next action: approve"), "REWORK output omitted the complete persisted remediation preview before approval");
+    assert(rework.includes("State: rework") && rework.includes("## Remediation proposal") && rework.includes("Task: Fix") && rework.includes("Objective: Resolve") && rework.includes("Validation: pnpm test") && !rework.includes("approved intent"), "rework context did not present the compact persisted remediation preview");
     const status = run(repo, ["work", "status", "WORK-001"]);
-    assert(status.includes("Remediation proposal:") && status.includes("Objective: Resolve") && status.includes("Recommended next action: approve"), "rework status omitted persisted remediation before approval");
+    assert(status.includes("Remediation proposal:") && status.includes("Task: Fix") && status.includes("Objective: Resolve") && status.includes("Recommended next action: approve"), "rework status omitted persisted remediation before approval");
     assert(run(repo, ["work", "show", "WORK-001"]).includes("Persisted remediation proposal") && run(repo, ["work", "show", "WORK-001"]).includes("Fix"), "rework recovery omitted persisted remediation");
 
     run(repo, ["work", "materialize-rework", "WORK-001"]);
@@ -35,6 +35,23 @@ test("active context is a compact handoff and work show retains durable detail",
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+test("fresh-session REWORK approval preview is reconstructible from durable state", () => {
+  const repo = setup();
+  try {
+    materialize(repo);
+    finish(repo, 1, "one.txt");
+    finish(repo, 2, "two.txt");
+    const finding = "Issue: historical Product Context coverage is incomplete\nWhy it blocks PASS: the approved ownership regression boundary is not fully proven\nEvidence: Review validation found no legacy Product fixture assertion\nAffected Work-level acceptance criterion: provenance regressions cover every supported historical scaffold\nMedium residual-risk decision: not accepted because this is a required release-boundary regression";
+    review(repo, "REWORK", ["--findings", JSON.stringify([{ severity: "medium", finding }]), "--remediation-title", "Add Product fixture", "--remediation-objective", "Prove historical Product ownership", "--remediation-approach", "Add the release fixture and classification assertions", "--remediation-touchpoints", "test/fixtures/v0.2.0/product.md; test/managed-skill.test.mjs", "--remediation-acceptance-criteria", "Historical Product ownership is classified as legacy", "--remediation-validation", "pnpm test"]);
+    const shown = run(repo, ["work", "show", "WORK-001"]);
+    const status = run(repo, ["work", "status", "WORK-001"]);
+    const active = readFileSync(join(repo, ".nerv/agent/active/WORK-001.md"), "utf8");
+    assert(shown.includes("WORK-001") && shown.includes("rework") && shown.includes("historical Product Context coverage is incomplete") && shown.includes("Add Product fixture") && shown.includes("Prove historical Product ownership") && shown.includes("Add the release fixture and classification assertions") && shown.includes("Historical Product ownership is classified as legacy") && shown.includes("pnpm test"), "fresh-session work show omitted durable REWORK fields");
+    for (const output of [status, active]) assert(output.includes("Add Product fixture") && output.includes("Prove historical Product ownership") && output.includes("Add the release fixture and classification assertions") && output.includes("Historical Product ownership is classified as legacy") && output.includes("pnpm test"), "fresh-session derived recovery omitted durable remediation fields");
+    assert(shown.includes("Scope: approved scope") && shown.includes("Acceptance criteria: contract persists"), "fresh-session recovery omitted the durable Work boundary");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
 test("REWORK review output formats the created persisted record", () => {

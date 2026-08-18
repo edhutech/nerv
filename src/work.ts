@@ -8,10 +8,10 @@ export function activePath(workspaceRoot: string, workRef: string) {
 export function remediationPreview(review: Pick<Review, "remediation_json"> | null): string {
   if (!review?.remediation_json) return "";
   try {
-    const proposal = JSON.parse(review.remediation_json) as Array<Pick<Task, "objective" | "implementation_approach" | "expected_touchpoints" | "acceptance_criteria" | "validation">>;
+    const proposal = JSON.parse(review.remediation_json) as Array<Pick<Task, "title" | "objective" | "implementation_approach" | "expected_touchpoints" | "acceptance_criteria" | "validation">>;
     const task = proposal[0];
     if (!task) return "";
-    return [`Objective: ${task.objective}`, `Implementation approach: ${task.implementation_approach || "none specified"}`, `Expected touchpoints: ${task.expected_touchpoints || "none specified"}`, `Acceptance criteria: ${task.acceptance_criteria}`, `Validation: ${task.validation}`].join("\n");
+    return [`Task: ${task.title}`, `Objective: ${task.objective}`, `Implementation approach: ${task.implementation_approach || "none specified"}`, `Expected touchpoints: ${task.expected_touchpoints || "none specified"}`, `Acceptance criteria: ${task.acceptance_criteria}`, `Validation: ${task.validation}`].join("\n");
   } catch {
     return "";
   }

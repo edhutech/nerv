@@ -6,7 +6,7 @@ import { CANONICAL_CONTEXT_SCAFFOLDS } from "../dist/workspace.js";
 test("managed skill policy separates current identity from supported release identities", () => {
   const policy = MANAGED_IDENTITIES[".agents/skills/nerv/SKILL.md"];
   const packaged = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8");
-  assert(policy.current === "b47dc934bfabc0124b19f1d3c5ef0ef237ddc67a37e85e97b699d54d3601c416", "packaged skill current identity changed unexpectedly");
+  assert(policy.current === "0c88ecb8b3c9c618f8b5e23f1395b8fb7f03b80eeae58bf472c464f642fa8511", "packaged skill current identity changed unexpectedly");
   assert(knownIdentity(".agents/skills/nerv/SKILL.md", packaged) === "current", "packaged skill is not registered as current");
   assert(policy.legacy.length === 1 && policy.legacy[0] === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "supported v0.2.0 identity was lost from the legacy policy");
   assert(!policy.legacy.includes("f47fd908766574bc5ef6dae4594c26fa3ad5480928ad2edbdabde7a6ea1f5d89"), "unreleased development identity became runtime compatibility");

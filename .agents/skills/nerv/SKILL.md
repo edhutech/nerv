@@ -88,6 +88,37 @@ Review only an active Work with all Tasks done. Evaluate the approved result, re
 
 Classify findings as critical, high, medium, or low. Critical/high require REWORK; medium requires REWORK unless explicitly accepted as durable residual risk; low is residual. A tree that cannot produce a trustworthy PASS fingerprint is also a blocking finding. REWORK remains in the same Work: show blockers and the persisted remediation proposal's objective, approach, expected touchpoints, acceptance criteria, and validation, then await approval. Do not recommend `approve` before this compact preview has been presented. The original Work Plan need not be repeated.
 
+For a developer-facing REWORK response, present this compact hierarchy:
+
+```text
+## REWORK
+Work: WORK-###
+Outcome: REWORK
+
+### Findings
+Severity: <severity>
+Issue: <concise issue>
+Why it blocks PASS: <blocking rationale>
+Evidence: <relevant persisted Review evidence or finding evidence>
+Affected Work-level acceptance criterion: <criterion or approved outcome boundary>
+Medium residual-risk decision: <why this medium finding is not accepted as durable residual risk, when applicable>
+
+### Remediation proposal
+Task: <persisted remediation Task title>
+Objective: <persisted objective>
+Implementation approach: <persisted approach>
+Expected touchpoints: <persisted touchpoints, when available>
+Acceptance criteria: <persisted Task criteria>
+Validation: <persisted Task validation>
+
+### Scope continuity
+<State whether the persisted remediation remains within the approved Work boundary. If that cannot be established or a material authority change exists, state that ordinary REWORK approval is not sufficient.>
+
+Recommended next action: approve
+```
+
+After session recovery, reconstruct this preview only from the persisted Work boundary, latest Review outcome/findings/validation evidence, and persisted remediation proposal exposed by `nerv work show WORK-###`, `nerv work status WORK-###`, or derived active context. Do not rely on conversation history or invent rationale, evidence, acceptance criteria, or scope facts that durable state does not establish. Keep the original Plan omitted unless a specific durable field is needed to explain the affected boundary. A REWORK response has exactly one final handoff: `Recommended next action: approve`; never recommend Task execution.
+
 PASS saves the reviewed-tree fingerprint only after the material approved outcome has been demonstrated with relevant evidence. Show residual low findings and accepted medium risks. Optional local or user verification may occur before Close only as additional developer inspection, never as a substitute for evidence required by Review; remote CI, push, deployment, and provider access are outside this lifecycle. Supplied verification evidence can later require REWORK.
 
 Close requires PASS, validation evidence, and the developer's request. Before Close, inspect authoritative Repo Context for a repository commit convention. When it defines one, the agent must construct a compliant explicit subject and invoke the canonical `nerv close WORK-### --message <subject>` form rather than silently using the Work title; for this repository, valid Conventional Commit subjects include `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, `refactor: ...`, `chore: ...`, `ci: ...`, and `build: ...`. When no authoritative convention exists, the generic runtime may continue using the Work title by default; Nerv does not impose Conventional Commits globally. It commits only the exact reviewed attributable tree, preserves unrelated changes, and never stages indiscriminately. One Work normally produces one reviewed atomic commit; a verified no-diff result closes without an empty commit.
