@@ -89,6 +89,34 @@ test("lifecycle shorthand is an unambiguous agent intent over canonical protocol
   assert(source.includes('program.command("review").argument("<workRef>")') && source.includes('program.command("close").argument("<workRef>")'), "canonical explicit review/close commands were removed");
 });
 
+test("lifecycle intent is semantic and execution topology remains native", () => {
+  for (const expected of [
+    "semantic conversational intent, not keyword matching",
+    "the developer's full message clearly expresses the lifecycle action",
+    "not negative, hypothetical, conditional, explanatory, or deferred",
+    "Words such as `approve`, `review`, or `close` appearing in a message are never sufficient by themselves",
+    "Before approve, explain the migration",
+    "Do not approve yet",
+    "What happens after close?",
+    "Do not close this yet",
+    "For the review, use two subagents first",
+    "antes de cerrar quiero revisar otra cosa",
+    "If intent, Work resolution, or state is ambiguous or invalid, explain that instead of guessing or forcing a transition.",
+    "I approve this plan",
+    "apruébalo",
+    "The developer and host agent may choose their native execution strategy",
+    "including one or more subagents",
+    "A capability invocation, subagent, or delegation does not by itself create a Task or Work",
+    "create a Task only for a real execution boundary inside the approved Work",
+    "create another Work only for a materially separate outcome needing its own approval, evidence, Review, and Close",
+    "Nerv remains agent-, model-, provider-, and host-agnostic.",
+  ]) assert(skill.includes(expected), `semantic lifecycle or execution-freedom contract omitted: ${expected}`);
+  const spanishPositive = "apruébalo";
+  const spanishNegative = "todavía no lo apruebes";
+  const spanishConditional = "antes de cerrar quiero revisar otra cosa";
+  assert(skill.includes(spanishPositive) && skill.includes(spanishNegative) && skill.includes(spanishConditional), "Spanish lifecycle intent distinctions were not documented");
+});
+
 test("explicit temporary opt-out is scoped developer authority, not a runtime mode", () => {
   const englishTaskOptOut = "Do not use Nerv for this task.";
   const englishSessionOptOut = "Do not use Nerv for this session.";

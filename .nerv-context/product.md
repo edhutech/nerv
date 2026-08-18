@@ -24,6 +24,7 @@ Developers need compact durable work context across sessions without historical 
 - One Work Item normally closes as one Git-safe reviewed atomic commit; a verified no-diff outcome closes without an empty commit.
 - Human-facing interaction may follow the user's language when practical while commands, IDs, lifecycle outcomes, and other technical protocol remain canonical.
 - When one current Work and valid transition are unambiguous, human-facing lifecycle input may use a single canonical action word while Nerv's explicit runtime protocol and Work observability remain unchanged.
+- Lifecycle actions require clear developer intent; execution topology remains native to the developer and host agent, and capabilities or delegation do not imply Tasks or Works.
 - Explicit developer authority may temporarily override automatic Nerv governance for the developer-stated task or conversational scope without changing repository installation or durable Nerv state.
 - Repository setup is reversible through ownership-safe removal; uninstall must fail closed when local Nerv state cannot establish that no unresolved Work exists.
 - Durable Product Context is authority-backed current product truth; implementation decisions, unsupported assumptions, speculative copy, and temporary demo content are not product authority.
