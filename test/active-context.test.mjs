@@ -1,5 +1,5 @@
 import test from "node:test";
-import { assert, existsSync, finish, join, materialize, plan, readFileSync, remediation, review, rmSync, run, setup, writeFileSync } from "./helpers.mjs";
+import { assert, existsSync, finish, join, materialize, plan, readFileSync, remediation, review, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
 
 test("active context is a compact handoff and work show retains durable detail", () => {
   const repo = setup();
@@ -16,9 +16,12 @@ test("active context is a compact handoff and work show retains durable detail",
     writeFileSync(join(repo, "one.txt"), "feature\n");
     run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "targeted passed", "--files", "one.txt"]);
     finish(repo, 2, "two.txt");
-    review(repo, "REWORK", remediation);
+    const reworkOutput = review(repo, "REWORK", remediation);
     const rework = readFileSync(activePath, "utf8");
-    assert(rework.includes("State: rework") && !rework.includes("Fix\n\nObjective: Resolve"), "rework context retained remediation history");
+    assert(reworkOutput.includes("Remediation proposal:") && reworkOutput.includes("Objective: Resolve") && reworkOutput.includes("Implementation approach: Change") && reworkOutput.includes("Expected touchpoints: src/index.ts") && reworkOutput.includes("Acceptance criteria: Resolved") && reworkOutput.includes("Validation: pnpm test") && reworkOutput.includes("Recommended next operation: nerv approve"), "REWORK output omitted the persisted remediation preview before approval");
+    assert(rework.includes("State: rework") && rework.includes("## Remediation proposal") && rework.includes("Objective: Resolve") && rework.includes("Validation: pnpm test") && !rework.includes("approved intent"), "rework context did not present the compact persisted remediation preview");
+    const status = run(repo, ["work", "status", "WORK-001"]);
+    assert(status.includes("Remediation proposal:") && status.includes("Objective: Resolve") && status.includes("Recommended next operation: nerv approve"), "rework status omitted persisted remediation before approval");
     assert(run(repo, ["work", "show", "WORK-001"]).includes("Persisted remediation proposal") && run(repo, ["work", "show", "WORK-001"]).includes("Fix"), "rework recovery omitted persisted remediation");
 
     run(repo, ["work", "materialize-rework", "WORK-001"]);
@@ -31,4 +34,9 @@ test("active context is a compact handoff and work show retains durable detail",
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+test("REWORK review output formats the created persisted record", () => {
+  const source = readFileSync(join(root, "src/index.ts"), "utf8");
+  assert(source.includes("const createdReview = repo.createReview(") && source.includes("remediationPreview(createdReview)"), "REWORK review output did not format the created persisted Review record");
 });

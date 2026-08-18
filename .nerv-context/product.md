@@ -24,6 +24,7 @@ Developers need compact durable work context across sessions without historical 
 - One Work Item normally closes as one Git-safe reviewed atomic commit; a verified no-diff outcome closes without an empty commit.
 - Human-facing interaction may follow the user's language when practical while commands, IDs, lifecycle outcomes, and other technical protocol remain canonical.
 - Durable Product Context is authority-backed current product truth; implementation decisions, unsupported assumptions, speculative copy, and temporary demo content are not product authority.
+- Human approval is informed: persisted REWORK remediation is presented before approval is requested.
 
 ## Boundaries
 
