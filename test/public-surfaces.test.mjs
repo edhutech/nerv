@@ -8,6 +8,8 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("README provides a concise documented onboarding path", () => {
   const readme = readFileSync(resolve(root, "README.md"), "utf8");
   assert.match(readme, /npm install --global @edhutech\/nerv/);
+  assert.match(readme, /nerv uninstall/);
+  assert.match(readme, /npm uninstall -g @edhutech\/nerv/);
   assert.match(readme, /Node\.js 22 and 24 LTS/);
   assert.match(readme, /intent -> Plan Preview -> approval -> execution -> review -> close/);
   assert.match(readme, /OpenCode, Codex, Cursor, and Claude Code/);

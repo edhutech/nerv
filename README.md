@@ -28,6 +28,14 @@ git add AGENTS.md CLAUDE.md .agents/skills/nerv/SKILL.md .nerv-context/product.m
 git commit -m "Establish Nerv setup"
 ```
 
+To remove Nerv from this repository without removing the global CLI:
+
+```bash
+nerv uninstall
+```
+
+Global package removal is separate: `npm uninstall -g @edhutech/nerv`. Repository uninstall refuses when local Nerv state cannot be inspected or unresolved Work exists, and does not stage or commit changes.
+
 Then ask your coding agent to prepare a Nerv Plan Preview for the change you want. Review it, explicitly approve it, and let the agent execute the approved Tasks.
 
 ## How Nerv Works

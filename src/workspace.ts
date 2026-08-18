@@ -1,11 +1,13 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase } from "./database.js";
-import { workRef } from "./repository.js";
+import { workRef, type WorkItem } from "./repository.js";
 
 const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
-const AGENTS_BRIDGE = "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n";
+export const AGENTS_BRIDGE = "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n";
+export const NERV_EXCLUDE_BLOCK = "# Nerv local state (managed)\n.nerv/\n# End Nerv local state\n";
 const UNSUPPORTED_SCHEMA = "existing .nerv/nerv.db uses an unsupported generated schema; use a compatible/current Nerv version, or back up .nerv before intentionally discarding it";
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 export type SetupStatus = { path: string; established: boolean };
@@ -47,6 +49,130 @@ export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillMess
   ensureSharedContext(repoRoot);
   return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillMessage, setup: canonicalSetupStatus(repoRoot) };
 }
+
+export type UninstallResult = { removed: string[]; preserved: string[]; alreadyAbsent: boolean };
+
+export function uninstallWorkspace(repoRoot: string): UninstallResult {
+  const inspection = inspectWorkspaceForUninstall(repoRoot);
+  const removed: string[] = [];
+  const preserved: string[] = [];
+  const packagedSkill = readFileSync(new URL("../.agents/skills/nerv/SKILL.md", import.meta.url), "utf8");
+  const packagedClaude = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
+
+  removeManagedFile(repoRoot, ".agents/skills/nerv/SKILL.md", packagedSkill, "Public Nerv skill", removed, preserved);
+  removeManagedFile(repoRoot, "AGENTS.md", AGENTS_BRIDGE, "Agent discovery bridge", removed, preserved, true);
+  removeManagedFile(repoRoot, "CLAUDE.md", packagedClaude, "Claude Code bridge", removed, preserved, true);
+  removeManagedFile(repoRoot, ".nerv-context/product.md", CANONICAL_CONTEXT_SCAFFOLDS.product, "Product Context scaffold", removed, preserved);
+  removeManagedFile(repoRoot, ".nerv-context/repo.md", CANONICAL_CONTEXT_SCAFFOLDS.repo, "Repo Context scaffold", removed, preserved);
+  removeManagedExclude(repoRoot, removed);
+
+  if (inspection.present) {
+    rmSync(join(repoRoot, ".nerv"), { recursive: true, force: false });
+    removed.push(".nerv/");
+  }
+
+  pruneEmptyDirectories(repoRoot, [".agents/skills/nerv", ".agents/skills", ".nerv-context"]);
+  return { removed, preserved, alreadyAbsent: removed.length === 0 && preserved.length === 0 };
+}
+
+function inspectWorkspaceForUninstall(repoRoot: string): { present: boolean; work: WorkItem[] } {
+  const workspacePath = join(repoRoot, ".nerv");
+  let workspaceStat: ReturnType<typeof lstatSync>;
+  try {
+    workspaceStat = lstatSync(workspacePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { present: false, work: [] };
+    throw new Error("Cannot uninstall Nerv safely: .nerv cannot be inspected; local state may be inaccessible.");
+  }
+  if (!workspaceStat.isDirectory()) throw new Error("Cannot uninstall Nerv safely: .nerv exists but is not a directory; local state cannot be inspected.");
+  const databasePath = join(workspacePath, "nerv.db");
+  let databaseStat: ReturnType<typeof lstatSync>;
+  try {
+    databaseStat = lstatSync(databasePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`Cannot uninstall Nerv safely: .nerv/nerv.db is missing, unsupported, unreadable, or corrupt. Resolve or preserve the local state before retrying.`);
+    throw new Error("Cannot uninstall Nerv safely: .nerv/nerv.db cannot be accessed. Resolve or preserve the local state before retrying.");
+  }
+  if (!databaseStat.isFile() || !hasRequiredSchema(databasePath)) {
+    throw new Error(`Cannot uninstall Nerv safely: .nerv/nerv.db is missing, unsupported, unreadable, or corrupt. Resolve or preserve the local state before retrying.`);
+  }
+  let database: DatabaseSync | undefined;
+  try {
+    database = new DatabaseSync(databasePath, { readOnly: true });
+    const work = database.prepare("SELECT * FROM work_items ORDER BY ref").all() as WorkItem[];
+    if (work.some((item) => typeof item.ref !== "string" || !["active", "review", "rework", "closed"].includes(item.status))) {
+      throw new Error("invalid Work state");
+    }
+    const unresolved = work.filter((item) => item.status !== "closed");
+    if (unresolved.length) {
+      throw new Error(`Cannot uninstall Nerv while unresolved Work exists: ${unresolved.map((item) => `${item.ref} (${item.status})`).join(", ")}. Resolve it first.`);
+    }
+    return { present: true, work };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Cannot uninstall Nerv while unresolved Work exists:")) throw error;
+    throw new Error("Cannot uninstall Nerv safely: .nerv/nerv.db cannot be inspected for unresolved Work. Resolve or preserve the local state before retrying.");
+  } finally {
+    database?.close();
+  }
+}
+
+function removeManagedFile(repoRoot: string, relativePath: string, managed: string, label: string, removed: string[], preserved: string[], allowEmbedded = false): void {
+  const path = join(repoRoot, relativePath);
+  if (!existsSync(path)) return;
+  if (!isRegularFile(path)) {
+    preserved.push(`${relativePath} (${label} is not a regular file)`);
+    return;
+  }
+  const content = readFileSync(path, "utf8");
+  if (content === managed) {
+    rmSync(path);
+    removed.push(relativePath);
+    return;
+  }
+  if (allowEmbedded) {
+    const crlf = managed.replaceAll("\n", "\r\n");
+    const next = content.includes(managed) ? content.replace(managed, "") : content.includes(crlf) ? content.replace(crlf, "") : null;
+    if (next !== null) {
+      if (next) writeFileSync(path, next, "utf8");
+      else rmSync(path);
+      removed.push(relativePath);
+      return;
+    }
+  }
+  preserved.push(`${relativePath} (${label} modified or contains custom content)`);
+}
+
+function removeManagedExclude(repoRoot: string, removed: string[]): void {
+  const path = localExcludePath(repoRoot);
+  if (!existsSync(path) || !isRegularFile(path)) return;
+  const content = readFileSync(path, "utf8");
+  const crlf = NERV_EXCLUDE_BLOCK.replaceAll("\n", "\r\n");
+  const next = content.includes(NERV_EXCLUDE_BLOCK) ? content.replace(NERV_EXCLUDE_BLOCK, "") : content.includes(crlf) ? content.replace(crlf, "") : null;
+  if (next !== null && next !== content) {
+    writeFileSync(path, next, "utf8");
+    removed.push(".git/info/exclude Nerv block");
+  }
+}
+
+function localExcludePath(repoRoot: string): string {
+  const resolved = git(repoRoot, ["rev-parse", "--git-path", "info/exclude"]);
+  return isAbsolute(resolved) ? resolved : resolve(repoRoot, resolved);
+}
+
+function pruneEmptyDirectories(repoRoot: string, paths: string[]): void {
+  for (const relativePath of paths) {
+    const path = join(repoRoot, relativePath);
+    try {
+      if (statSync(path).isDirectory() && readdirSync(path).length === 0) rmSync(path);
+    } catch {
+      // The path may already be absent or may contain developer-owned content.
+    }
+  }
+}
+
+function isRegularFile(path: string): boolean {
+  try { return lstatSync(path).isFile(); } catch { return false; }
+}
 function ensureSharedContext(repoRoot: string): void {
   const directory = join(repoRoot, ".nerv-context");
   mkdirSync(directory, { recursive: true });
@@ -75,13 +201,13 @@ function nextWorkNumber(repoRoot: string): number {
   return highest + 1;
 }
 export function ensureLocalExclude(repoRoot: string): void {
-  const resolved = git(repoRoot, ["rev-parse", "--git-path", "info/exclude"]);
-  const path = isAbsolute(resolved) ? resolved : resolve(repoRoot, resolved);
+  const path = localExcludePath(repoRoot);
   mkdirSync(dirname(path), { recursive: true });
-  if (!existsSync(path)) { writeFileSync(path, ".nerv/\n", "utf8"); return; }
+  if (!existsSync(path)) { writeFileSync(path, NERV_EXCLUDE_BLOCK, "utf8"); return; }
   const content = readFileSync(path, "utf8");
+  if (content.includes(NERV_EXCLUDE_BLOCK) || content.includes(NERV_EXCLUDE_BLOCK.replaceAll("\n", "\r\n"))) return;
   if (content.split(/\r?\n/).some((line) => [".nerv", ".nerv/", "/.nerv", "/.nerv/"].includes(line.trim()))) return;
-  appendFileSync(path, `${content.endsWith("\n") || content.length === 0 ? "" : "\n"}.nerv/\n`);
+  appendFileSync(path, `${content.endsWith("\n") || content.length === 0 ? "" : "\n"}${NERV_EXCLUDE_BLOCK}`);
 }
 export function canonicalSetupStatus(repoRoot: string): SetupStatus[] {
   return CANONICAL_SETUP_PATHS.map((path) => ({ path, established: existsSync(join(repoRoot, path)) && gitSucceeds(repoRoot, ["ls-files", "--error-unmatch", "--", path]) && gitSucceeds(repoRoot, ["diff", "--quiet", "--cached", "HEAD", "--", path]) && gitSucceeds(repoRoot, ["diff", "--quiet", "HEAD", "--", path]) }));

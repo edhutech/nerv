@@ -15,7 +15,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 ## Important paths
 
 - `.agents/skills/nerv/SKILL.md`: managed public Nerv skill.
-- `AGENTS.md` and `CLAUDE.md`: optional minimal discovery bridges, created only when absent and never managed after creation.
+- `AGENTS.md` and `CLAUDE.md`: optional minimal discovery bridges, created only when absent; uninstall removes only exact Nerv-managed content and preserves custom content.
 - `test/`: focused built-CLI regression coverage in temporary Git repositories.
 
 ## Development rules
@@ -34,7 +34,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 
 ## Generated and local state
 
-`.nerv/` is local operational state and temporary active context, excluded through Git's repository-local exclude mechanism. `.nerv-context/` is tracked shared context; `product.md` and `repo.md` are its only canonical current-truth files. Before every new Work, those files and the managed public skill must be committed and clean at `HEAD`.
+`.nerv/` is local operational state and temporary active context, excluded through Git's repository-local exclude mechanism. A delimited Nerv-owned exclusion block may be removed by uninstall; legacy unmarked exclusions are preserved. `.nerv-context/` is tracked shared context; `product.md` and `repo.md` are its only canonical current-truth files. Before every new Work, those files and the managed public skill must be committed and clean at `HEAD`.
 
 ## Validation
 

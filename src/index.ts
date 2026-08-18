@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { createRequire } from "node:module";
-import { assertCanonicalSetupEstablished, getWorkspaceStatus, ensureWorkspace } from "./workspace.js";
+import { assertCanonicalSetupEstablished, getWorkspaceStatus, ensureWorkspace, uninstallWorkspace } from "./workspace.js";
 import { openRepository, type ApprovedPlan, type PlanTask, type Repository, type Review, type Task, type WorkItem } from "./repository.js";
 import { discoverContext } from "./context.js";
 import { nextOperation, remediationPreview, removeActiveContext, syncActiveContext } from "./work.js";
@@ -33,6 +33,12 @@ JSON contract for --findings:
   Optional field: accepted_as_residual_risk (boolean; true only for medium findings).
   Critical, high, and unaccepted medium findings block PASS; findings are required for REWORK.
   Example: ${REVIEW_FINDINGS_EXAMPLE}
+`;
+const UNINSTALL_HELP = `
+Removes repository-level Nerv setup only; it does not uninstall the global npm package.
+Uninstall refuses when local Nerv state cannot be inspected or unresolved Work exists.
+The command never stages or commits Git changes; review and commit any removals normally.
+Global removal remains: npm uninstall -g @edhutech/nerv
 `;
 function action(handler: () => void) {
   try {
@@ -135,6 +141,7 @@ function ownedPaths(tasks: Task[]): string[] {
 }
 
 program.command("init").action(() => action(() => { const status = getWorkspaceStatus(process.cwd()); if (!status.repoRoot) throw new Error("nerv init must be run inside a Git repository."); const existed = status.initialized; const result = ensureWorkspace(status.repoRoot); console.log(existed ? `Nerv is already initialized in ${status.repoRoot}.` : `Initialized Nerv in ${status.repoRoot}.`); console.log(`Repository setup: ${result.setup.every((entry) => entry.established) ? "established at HEAD" : `not established (${result.setup.filter((entry) => !entry.established).map((entry) => entry.path).join(", ")})`}.`); if (result.skillMessage) console.log(result.skillMessage); }));
+program.command("uninstall").description("Remove repository-level Nerv setup without uninstalling the global package.").addHelpText("after", UNINSTALL_HELP).action(() => action(() => { const status = getWorkspaceStatus(process.cwd()); if (!status.repoRoot) throw new Error("nerv uninstall must be run inside a Git repository."); const result = uninstallWorkspace(status.repoRoot); if (result.alreadyAbsent) { console.log("Nerv repository setup is already absent."); return; } console.log(`Removed repository-level Nerv setup: ${result.removed.length ? result.removed.join(", ") : "none"}.`); if (result.preserved.length) console.log(`Preserved developer-owned or modified content: ${result.preserved.join(", ")}.`); console.log("No Git changes were staged or committed."); }));
 const workCommand = program.command("work").description("Deterministic Work Item persistence primitives.");
 workCommand.command("materialize").requiredOption("--plan <json>").addHelpText("after", MATERIALIZE_PLAN_HELP).action((options: { plan: string }) => action(() => { const status = workspace(); const plan = approvedPlan(options.plan); const repo = openRepository(status.databasePath); let item: WorkItem; try { if (!repo.listWork().some((entry) => entry.status !== "closed")) assertCanonicalSetupEstablished(status.repoRoot); item = repo.materializePlan({ ...plan, git_baseline_json: JSON.stringify(captureBaseline(status.repoRoot)) }); } finally { repo.close(); } console.log(`Materialized ${item!.ref}: ${item!.title}\nStable ID: ${item!.id}\nContext: ${sync(status, item!)}`); console.log(`Recommended next operation: ${recommendedNext(status, item!)}`); }));
 workCommand.command("materialize-rework").argument("<workRef>").action((reference: string) => action(() => { const status = workspace(); const repo = openRepository(status.databasePath); let item: WorkItem; try { item = repo.materializeRework(work(repo, reference).id); } finally { repo.close(); } sync(status, item!); console.log(`Materialized persisted remediation Tasks in ${item!.ref}.\nRecommended next operation: ${recommendedNext(status, item!)}`); }));

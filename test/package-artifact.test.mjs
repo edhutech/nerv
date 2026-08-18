@@ -93,6 +93,7 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     const binary = join(temp, "node_modules", ".bin", process.platform === "win32" ? "nerv.cmd" : "nerv");
     assert.equal(run(binary, ["--version"], repo).trim(), packed.version);
     assert.match(run(binary, ["--help"], repo), /Usage: nerv/);
+    assert.match(run(binary, ["uninstall", "--help"], repo), /does not uninstall the global npm package/);
     run(binary, ["init"], repo);
     for (const path of ["AGENTS.md", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
     for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md"]) assert.equal(readFileSync(join(repo, path), "utf8"), readFileSync(join(root, path), "utf8"), `init did not install ${path}`);
