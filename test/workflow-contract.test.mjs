@@ -62,6 +62,7 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "`nerv approve`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`",
     "Recommended next operation: nerv review WORK-###",
     "After Close, no further lifecycle operation is required.",
+    "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",
     "When a Work is in REWORK, present its persisted remediation proposal before requesting approval",
     "persisted remediation proposal's objective, approach, expected touchpoints, acceptance criteria, and validation",
     "Do not recommend `nerv approve` before this compact preview has been presented.",

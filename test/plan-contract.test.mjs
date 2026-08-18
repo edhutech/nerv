@@ -1,5 +1,5 @@
 import test from "node:test";
-import { assert, materialize, minimalPlan, plan, rmSync, run, setup } from "./helpers.mjs";
+import { assert, finish, materialize, minimalPlan, plan, rmSync, run, setup } from "./helpers.mjs";
 
 test("minimal approved plans persist optional fields as empty strings", () => {
   const repo = setup();
@@ -38,6 +38,29 @@ test("materialize help exposes a parser-valid typed plan contract", () => {
     ]) assert(help.includes(expected), `materialize help omitted ${expected}`);
     materialize(repo, example);
     assert(run(repo, ["work", "show", "WORK-001"]).includes("Add status"), "documented materialize example was not accepted");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("review help exposes and accepts the parser-valid findings contract", () => {
+  const repo = setup();
+  const example = JSON.stringify([{ severity: "high", finding: "Describe the blocking issue" }]);
+  try {
+    const help = run(repo, ["review", "--help"]);
+    for (const expected of [
+      "Optional non-empty JSON array of finding objects.",
+      "Required finding fields: severity, finding.",
+      "severity must be one of: critical, high, medium, low.",
+      "Optional field: accepted_as_residual_risk (boolean; true only for medium findings).",
+      example,
+    ]) assert(help.includes(expected), `review help omitted ${expected}`);
+    materialize(repo);
+    finish(repo, 1, "one.txt");
+    finish(repo, 2, "two.txt");
+    const unsupported = JSON.stringify([{ severity: "medium", title: "Unsupported", detail: "Wrong field" }]);
+    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "invalid", "--validation-evidence", "full", "--findings", unsupported], 1).includes("finding field"), "unsupported finding fields did not produce a useful contract error");
+    assert(run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "needs correction", "--validation-evidence", "full", "--findings", example, "--remediation-title", "Fix", "--remediation-objective", "Resolve", "--remediation-acceptance-criteria", "Resolved", "--remediation-validation", "pnpm test"]).includes("REWORK"), "documented findings example was rejected by the parser");
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
