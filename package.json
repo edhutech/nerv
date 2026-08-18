@@ -36,6 +36,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "cli": "pnpm build && node scripts/cli.mjs",
     "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",

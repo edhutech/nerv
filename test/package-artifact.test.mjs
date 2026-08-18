@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -34,6 +34,9 @@ test("CI package scripts resolve from tracked source", () => {
     assert(existsSync(join(root, source)), `${name} source script is missing: ${source}`);
     assert.equal(execFileSync("git", ["ls-files", "--error-unmatch", source], { cwd: root, encoding: "utf8" }).trim(), source, `${name} source script is not tracked`);
   }
+  assert(existsSync(join(root, "scripts/cli.mjs")), "cli source script is missing");
+  assert.equal(packageJson.scripts.cli, "pnpm build && node scripts/cli.mjs");
+  assert.match(readFileSync(join(root, ".nerv-context/repo.md"), "utf8"), /pnpm cli -- <arguments>/);
   assert.equal(packageJson.dependencies?.["better-sqlite3"], undefined);
   assert.equal(packageJson.devDependencies?.["@types/better-sqlite3"], undefined);
   assert.equal(packageJson.pnpm?.onlyBuiltDependencies?.includes("better-sqlite3"), undefined);
@@ -44,6 +47,21 @@ function run(command, args, cwd) {
   assert.equal(result.status, 0, `${command} ${args.join(" ")} failed:\n${result.stdout}${result.stderr}`);
   return `${result.stdout}${result.stderr}`;
 }
+
+test("local cli script ignores PATH nerv and runs the repository build", () => {
+  const temp = mkdtempSync(join(tmpdir(), "nerv-local-cli-"));
+  try {
+    const fake = join(temp, process.platform === "win32" ? "nerv.cmd" : "nerv");
+    writeFileSync(fake, process.platform === "win32" ? "@echo FAKE_GLOBAL_NERV\r\n" : "#!/bin/sh\nprintf FAKE_GLOBAL_NERV\n");
+    if (process.platform !== "win32") chmodSync(fake, 0o755);
+    const result = spawnSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["cli", "--", "--help"], { cwd: root, encoding: "utf8", env: { ...process.env, PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
+    assert.equal(result.status, 0, `pnpm cli failed:\n${result.stdout}${result.stderr}`);
+    assert.match(`${result.stdout}${result.stderr}`, /Usage: nerv/);
+    assert.doesNotMatch(`${result.stdout}${result.stderr}`, /FAKE_GLOBAL_NERV/);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
 
 test("packed artifact has the exact public surface and runs in isolation", { skip: process.env.NERV_PACKAGE_TEST !== "1", timeout: 120_000 }, () => {
   const temp = mkdtempSync(join(tmpdir(), "nerv-package-"));

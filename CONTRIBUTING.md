@@ -14,6 +14,8 @@ For substantial changes, describe the problem and intended boundary before imple
 
 Nerv uses Node.js 22 or 24 and pnpm.
 
+For Nerv's own CLI, use `pnpm cli -- <arguments>`. It rebuilds the repository and runs the current local `dist/index.js`; do not use `pnpm exec nerv` to validate source-tree changes.
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm validate
