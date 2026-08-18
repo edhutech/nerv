@@ -30,7 +30,15 @@ test("CI package scripts resolve from tracked source", () => {
   assert.match(workflow, /pnpm validate/);
   assert.match(workflow, /pnpm test:package/);
   assert.match(workflow, /os: ubuntu-latest\s+node: 22\.14\.0\s+package_artifact: false/);
-  assert.equal(packageJson.engines?.node, ">=22.14.0 <23 || >=24.0.0 <25");
+  assert.equal(packageJson.engines?.node, ">=22.14.0 <23 || >=24.11.0 <25");
+  assert.match(packageJson.engines.node, /^>=22\.14\.0 <23 \|\| >=24\.11\.0 <25$/);
+  assert.doesNotMatch(packageJson.engines.node, />=22\.0\.0/);
+  assert.doesNotMatch(packageJson.engines.node, />=24\.0\.0/);
+  assert.doesNotMatch(packageJson.engines.node, />=25/);
+  assert.match(workflow, /os: ubuntu-latest\s+node: 24\.11\.0\s+package_artifact: false/);
+  assert.match(workflow, /os: ubuntu-latest\s+node: 24\.19\.0\s+package_artifact: true/);
+  assert.match(workflow, /os: macos-latest\s+node: 24\.19\.0\s+package_artifact: false/);
+  assert.match(workflow, /os: windows-latest\s+node: 24\.19\.0\s+package_artifact: false/);
   for (const [name, source] of [["build", "scripts/build.mjs"], ["test:package", "scripts/package-test.mjs"]]) {
     assert.match(packageJson.scripts[name], new RegExp(source.replace(".", "\\.")));
     assert(existsSync(join(root, source)), `${name} source script is missing: ${source}`);
