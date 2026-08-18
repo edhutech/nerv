@@ -54,10 +54,15 @@ test("uninstall removes a supported historical Repo Context scaffold", () => {
   const repo = setup(false);
   const repository = join(repo, ".nerv-context/repo.md");
   try {
-    const historical = readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8");
-    writeFileSync(repository, historical.replaceAll("\n", "\r\n"));
+    const historicalLf = normalizedText(readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8"));
+    const historicalCrlf = historicalLf.replaceAll("\n", "\r\n");
+    writeFileSync(repository, historicalLf);
     run(repo, ["uninstall"]);
-    assert(!existsSync(repository), "uninstall retained a recognized historical Repo Context scaffold");
+    assert(!existsSync(repository), "uninstall retained a recognized historical LF Repo Context scaffold");
+    run(repo, ["init"]);
+    writeFileSync(repository, historicalCrlf);
+    run(repo, ["uninstall"]);
+    assert(!existsSync(repository), "uninstall retained a recognized historical CRLF Repo Context scaffold");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
