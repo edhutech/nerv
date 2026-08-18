@@ -1,6 +1,5 @@
 import test from "node:test";
-import { execFileSync } from "node:child_process";
-import { Database, assert, existsSync, finish, git, gitResult, join, materialize, remediation, readFileSync, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
+import { Database, assert, existsSync, finish, git, gitResult, join, materialize, remediation, readFileSync, root, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
 
 const managedPaths = ["AGENTS.md", "CLAUDE.md", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"];
 
@@ -52,7 +51,7 @@ test("uninstall removes a supported historical skill and preserves modified hist
   const repo = setup(false);
   const skill = join(repo, ".agents/skills/nerv/SKILL.md");
   try {
-    const old = execFileSync("git", ["show", "v0.2.0:.agents/skills/nerv/SKILL.md"], { cwd: process.cwd(), encoding: "utf8" });
+    const old = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
     writeFileSync(skill, old.replaceAll("\n", "\r\n"));
     run(repo, ["uninstall"]);
     assert(!existsSync(skill), "uninstall retained a recognized historical CRLF skill");
@@ -70,7 +69,7 @@ test("uninstall fails closed when local state is absent but repository setup rem
     rmSync(join(repo, ".nerv"), { recursive: true, force: true });
     const result = run(repo, ["uninstall"], 1);
     assert(result.includes(".nerv is absent") && existsSync(join(repo, ".agents/skills/nerv/SKILL.md")), "uninstall bypassed missing-state safety");
-    const old = execFileSync("git", ["show", "v0.2.0:.agents/skills/nerv/SKILL.md"], { cwd: process.cwd(), encoding: "utf8" });
+    const old = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
     writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), old);
     run(repo, ["init"]);
     assert(readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8") === readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8"), "init could not classify setup after local state recreation");

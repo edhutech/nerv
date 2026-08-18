@@ -43,3 +43,5 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 ## Repository invariants
 
 The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `WORK-###` references are distinct; Tasks are positioned within their Work Item. SQLite allocates friendly refs while local state exists; fresh local state seeds only from valid paired Nerv trailers reachable from current `HEAD`. This is not distributed uniqueness, and no-diff Work refs cannot be reconstructed after local state is discarded. The first Task activates automatically and completion activates the next. Review and Close stage explicit Work paths only, block new unattributed changes, and discover untracked paths through repository `.gitignore` rules rather than mutable local Git exclusions.
+
+CI uses a shallow checkout; regression tests must be self-contained and must not depend on historical tags, remote access, or deep Git history.

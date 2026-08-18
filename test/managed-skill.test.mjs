@@ -1,6 +1,6 @@
 import test from "node:test";
-import { execFileSync } from "node:child_process";
-import { assert, join, readFileSync, rmSync, run, setup, writeFileSync } from "./helpers.mjs";
+import { assert, join, readFileSync, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
+import { knownIdentity, normalizedText, textIdentity } from "../dist/managed-artifacts.js";
 
 test("init installs, recognizes, and preserves the managed public skill", () => {
   const repo = setup(false);
@@ -23,7 +23,11 @@ test("init upgrades the supported v0.2.0 skill, recognizes CRLF, and preserves e
   const repo = setup(false);
   const skill = join(repo, ".agents/skills/nerv/SKILL.md");
   try {
-    const old = execFileSync("git", ["show", "v0.2.0:.agents/skills/nerv/SKILL.md"], { cwd: process.cwd(), encoding: "utf8" });
+    const old = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
+    assert(textIdentity(old) === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "historical fixture identity changed");
+    assert(knownIdentity(".agents/skills/nerv/SKILL.md", old) === "legacy", "historical fixture is not registered as legacy");
+    assert(knownIdentity(".agents/skills/nerv/SKILL.md", old.replaceAll("\n", "\r\n")) === "legacy", "CRLF historical fixture is not registered as legacy");
+    assert(normalizedText(old) === old, "historical fixture must use LF representation");
     writeFileSync(skill, old);
     assert(run(repo, ["init"]).includes("upgraded from a supported Nerv-managed version"), "init did not report the historical skill upgrade");
     const current = readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8");
