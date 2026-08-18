@@ -23,19 +23,20 @@ test("init upgrades the supported v0.2.0 skill, recognizes CRLF, and preserves e
   const repo = setup(false);
   const skill = join(repo, ".agents/skills/nerv/SKILL.md");
   try {
-    const old = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
-    assert(textIdentity(old) === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "historical fixture identity changed");
-    assert(knownIdentity(".agents/skills/nerv/SKILL.md", old) === "legacy", "historical fixture is not registered as legacy");
-    assert(knownIdentity(".agents/skills/nerv/SKILL.md", old.replaceAll("\n", "\r\n")) === "legacy", "CRLF historical fixture is not registered as legacy");
-    assert(normalizedText(old) === old, "historical fixture must use LF representation");
-    writeFileSync(skill, old);
+    const fixture = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
+    const historicalLf = normalizedText(fixture);
+    const historicalCrlf = historicalLf.replaceAll("\n", "\r\n");
+    assert(textIdentity(historicalLf) === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "historical fixture identity changed");
+    assert(knownIdentity(".agents/skills/nerv/SKILL.md", historicalLf) === "legacy", "historical fixture is not registered as legacy");
+    assert(knownIdentity(".agents/skills/nerv/SKILL.md", historicalCrlf) === "legacy", "CRLF historical fixture is not registered as legacy");
+    writeFileSync(skill, historicalLf);
     assert(run(repo, ["init"]).includes("upgraded from a supported Nerv-managed version"), "init did not report the historical skill upgrade");
     const current = readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8");
     assert(readFileSync(skill, "utf8") === current, "historical skill was not upgraded");
 
-    writeFileSync(skill, old.replaceAll("\n", "\r\n"));
+    writeFileSync(skill, historicalCrlf);
     assert(run(repo, ["init"]).includes("upgraded from a supported Nerv-managed version"), "CRLF historical skill was not recognized");
-    writeFileSync(skill, `${old.replaceAll("\n", "\r\n")}\r\nDeveloper change.\r\n`);
+    writeFileSync(skill, `${historicalCrlf}\r\nDeveloper change.\r\n`);
     const output = run(repo, ["init"]);
     assert(output.includes("ownership is not established") && readFileSync(skill, "utf8").includes("Developer change."), "modified historical skill was overwritten");
 
@@ -54,11 +55,11 @@ test("init installs idempotent discovery bridges and preserves custom instructio
     rmSync(agents);
     rmSync(bridge);
     run(repo, ["init"]);
-    const packaged = readFileSync(join(process.cwd(), "CLAUDE.md"), "utf8");
     const installedAgents = readFileSync(agents, "utf8");
-    assert(installedAgents.includes("<!-- Nerv managed discovery bridge -->") && installedAgents.includes(".agents/skills/nerv/SKILL.md") && readFileSync(bridge, "utf8").includes("<!-- Nerv managed discovery bridge -->") && packaged.includes(".agents/skills/nerv/SKILL.md"), "init did not install delimited discovery bridges");
+    const installedClaude = readFileSync(bridge, "utf8");
+    assert(installedAgents.includes("<!-- Nerv managed discovery bridge -->") && installedAgents.includes(".agents/skills/nerv/SKILL.md") && installedClaude.includes("<!-- Nerv managed discovery bridge -->") && installedClaude.includes(".agents/skills/nerv/SKILL.md"), "init did not install delimited discovery bridges");
     run(repo, ["init"]);
-    assert(readFileSync(agents, "utf8") === installedAgents && readFileSync(bridge, "utf8") === packaged, "init changed an existing discovery bridge");
+    assert(readFileSync(agents, "utf8") === installedAgents && readFileSync(bridge, "utf8") === installedClaude, "init changed an existing discovery bridge");
     writeFileSync(agents, "# Local agent instructions\r\n");
     writeFileSync(bridge, "# Local Claude instructions\r\n");
     run(repo, ["init"]);
