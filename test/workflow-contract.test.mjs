@@ -69,3 +69,28 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "The original Work Plan need not be repeated.",
   ]) assert(skill.includes(expected), `planning or multilingual contract omitted: ${expected}`);
 });
+
+test("explicit temporary opt-out is scoped developer authority, not a runtime mode", () => {
+  const englishTaskOptOut = "Do not use Nerv for this task.";
+  const englishSessionOptOut = "Do not use Nerv for this session.";
+  const spanishTaskOptOut = "No uses Nerv para esta tarea.";
+  const spanishSessionOptOut = "No uses Nerv durante esta sesión.";
+  for (const request of [englishTaskOptOut, englishSessionOptOut, spanishTaskOptOut, spanishSessionOptOut]) {
+    assert(/Nerv/i.test(request), "opt-out fixture names the governed system");
+  }
+  for (const expected of [
+    "After `nerv init`, automatic discovery makes Nerv the default",
+    "Explicit developer intent has precedence over that automatic governance",
+    "do not use Nerv for this task",
+    "do not use Nerv for this session",
+    "Equivalent natural-language intent in the developer's language, including English and Spanish",
+    "do not require an exact phrase or host-specific `/`, `@`, or `$` invocation",
+    "During an active opt-out scope, work natively",
+    "do not automatically prepare a Nerv Plan, materialize a Work Item, execute Nerv lifecycle commands, create Tasks, or perform Nerv Review or Close",
+    "do not remove or modify Nerv files or contexts, uninstall the skill, change lifecycle state, or introduce runtime session state",
+    "A future session returns to the normal Nerv default",
+    "use Nerv again",
+    "An already-active Work Item is not canceled, abandoned, mutated, or silently bypassed",
+    "Its durable lifecycle and active context remain authoritative",
+  ]) assert(skill.includes(expected), `temporary opt-out contract omitted: ${expected}`);
+});

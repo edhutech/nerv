@@ -17,6 +17,14 @@ The lifecycle vocabulary is `plan`, `approve`, `execute`, `review`, and `close`.
 
 End governed interactions with one recommended next operation: `nerv approve` after a plan or remediation proposal, `nerv review WORK-###` after execution and full validation, and `nerv close WORK-###` after PASS and any optional local/user verification. After Close, no further lifecycle operation is required.
 
+### Developer Authority And Temporary Opt-Out
+
+After `nerv init`, automatic discovery makes Nerv the default for repository work, including requests that do not name Nerv. Explicit developer intent has precedence over that automatic governance for the scope the developer states. A clear request such as "do not use Nerv for this task" suppresses the Nerv lifecycle only for that requested work; "do not use Nerv for this session" suppresses it for the current conversational session. Equivalent natural-language intent in the developer's language, including English and Spanish, has the same meaning; do not require an exact phrase or host-specific `/`, `@`, or `$` invocation.
+
+During an active opt-out scope, work natively: do not automatically prepare a Nerv Plan, materialize a Work Item, execute Nerv lifecycle commands, create Tasks, or perform Nerv Review or Close. This is temporary conversational authority, not repository installation or durable configuration: do not remove or modify Nerv files or contexts, uninstall the skill, change lifecycle state, or introduce runtime session state. A future session returns to the normal Nerv default unless the developer opts out again. A later explicit request such as "use Nerv again" or "use Nerv for this next task" restores governed behavior for subsequent work in the same conversation.
+
+An already-active Work Item is not canceled, abandoned, mutated, or silently bypassed by an opt-out request. Its durable lifecycle and active context remain authoritative; do not use the opt-out to corrupt or sidestep that governed Work. Treat the opt-out as applying to new work, and resume or complete the active Work through its existing lifecycle when the developer re-enables Nerv or when that Work must be safely continued.
+
 ### Plan
 
 Natural user requests need not name Nerv, Work, Tasks, Review, lifecycle commands, or repository instructions before this contract applies.
