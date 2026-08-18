@@ -9,7 +9,7 @@ Prepare this asset for the GitHub repository Social Preview upload. It is mainta
 
 ## Composition
 
-Use a quiet, high-contrast dark field with a restrained warm accent. Place `Nerv` large on the left and the short positioning below it. On the right, use a sparse linear workflow motif: `plan -> approve -> execute -> review -> close`. Avoid agent mascots, dense interface mockups, logos for third-party agents, badges, or implementation detail.
+Use a quiet, high-contrast dark field with a restrained warm accent. Place `Nerv` large on the left and the short positioning below it. On the right, use a sparse linear workflow motif: `request -> Plan -> approve -> automatic execution -> review -> close`. Avoid agent mascots, dense interface mockups, logos for third-party agents, badges, or implementation detail.
 
 The visual should communicate durable, deliberate developer workflow rather than autonomous AI activity.
 

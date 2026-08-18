@@ -39,12 +39,25 @@ test("uninstall strips only managed bridge blocks and preserves custom content",
     writeFileSync(join(repo, "CLAUDE.md"), claude);
     writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), `${readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8")}Local skill modification.\n`);
     writeFileSync(join(repo, ".nerv-context/product.md"), "# Product\n\nProject-specific truth.\n");
+    writeFileSync(join(repo, ".nerv-context/repo.md"), "# Repository\n\nProject-specific rules.\n");
     const output = run(repo, ["uninstall"]);
     assert(output.includes("Preserved developer-owned or modified content"), "uninstall did not report preserved custom content");
     assert(readFileSync(join(repo, "AGENTS.md"), "utf8") === "Developer instructions\n\n\nMore instructions\n", "uninstall damaged custom AGENTS content");
     assert(readFileSync(join(repo, "CLAUDE.md"), "utf8") === "Claude instructions\n\n\nMore Claude instructions\n", "uninstall damaged custom CLAUDE content");
     assert(readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8").endsWith("Local skill modification.\n"), "uninstall removed a modified skill");
     assert(readFileSync(join(repo, ".nerv-context/product.md"), "utf8") === "# Product\n\nProject-specific truth.\n", "uninstall removed project-specific Product Context");
+    assert(readFileSync(join(repo, ".nerv-context/repo.md"), "utf8") === "# Repository\n\nProject-specific rules.\n", "uninstall removed project-specific Repo Context");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("uninstall removes a supported historical Repo Context scaffold", () => {
+  const repo = setup(false);
+  const repository = join(repo, ".nerv-context/repo.md");
+  try {
+    const historical = readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8");
+    writeFileSync(repository, historical.replaceAll("\n", "\r\n"));
+    run(repo, ["uninstall"]);
+    assert(!existsSync(repository), "uninstall retained a recognized historical Repo Context scaffold");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 

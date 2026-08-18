@@ -22,7 +22,7 @@ test("README provides a concise documented onboarding path", () => {
 test("Social Preview guidance is maintainer configuration without a public tagline", () => {
   const socialPreview = readFileSync(resolve(root, ".github", "social-preview.md"), "utf8");
   assert.match(socialPreview, /Local-first work harness for coding-agent projects/);
-  assert.match(socialPreview, /plan -> approve -> execute -> review -> close/);
+  assert.match(socialPreview, /request -> Plan -> approve -> automatic execution -> review -> close/);
   assert.doesNotMatch(socialPreview, /Tagline/);
   assert(!existsSync(resolve(root, "docs", "social-preview.md")));
 });

@@ -1,5 +1,4 @@
 import { accessSync, chmodSync, constants, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { delimiter, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -7,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { DatabaseSync as Database } from "node:sqlite";
 import { openRepository } from "../dist/repository.js";
 
-export { chmodSync, createHash, Database, existsSync, join, mkdirSync, mkdtempSync, openRepository, readFileSync, rmSync, spawnSync, symlinkSync, tmpdir, writeFileSync };
+export { chmodSync, Database, existsSync, join, mkdirSync, mkdtempSync, openRepository, readFileSync, rmSync, spawnSync, symlinkSync, tmpdir, writeFileSync };
 
 export const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const cli = join(root, "dist/index.js");
@@ -67,8 +66,6 @@ if (command === "update-ref" && !existsSync(marker)) {
     const db = new DatabaseSync(".nerv/nerv.db");
     try { db.exec("CREATE TRIGGER fail_close BEFORE UPDATE ON work_items WHEN NEW.status = 'closed' BEGIN SELECT RAISE(ABORT, 'forced durable Close failure'); END"); } finally { db.close(); }
     record("durable-failure-injected", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
-    if (process.env.NERV_GIT_RACE_SCENARIO === "compensation") {
-    }
     record("mutation-completed", { scenario: process.env.NERV_GIT_RACE_SCENARIO });
     process.exit(0);
   }

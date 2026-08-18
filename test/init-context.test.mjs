@@ -26,6 +26,19 @@ test("status deterministically distinguishes missing, scaffold, and established 
   }
 });
 
+test("init preserves customized Product and Repo Context", () => {
+  const repo = setup(false);
+  try {
+    const product = "# Product\n\nProject-specific truth.\n";
+    const repository = "# Repository\n\nProject-specific rules.\n";
+    writeFileSync(join(repo, ".nerv-context/product.md"), product);
+    writeFileSync(join(repo, ".nerv-context/repo.md"), repository);
+    run(repo, ["init"]);
+    assert(readFileSync(join(repo, ".nerv-context/product.md"), "utf8") === product, "init overwrote customized Product Context");
+    assert(readFileSync(join(repo, ".nerv-context/repo.md"), "utf8") === repository, "init overwrote customized Repo Context");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
 test("init supports unborn repositories and linked worktree exclusions", () => {
   const repo = mkdtempSync(join(tmpdir(), "nerv-unborn-")); try { git(repo, ["init"]); git(repo, ["config", "user.email", "test@example.com"]); git(repo, ["config", "user.name", "Test"]); assert(run(repo, ["init"]).includes("Initialized Nerv"), "unborn repository init failed"); assert(readFileSync(join(repo, "AGENTS.md"), "utf8").includes(".agents/skills/nerv/SKILL.md") && readFileSync(join(repo, "CLAUDE.md"), "utf8").includes("Follow `AGENTS.md` when it exists."), "unborn repository received a broken discovery bridge"); git(repo, ["add", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"]); git(repo, ["commit", "-m", "establish nervous setup"]); assert(materializedRef(repo) === "WORK-001", "unborn repository did not seed WORK-001"); } finally { rmSync(repo, { recursive: true, force: true }); }
   const linked = setup(); const worktree = join(linked, "../nerv-linked-worktree"); try { rmSync(worktree, { recursive: true, force: true }); git(linked, ["worktree", "add", "-b", "smoke-linked", worktree]); run(worktree, ["init"]); assert(gitResult(worktree, ["check-ignore", "-v", ".nerv/nerv.db"]).status === 0, "Git-resolved linked-worktree exclusion did not ignore .nerv"); } finally { git(linked, ["worktree", "remove", "--force", worktree]); rmSync(linked, { recursive: true, force: true }); }

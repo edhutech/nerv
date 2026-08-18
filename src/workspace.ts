@@ -2,15 +2,14 @@ import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdir
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
-import { hasRequiredSchema, initializeDatabase } from "./database.js";
-import { workRef, type WorkItem } from "./repository.js";
-import { bridgeBlock, bridgeContent, exactSingleBridge, knownIdentity } from "./managed-artifacts.js";
+import { hasRequiredSchema, initializeDatabase, UNSUPPORTED_SCHEMA } from "./database.js";
+import { workRef } from "./repository.js";
+import { bridgeBlock, bridgeContent, exactSingleBridge, knownIdentity, normalizedText } from "./managed-artifacts.js";
 
 const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
 export const AGENTS_BRIDGE = bridgeContent("agents");
 const LEGACY_AGENTS_BRIDGE = "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n";
 export const NERV_EXCLUDE_BLOCK = "# Nerv local state (managed)\n.nerv/\n# End Nerv local state\n";
-const UNSUPPORTED_SCHEMA = "existing .nerv/nerv.db uses an unsupported generated schema; use a compatible/current Nerv version, or back up .nerv before intentionally discarding it";
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 export type SetupStatus = { path: string; established: boolean };
 export const CANONICAL_CONTEXT_SCAFFOLDS = {
@@ -39,16 +38,15 @@ export function getWorkspaceStatus(start: string): WorkspaceStatus {
   const databasePath = join(workspaceRoot, "nerv.db");
   return { repoRoot, workspaceRoot, databasePath, initialized: DIRS.every((dir) => isDirectory(join(repoRoot, dir))) && existsSync(databasePath) && hasRequiredSchema(databasePath) };
 }
-export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { skillMessage: string | undefined; messages: string[]; setup: SetupStatus[] } {
+export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { messages: string[]; setup: SetupStatus[] } {
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error(UNSUPPORTED_SCHEMA);
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
   initializeDatabase(databasePath, existsSync(databasePath) ? undefined : nextWorkNumber(repoRoot));
   ensureLocalExclude(repoRoot);
   const messages = [ensurePublicSkill(repoRoot), ensureAgentsBridge(repoRoot), ensureClaudeBridge(repoRoot)].filter((message): message is string => Boolean(message));
-  const skillMessage = messages.find((message) => message.startsWith("Public Nerv skill"));
   ensureSharedContext(repoRoot);
-  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, skillMessage, messages, setup: canonicalSetupStatus(repoRoot) };
+  return { repoRoot, workspaceRoot: join(repoRoot, ".nerv"), databasePath, initialized: true, messages, setup: canonicalSetupStatus(repoRoot) };
 }
 
 export type UninstallResult = { removed: string[]; preserved: string[]; alreadyAbsent: boolean };
@@ -79,13 +77,13 @@ export function uninstallWorkspace(repoRoot: string): UninstallResult {
   return { removed, preserved, alreadyAbsent: removed.length === 0 && preserved.length === 0 };
 }
 
-function inspectWorkspaceForUninstall(repoRoot: string): { present: boolean; work: WorkItem[] } {
+function inspectWorkspaceForUninstall(repoRoot: string): { present: boolean } {
   const workspacePath = join(repoRoot, ".nerv");
   let workspaceStat: ReturnType<typeof lstatSync>;
   try {
     workspaceStat = lstatSync(workspacePath);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { present: false, work: [] };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { present: false };
     throw new Error("Cannot uninstall Nerv safely: .nerv cannot be inspected; local state may be inaccessible.");
   }
   if (!workspaceStat.isDirectory()) throw new Error("Cannot uninstall Nerv safely: .nerv exists but is not a directory; local state cannot be inspected.");
@@ -103,7 +101,7 @@ function inspectWorkspaceForUninstall(repoRoot: string): { present: boolean; wor
   let database: DatabaseSync | undefined;
   try {
     database = new DatabaseSync(databasePath, { readOnly: true });
-    const work = database.prepare("SELECT * FROM work_items ORDER BY ref").all() as WorkItem[];
+    const work = database.prepare("SELECT * FROM work_items ORDER BY ref").all() as { ref: string; status: string }[];
     if (work.some((item) => typeof item.ref !== "string" || !["active", "review", "rework", "closed"].includes(item.status))) {
       throw new Error("invalid Work state");
     }
@@ -111,7 +109,7 @@ function inspectWorkspaceForUninstall(repoRoot: string): { present: boolean; wor
     if (unresolved.length) {
       throw new Error(`Cannot uninstall Nerv while unresolved Work exists: ${unresolved.map((item) => `${item.ref} (${item.status})`).join(", ")}. Resolve it first.`);
     }
-    return { present: true, work };
+    return { present: true };
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Cannot uninstall Nerv while unresolved Work exists:")) throw error;
     throw new Error("Cannot uninstall Nerv safely: .nerv/nerv.db cannot be inspected for unresolved Work. Resolve or preserve the local state before retrying.");
@@ -128,7 +126,7 @@ function removeManagedFile(repoRoot: string, relativePath: string, managed: stri
     return;
   }
   const content = readFileSync(path, "utf8");
-  const identity = relativePath === "AGENTS.md" && normalizedBridge(content) === normalizedBridge(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, content);
+  const identity = relativePath === "AGENTS.md" && normalizedText(content) === normalizedText(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, content);
   if (identity !== "unknown" && relativePath !== "AGENTS.md" && relativePath !== "CLAUDE.md") {
     rmSync(path);
     removed.push(relativePath);
@@ -234,12 +232,11 @@ function ensurePublicSkill(repoRoot: string): string | undefined {
   return ensureManagedFile(destination, packaged, ".agents/skills/nerv/SKILL.md", "Public Nerv skill");
 }
 function ensureAgentsBridge(repoRoot: string): string | undefined {
-  return ensureDiscoveryBridge(join(repoRoot, "AGENTS.md"), AGENTS_BRIDGE, "Agent discovery bridge");
+  return ensureDiscoveryBridge(join(repoRoot, "AGENTS.md"), "Agent discovery bridge");
 }
 function ensureClaudeBridge(repoRoot: string): string | undefined {
   const destination = join(repoRoot, "CLAUDE.md");
-  const packaged = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
-  return ensureDiscoveryBridge(destination, packaged, "Claude Code bridge");
+  return ensureDiscoveryBridge(destination, "Claude Code bridge");
 }
 function ensureManagedFile(destination: string, packaged: string, relativePath: string, label: string): string | undefined {
   if (!existsSync(destination)) {
@@ -257,7 +254,7 @@ function ensureManagedFile(destination: string, packaged: string, relativePath: 
   }
   return `${label} preserved at ${destination}; ownership is not established.`;
 }
-function ensureDiscoveryBridge(destination: string, packaged: string, label: string): string | undefined {
+function ensureDiscoveryBridge(destination: string, label: string): string | undefined {
   if (!existsSync(destination)) {
     mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude"));
@@ -277,7 +274,7 @@ function ensureDiscoveryBridge(destination: string, packaged: string, label: str
     return `${label} could not be safely established at ${destination}; an incomplete Nerv bridge was preserved.`;
   }
   const relativePath = destination.endsWith("AGENTS.md") ? "AGENTS.md" : "CLAUDE.md";
-  const identity = relativePath === "AGENTS.md" && normalizedBridge(installed) === normalizedBridge(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, installed);
+  const identity = relativePath === "AGENTS.md" && normalizedText(installed) === normalizedText(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, installed);
   if (identity === "current" || identity === "legacy") {
     writeFileSync(destination, bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude"));
     return `${label} upgraded to an owned bridge block.`;
@@ -285,9 +282,6 @@ function ensureDiscoveryBridge(destination: string, packaged: string, label: str
   const separator = installed.length && !installed.endsWith("\n") && !installed.endsWith("\r") ? "\n" : "";
   writeFileSync(destination, `${installed}${separator}\n${bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude")}`);
   return `${label} established alongside preserved custom content.`;
-}
-function normalizedBridge(value: string): string {
-  return value.replaceAll("\r\n", "\n");
 }
 function hasRepositorySetup(repoRoot: string): boolean {
   const paths = [".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"];

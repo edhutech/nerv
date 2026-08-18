@@ -1,14 +1,35 @@
 import test from "node:test";
 import { assert, join, readFileSync, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
 import { knownIdentity, MANAGED_IDENTITIES, normalizedText, textIdentity } from "../dist/managed-artifacts.js";
+import { CANONICAL_CONTEXT_SCAFFOLDS } from "../dist/workspace.js";
 
 test("managed skill policy separates current identity from supported release identities", () => {
   const policy = MANAGED_IDENTITIES[".agents/skills/nerv/SKILL.md"];
   const packaged = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8");
-  assert(policy.current === "473fc4791dd090372f7ae6b28519f3ec3977e38f74c5eb668b55ba2a3561c4f9", "packaged skill current identity changed unexpectedly");
+  assert(policy.current === "b47dc934bfabc0124b19f1d3c5ef0ef237ddc67a37e85e97b699d54d3601c416", "packaged skill current identity changed unexpectedly");
   assert(knownIdentity(".agents/skills/nerv/SKILL.md", packaged) === "current", "packaged skill is not registered as current");
   assert(policy.legacy.length === 1 && policy.legacy[0] === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "supported v0.2.0 identity was lost from the legacy policy");
   assert(!policy.legacy.includes("f47fd908766574bc5ef6dae4594c26fa3ad5480928ad2edbdabde7a6ea1f5d89"), "unreleased development identity became runtime compatibility");
+});
+
+test("context scaffold ownership distinguishes current, historical, and project content", () => {
+  const productPolicy = MANAGED_IDENTITIES[".nerv-context/product.md"];
+  const repoPolicy = MANAGED_IDENTITIES[".nerv-context/repo.md"];
+  const historicalProduct = readFileSync(join(root, "test/fixtures/v0.2.0/product.md"), "utf8");
+  const historicalRepo = readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8");
+  assert(knownIdentity(".nerv-context/product.md", CANONICAL_CONTEXT_SCAFFOLDS.product) === "current", "canonical Product scaffold is not current");
+  assert(knownIdentity(".nerv-context/repo.md", CANONICAL_CONTEXT_SCAFFOLDS.repo) === "current", "canonical Repo scaffold is not current");
+  assert(knownIdentity(".nerv-context/product.md", `${CANONICAL_CONTEXT_SCAFFOLDS.product}Project truth\n`) === "unknown", "custom Product Context became managed");
+  assert(knownIdentity(".nerv-context/repo.md", `${CANONICAL_CONTEXT_SCAFFOLDS.repo}Project rules\n`) === "unknown", "custom Repo Context became managed");
+  assert(knownIdentity(".nerv-context/product.md", historicalProduct) === "legacy", "v0.2.0 Product scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/product.md", historicalProduct.replaceAll("\n", "\r\n")) === "legacy", "CRLF v0.2.0 Product scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/repo.md", historicalRepo) === "legacy", "v0.2.0 Repo scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/repo.md", historicalRepo.replaceAll("\n", "\r\n")) === "legacy", "CRLF v0.2.0 Repo scaffold is not legacy");
+  assert(productPolicy.current === textIdentity(CANONICAL_CONTEXT_SCAFFOLDS.product), "Product current identity does not match its scaffold");
+  assert(repoPolicy.current === textIdentity(CANONICAL_CONTEXT_SCAFFOLDS.repo), "Repo current identity does not match its scaffold");
+  assert(!repoPolicy.legacy.includes("26936e8a8f05229211ccb8e628dd248aea03392ec6044a6bf657fd6fc3e41606"), "current Repo scaffold remains incorrectly listed as legacy");
+  assert(!repoPolicy.current.includes("ca37e87d3df1e32ead8601c63c4f4700fc5e4c3474d4c6da4a215a14d0209dd9"), "project-specific Repo Context remains registered as current");
+  assert(repoPolicy.legacy.length === 1 && repoPolicy.legacy[0] === "f389dfa64649f6f315eed16805bf06ea09ca5fb1179c214fba35acef8680712d", "Repo legacy policy does not match the supported v0.2.0 boundary");
 });
 
 test("init installs, recognizes, and preserves the managed public skill", () => {

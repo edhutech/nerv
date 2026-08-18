@@ -138,6 +138,13 @@ test("preferred handoffs and repository commit authority remain coherent", () =>
   assert(skill.includes("`nerv review WORK-###`") && skill.includes("`nerv close WORK-###`"), "explicit canonical lifecycle commands were not preserved");
 });
 
+test("Plan presentation uses current lifecycle terminology", () => {
+  assert(skill.includes("Show an execution-ready Plan before changing Work records"), "Plan presentation retained stale preview terminology");
+  assert(skill.includes("Acceptance criteria: <completion condition>"), "Task acceptance criteria label changed unexpectedly");
+  assert(skill.includes("Work-level acceptance criteria: <Work-level conditions>"), "Work-level acceptance criteria are not distinguished");
+  assert(!skill.includes("Plan Preview"), "public skill retained stale Plan Preview terminology");
+});
+
 test("explicit temporary opt-out is scoped developer authority, not a runtime mode", () => {
   const englishTaskOptOut = "Do not use Nerv for this task.";
   const englishSessionOptOut = "Do not use Nerv for this session.";

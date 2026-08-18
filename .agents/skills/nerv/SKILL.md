@@ -39,7 +39,7 @@ Shape the Work from intent, relevant context, artifact type, and relevant engine
 
 Skills, plugins, MCPs, code-intelligence or memory systems, browser, research, and other domain tools may assist execution or provide evidence. The developer and host agent may choose their native execution strategy, including one or more subagents, without Nerv prescribing topology. A capability invocation, subagent, or delegation does not by itself create a Task or Work; create a Task only for a real execution boundary inside the approved Work, and create another Work only for a materially separate outcome needing its own approval, evidence, Review, and Close. They cannot bypass approval, redefine approved scope, advance the lifecycle, substitute Work Review, or Close Work. Attribute and review every repository mutation they make normally. Nerv remains agent-, model-, provider-, and host-agnostic. Fabricated testimonials, customers, metrics, certifications, awards, contacts, or similar social proof must never be presented as real; if used for a demonstration, identify it clearly as temporary placeholder or demo content and keep it out of canonical Product Context.
 
-Show an execution-ready preview before changing Work records:
+Show an execution-ready Plan before changing Work records:
 
 ```text
 Proposed Work Item: <title>
@@ -54,11 +54,11 @@ Implementation approach: <evidence-based path>
 Expected touchpoints: <when known>
 Acceptance criteria: <completion condition>
 Targeted validation: <check>
-Acceptance criteria: <Work-level conditions>
+Work-level acceptance criteria: <Work-level conditions>
 Full validation: <checks>
 ```
 
-Require Work title, goal, scope, acceptance criteria, and validation; require Task title, objective, acceptance criteria, and validation. Include material implementation decisions and proposed defaults when they make the Plan execution-ready. Include other fields only when useful. Use one Task by default; add more only for a real dependency, ownership, recovery, or validation boundary. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict. End every Plan Preview with Recommended next action: `approve`.
+Require Work title, goal, scope, acceptance criteria, and validation; require Task title, objective, acceptance criteria, and validation. Include material implementation decisions and proposed defaults when they make the Plan execution-ready. Include other fields only when useful. Use one Task by default; add more only for a real dependency, ownership, recovery, or validation boundary. Touchpoints guide work; they are not a path allowlist. Do not assign a Work ref or materialize speculative plans. Warn only about a material unresolved authority conflict. End every Plan with Recommended next action: `approve`.
 
 After explicit approval, atomically materialize the complete Work, every Task, and its activation baseline. For REWORK, materialize only the persisted remediation proposal. Use `nerv --help` solely for exact primitive arguments.
 
