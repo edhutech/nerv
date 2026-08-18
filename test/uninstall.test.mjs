@@ -1,4 +1,5 @@
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import { Database, assert, existsSync, finish, git, gitResult, join, materialize, remediation, readFileSync, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
 
 const managedPaths = ["AGENTS.md", "CLAUDE.md", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"];
@@ -47,7 +48,36 @@ test("uninstall strips only managed bridge blocks and preserves custom content",
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
-test("uninstall removes at most one managed bridge and exclusion block", () => {
+test("uninstall removes a supported historical skill and preserves modified historical content", () => {
+  const repo = setup(false);
+  const skill = join(repo, ".agents/skills/nerv/SKILL.md");
+  try {
+    const old = execFileSync("git", ["show", "v0.2.0:.agents/skills/nerv/SKILL.md"], { cwd: process.cwd(), encoding: "utf8" });
+    writeFileSync(skill, old.replaceAll("\n", "\r\n"));
+    run(repo, ["uninstall"]);
+    assert(!existsSync(skill), "uninstall retained a recognized historical CRLF skill");
+
+    run(repo, ["init"]);
+    writeFileSync(skill, `${old}\nDeveloper change.\n`);
+    run(repo, ["uninstall"]);
+    assert(readFileSync(skill, "utf8").includes("Developer change."), "uninstall removed modified historical content");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("uninstall fails closed when local state is absent but repository setup remains", () => {
+  const repo = setup(false);
+  try {
+    rmSync(join(repo, ".nerv"), { recursive: true, force: true });
+    const result = run(repo, ["uninstall"], 1);
+    assert(result.includes(".nerv is absent") && existsSync(join(repo, ".agents/skills/nerv/SKILL.md")), "uninstall bypassed missing-state safety");
+    const old = execFileSync("git", ["show", "v0.2.0:.agents/skills/nerv/SKILL.md"], { cwd: process.cwd(), encoding: "utf8" });
+    writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), old);
+    run(repo, ["init"]);
+    assert(readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8") === readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8"), "init could not classify setup after local state recreation");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("uninstall preserves duplicate or modified managed bridge blocks and removes only an exact single block", () => {
   const repo = setup(false);
   try {
     const managedAgents = readFileSync(join(repo, "AGENTS.md"), "utf8");
@@ -55,8 +85,12 @@ test("uninstall removes at most one managed bridge and exclusion block", () => {
     writeFileSync(join(repo, "AGENTS.md"), `${managedAgents}Custom content\n${managedAgents}`);
     writeFileSync(join(repo, ".git/info/exclude"), `${managedExclude}custom exclusion\n${managedExclude}`);
     run(repo, ["uninstall"]);
-    assert(readFileSync(join(repo, "AGENTS.md"), "utf8") === "Custom content\n" + managedAgents, "uninstall removed more than one matching bridge block");
+    assert(readFileSync(join(repo, "AGENTS.md"), "utf8") === `${managedAgents}Custom content\n${managedAgents}`, "uninstall removed ambiguous duplicate bridge blocks");
     assert(readFileSync(join(repo, ".git/info/exclude"), "utf8") === "custom exclusion\n" + managedExclude, "uninstall removed more than one matching exclusion block");
+    writeFileSync(join(repo, "AGENTS.md"), managedAgents.replace(".agents/skills/nerv/SKILL.md", ".agents/skills/custom/SKILL.md"));
+    run(repo, ["init"]);
+    run(repo, ["uninstall"]);
+    assert(readFileSync(join(repo, "AGENTS.md"), "utf8").includes("custom/SKILL.md"), "uninstall removed a modified managed bridge block");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 

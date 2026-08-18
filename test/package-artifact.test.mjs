@@ -17,6 +17,7 @@ const expectedFiles = [
   "dist/database.js",
   "dist/git.js",
   "dist/index.js",
+  "dist/managed-artifacts.js",
   "dist/repository.js",
   "dist/work.js",
   "dist/workspace.js",
@@ -97,7 +98,7 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     run(binary, ["init"], repo);
     for (const path of ["AGENTS.md", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"]) assert(existsSync(join(repo, path)), `init did not create ${path}`);
     for (const path of [".agents/skills/nerv/SKILL.md", "CLAUDE.md"]) assert.equal(readFileSync(join(repo, path), "utf8"), readFileSync(join(root, path), "utf8"), `init did not install ${path}`);
-    assert.equal(readFileSync(join(repo, "AGENTS.md"), "utf8"), "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n");
+    assert.match(readFileSync(join(repo, "AGENTS.md"), "utf8"), /Nerv managed discovery bridge/);
     assert.equal(execFileSync("git", ["check-ignore", ".nerv/nerv.db"], { cwd: repo, encoding: "utf8" }).trim(), ".nerv/nerv.db");
     execFileSync("git", ["add", ".agents/skills/nerv/SKILL.md", "CLAUDE.md", ".nerv-context/product.md", ".nerv-context/repo.md"], { cwd: repo });
     execFileSync("git", ["commit", "-m", "establish nerv"], { cwd: repo });
