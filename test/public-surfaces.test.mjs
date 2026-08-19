@@ -84,7 +84,7 @@ test("publish workflow is an intentional Trusted Publishing boundary", () => {
   assert.equal(packageJson.author, "Edhú Nuñez Alvarado");
   assert.equal(normalizeLineEndings(readFileSync(resolve(root, "NOTICE"), "utf8")), "Nerv\nCopyright 2026 Edhú Nuñez Alvarado\n");
   assert.match(publish, /package repository metadata must identify edhutech\/nerv/);
-  assert.equal(packageJson.version, "0.3.0");
+  assert.equal(packageJson.version, "0.3.1");
   assert(publish.includes('test "$(node -p \'require("./package.json").version\')" = "${GITHUB_REF_NAME#v}"'), "publish workflow must fail closed on release/tag and package version mismatch");
 });
 
