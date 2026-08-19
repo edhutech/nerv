@@ -21,9 +21,6 @@ jobs:
             package_artifact: false
           - os: ubuntu-latest
             node: 24.11.0
-            package_artifact: false
-          - os: ubuntu-latest
-            node: 24.19.0
             package_artifact: true
           - os: macos-latest
             node: 24.19.0

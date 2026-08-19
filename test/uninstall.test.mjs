@@ -1,6 +1,5 @@
 import test from "node:test";
-import { Database, assert, existsSync, finish, git, gitResult, join, materialize, remediation, readFileSync, root, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
-import { normalizedText } from "../dist/managed-artifacts.js";
+import { Database, assert, existsSync, finish, fixtureEol, git, gitResult, join, materialize, remediation, readFileSync, root, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
 
 const managedPaths = ["AGENTS.md", "CLAUDE.md", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"];
 
@@ -54,13 +53,12 @@ test("uninstall removes a supported historical Repo Context scaffold", () => {
   const repo = setup(false);
   const repository = join(repo, ".nerv-context/repo.md");
   try {
-    const historicalLf = normalizedText(readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8"));
-    const historicalCrlf = historicalLf.replaceAll("\n", "\r\n");
-    writeFileSync(repository, historicalLf);
+    const historical = fixtureEol(readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8"));
+    writeFileSync(repository, historical.lf);
     run(repo, ["uninstall"]);
     assert(!existsSync(repository), "uninstall retained a recognized historical LF Repo Context scaffold");
     run(repo, ["init"]);
-    writeFileSync(repository, historicalCrlf);
+    writeFileSync(repository, historical.crlf);
     run(repo, ["uninstall"]);
     assert(!existsSync(repository), "uninstall retained a recognized historical CRLF Repo Context scaffold");
   } finally { rmSync(repo, { recursive: true, force: true }); }
@@ -71,19 +69,18 @@ test("uninstall removes a supported historical skill and preserves modified hist
   const skill = join(repo, ".agents/skills/nerv/SKILL.md");
   try {
     const fixture = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
-    const historicalLf = normalizedText(fixture);
-    const historicalCrlf = historicalLf.replaceAll("\n", "\r\n");
-    writeFileSync(skill, historicalLf);
+    const historical = fixtureEol(fixture);
+    writeFileSync(skill, historical.lf);
     run(repo, ["uninstall"]);
     assert(!existsSync(skill), "uninstall retained a recognized historical LF skill");
 
     run(repo, ["init"]);
-    writeFileSync(skill, historicalCrlf);
+    writeFileSync(skill, historical.crlf);
     run(repo, ["uninstall"]);
     assert(!existsSync(skill), "uninstall retained a recognized historical CRLF skill");
 
     run(repo, ["init"]);
-    writeFileSync(skill, `${historicalCrlf}\r\nDeveloper change.\r\n`);
+    writeFileSync(skill, `${historical.crlf}\r\nDeveloper change.\r\n`);
     run(repo, ["uninstall"]);
     assert(readFileSync(skill, "utf8").includes("Developer change."), "uninstall removed modified historical content");
   } finally { rmSync(repo, { recursive: true, force: true }); }
@@ -95,8 +92,8 @@ test("uninstall fails closed when local state is absent but repository setup rem
     rmSync(join(repo, ".nerv"), { recursive: true, force: true });
     const result = run(repo, ["uninstall"], 1);
     assert(result.includes(".nerv is absent") && existsSync(join(repo, ".agents/skills/nerv/SKILL.md")), "uninstall bypassed missing-state safety");
-    const historicalLf = normalizedText(readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8"));
-    writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), historicalLf);
+    const historical = fixtureEol(readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8"));
+    writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), historical.lf);
     run(repo, ["init"]);
     assert(readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8") === readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8"), "init could not classify setup after local state recreation");
   } finally { rmSync(repo, { recursive: true, force: true }); }

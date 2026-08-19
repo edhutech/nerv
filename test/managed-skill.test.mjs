@@ -1,6 +1,6 @@
 import test from "node:test";
-import { assert, join, readFileSync, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
-import { knownIdentity, MANAGED_IDENTITIES, normalizedText, textIdentity } from "../dist/managed-artifacts.js";
+import { assert, fixtureEol, join, readFileSync, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
+import { knownIdentity, MANAGED_IDENTITIES, textIdentity } from "../dist/managed-artifacts.js";
 import { CANONICAL_CONTEXT_SCAFFOLDS } from "../dist/workspace.js";
 
 test("managed skill policy separates current identity from supported release identities", () => {
@@ -15,18 +15,16 @@ test("managed skill policy separates current identity from supported release ide
 test("context scaffold ownership distinguishes current, historical, and project content", () => {
   const productPolicy = MANAGED_IDENTITIES[".nerv-context/product.md"];
   const repoPolicy = MANAGED_IDENTITIES[".nerv-context/repo.md"];
-  const historicalProduct = normalizedText(readFileSync(join(root, "test/fixtures/v0.2.0/product.md"), "utf8"));
-  const historicalRepo = normalizedText(readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8"));
-  const historicalProductCrlf = historicalProduct.replaceAll("\n", "\r\n");
-  const historicalRepoCrlf = historicalRepo.replaceAll("\n", "\r\n");
+  const historicalProduct = fixtureEol(readFileSync(join(root, "test/fixtures/v0.2.0/product.md"), "utf8"));
+  const historicalRepo = fixtureEol(readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8"));
   assert(knownIdentity(".nerv-context/product.md", CANONICAL_CONTEXT_SCAFFOLDS.product) === "current", "canonical Product scaffold is not current");
   assert(knownIdentity(".nerv-context/repo.md", CANONICAL_CONTEXT_SCAFFOLDS.repo) === "current", "canonical Repo scaffold is not current");
   assert(knownIdentity(".nerv-context/product.md", `${CANONICAL_CONTEXT_SCAFFOLDS.product}Project truth\n`) === "unknown", "custom Product Context became managed");
   assert(knownIdentity(".nerv-context/repo.md", `${CANONICAL_CONTEXT_SCAFFOLDS.repo}Project rules\n`) === "unknown", "custom Repo Context became managed");
-  assert(knownIdentity(".nerv-context/product.md", historicalProduct) === "legacy", "v0.2.0 Product scaffold is not legacy");
-  assert(knownIdentity(".nerv-context/product.md", historicalProductCrlf) === "legacy", "CRLF v0.2.0 Product scaffold is not legacy");
-  assert(knownIdentity(".nerv-context/repo.md", historicalRepo) === "legacy", "v0.2.0 Repo scaffold is not legacy");
-  assert(knownIdentity(".nerv-context/repo.md", historicalRepoCrlf) === "legacy", "CRLF v0.2.0 Repo scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/product.md", historicalProduct.lf) === "legacy", "v0.2.0 Product scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/product.md", historicalProduct.crlf) === "legacy", "CRLF v0.2.0 Product scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/repo.md", historicalRepo.lf) === "legacy", "v0.2.0 Repo scaffold is not legacy");
+  assert(knownIdentity(".nerv-context/repo.md", historicalRepo.crlf) === "legacy", "CRLF v0.2.0 Repo scaffold is not legacy");
   assert(productPolicy.current === textIdentity(CANONICAL_CONTEXT_SCAFFOLDS.product), "Product current identity does not match its scaffold");
   assert(repoPolicy.current === textIdentity(CANONICAL_CONTEXT_SCAFFOLDS.repo), "Repo current identity does not match its scaffold");
   assert(!repoPolicy.legacy.includes("26936e8a8f05229211ccb8e628dd248aea03392ec6044a6bf657fd6fc3e41606"), "current Repo scaffold remains incorrectly listed as legacy");
@@ -56,19 +54,18 @@ test("init upgrades the supported v0.2.0 skill, recognizes CRLF, and preserves e
   const skill = join(repo, ".agents/skills/nerv/SKILL.md");
   try {
     const fixture = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
-    const historicalLf = normalizedText(fixture);
-    const historicalCrlf = historicalLf.replaceAll("\n", "\r\n");
-    assert(textIdentity(historicalLf) === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "historical fixture identity changed");
-    assert(knownIdentity(".agents/skills/nerv/SKILL.md", historicalLf) === "legacy", "historical fixture is not registered as legacy");
-    assert(knownIdentity(".agents/skills/nerv/SKILL.md", historicalCrlf) === "legacy", "CRLF historical fixture is not registered as legacy");
-    writeFileSync(skill, historicalLf);
+    const historical = fixtureEol(fixture);
+    assert(textIdentity(historical.lf) === "cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd", "historical fixture identity changed");
+    assert(knownIdentity(".agents/skills/nerv/SKILL.md", historical.lf) === "legacy", "historical fixture is not registered as legacy");
+    assert(knownIdentity(".agents/skills/nerv/SKILL.md", historical.crlf) === "legacy", "CRLF historical fixture is not registered as legacy");
+    writeFileSync(skill, historical.lf);
     assert(run(repo, ["init"]).includes("upgraded from a supported Nerv-managed version"), "init did not report the historical skill upgrade");
     const current = readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8");
     assert(readFileSync(skill, "utf8") === current, "historical skill was not upgraded");
 
-    writeFileSync(skill, historicalCrlf);
+    writeFileSync(skill, historical.crlf);
     assert(run(repo, ["init"]).includes("upgraded from a supported Nerv-managed version"), "CRLF historical skill was not recognized");
-    writeFileSync(skill, `${historicalCrlf}\r\nDeveloper change.\r\n`);
+    writeFileSync(skill, `${historical.crlf}\r\nDeveloper change.\r\n`);
     const output = run(repo, ["init"]);
     assert(output.includes("ownership is not established") && readFileSync(skill, "utf8").includes("Developer change."), "modified historical skill was overwritten");
 

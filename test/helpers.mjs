@@ -18,10 +18,34 @@ export function childEnv(overrides = {}) {
   for (const key of Object.keys(overrides)) for (const existing of Object.keys(environment)) if (existing.toLowerCase() === key.toLowerCase()) delete environment[existing];
   return { ...environment, ...overrides };
 }
+function commandInvocation(command, args) {
+  if (process.platform !== "win32" || !/\.(?:cmd|bat)$/i.test(command)) return { command, args };
+  const quote = (value) => `"${String(value).replace(/(["^&|<>()])/g, "^$1").replace(/%/g, "%%")}"`;
+  const commandLine = [command, ...args].map(quote).join(" ");
+  return { command: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", `"${commandLine}"`], windowsVerbatimArguments: true };
+}
+function processDetails(command, args, options, result) {
+  return `${command} ${args.join(" ")} failed\n` +
+    `cwd: ${options.cwd ?? process.cwd()}\n` +
+    `status: ${result.status}\n` +
+    `signal: ${result.signal}\n` +
+    `error: ${result.error?.message ?? result.error ?? "none"}\n` +
+    `stdout:\n${result.stdout ?? ""}\n` +
+    `stderr:\n${result.stderr ?? ""}`;
+}
+export function runCommand(command, args = [], { expectedStatus = 0, ...options } = {}) {
+  const invocation = commandInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, { ...options, windowsVerbatimArguments: invocation.windowsVerbatimArguments, encoding: options.encoding ?? "utf8", env: childEnv(options.env) });
+  if (result.error || result.status !== expectedStatus) throw new Error(processDetails(command, args, options, result));
+  return result;
+}
+export function fixtureEol(text) {
+  const lf = text.replace(/\r\n?/g, "\n");
+  return { lf, crlf: lf.replaceAll("\n", "\r\n") };
+}
 export function run(cwd, args, expected = 0, env = {}) {
-  const result = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: childEnv(env) });
-  const output = `${result.stdout}${result.stderr}`;
-  if (result.status !== expected) throw new Error(`${args.join(" ")}: ${output}`);
+  const result = runCommand(process.execPath, [cli, ...args], { cwd, env, expectedStatus: expected });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   return output;
 }
 export function gitResult(cwd, args, env = {}) { return spawnSync("git", args, { cwd, encoding: "utf8", env: childEnv(env) }); }

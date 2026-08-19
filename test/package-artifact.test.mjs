@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { runCommand } from "./helpers.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -35,8 +36,9 @@ test("CI package scripts resolve from tracked source", () => {
   assert.doesNotMatch(packageJson.engines.node, />=22\.0\.0/);
   assert.doesNotMatch(packageJson.engines.node, />=24\.0\.0/);
   assert.doesNotMatch(packageJson.engines.node, />=25/);
-  assert.match(workflow, /os: ubuntu-latest\s+node: 24\.11\.0\s+package_artifact: false/);
-  assert.match(workflow, /os: ubuntu-latest\s+node: 24\.19\.0\s+package_artifact: true/);
+  assert.match(workflow, /os: ubuntu-latest\s+node: 24\.11\.0\s+package_artifact: true/);
+  assert.equal((workflow.match(/package_artifact: true/g) ?? []).length, 1);
+  assert.doesNotMatch(workflow, /os: ubuntu-latest\s+node: 24\.19\.0/);
   assert.match(workflow, /os: macos-latest\s+node: 24\.19\.0\s+package_artifact: false/);
   assert.match(workflow, /os: windows-latest\s+node: 24\.19\.0\s+package_artifact: false/);
   for (const [name, source] of [["build", "scripts/build.mjs"], ["test:package", "scripts/package-test.mjs"]]) {
@@ -52,10 +54,30 @@ test("CI package scripts resolve from tracked source", () => {
   assert.equal(packageJson.pnpm?.onlyBuiltDependencies?.includes("better-sqlite3"), undefined);
 });
 
+test("test command launch failures include process diagnostics", () => {
+  const missingCwd = join(tmpdir(), `nerv-missing-cwd-${process.pid}`);
+  assert.throws(() => runCommand(process.execPath, ["--version"], { cwd: missingCwd }), (error) =>
+    error.message.includes(process.execPath) && error.message.includes(`cwd: ${missingCwd}`) && error.message.includes("error:") && error.message.includes("status:") && error.message.includes("stdout:") && error.message.includes("stderr:"));
+});
+
+test("Windows command scripts preserve literal arguments", { skip: process.platform !== "win32" }, () => {
+  const temp = mkdtempSync(join(tmpdir(), "nerv-command-args-"));
+  try {
+    const capture = join(temp, "capture.mjs");
+    const wrapper = join(temp, "capture.cmd");
+    writeFileSync(capture, 'import { writeFileSync } from "node:fs"; writeFileSync(process.env.NERV_CAPTURE, JSON.stringify(process.argv.slice(2)));\n');
+    writeFileSync(wrapper, '@node "%~dp0capture.mjs" %*\r\n');
+    const args = ['{"quoted":"a b"}', "space name", "&|<>()^%!literal"];
+    runCommand(wrapper, args, { env: { NERV_CAPTURE: join(temp, "args.json") } });
+    assert.deepEqual(JSON.parse(readFileSync(join(temp, "args.json"), "utf8")), args);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", env: { ...process.env, npm_config_update_notifier: "false" } });
-  assert.equal(result.status, 0, `${command} ${args.join(" ")} failed:\n${result.stdout}${result.stderr}`);
-  return `${result.stdout}${result.stderr}`;
+  const result = runCommand(command, args, { cwd, env: { npm_config_update_notifier: "false" } });
+  return `${result.stdout ?? ""}${result.stderr ?? ""}`;
 }
 
 test("local cli script ignores PATH nerv and runs the repository build", () => {
@@ -64,10 +86,10 @@ test("local cli script ignores PATH nerv and runs the repository build", () => {
     const fake = join(temp, process.platform === "win32" ? "nerv.cmd" : "nerv");
     writeFileSync(fake, process.platform === "win32" ? "@echo FAKE_GLOBAL_NERV\r\n" : "#!/bin/sh\nprintf FAKE_GLOBAL_NERV\n");
     if (process.platform !== "win32") chmodSync(fake, 0o755);
-    const result = spawnSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["cli", "--", "--help"], { cwd: root, encoding: "utf8", env: { ...process.env, PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
-    assert.equal(result.status, 0, `pnpm cli failed:\n${result.stdout}${result.stderr}`);
-    assert.match(`${result.stdout}${result.stderr}`, /Usage: nerv/);
-    assert.doesNotMatch(`${result.stdout}${result.stderr}`, /FAKE_GLOBAL_NERV/);
+    const result = runCommand(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["cli", "--", "--help"], { cwd: root, env: { PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.match(output, /Usage: nerv/);
+    assert.doesNotMatch(output, /FAKE_GLOBAL_NERV/);
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
