@@ -3,6 +3,7 @@
   "version": "0.3.0",
   "description": "Local-first agent work harness for developers who work with coding agents.",
   "license": "Apache-2.0",
+  "author": "Edhú Nuñez Alvarado",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/edhutech/nerv.git"
@@ -28,6 +29,7 @@
     "README.md",
     "CLAUDE.md",
     "LICENSE",
+    "NOTICE",
     ".agents/skills/nerv/SKILL.md"
   ],
   "publishConfig": {

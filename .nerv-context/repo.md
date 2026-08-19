@@ -29,7 +29,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 - OpenCode, Codex, and Cursor natively discover `AGENTS.md` and `.agents/skills`; Claude Code uses its optional bridge. No host affects runtime state or lifecycle.
 - `.github/workflows/ci.yml` uses read-only SHA-pinned GitHub Actions for Node 22.14.0 and 24.11.0 minimums on Linux, Node 24.19.0 on macOS and Windows, and package E2E once on Linux Node 24.11.0. It never publishes.
 - `README.md` is the developer landing page; detailed product documentation belongs to a future dedicated documentation experience, while this repository keeps onboarding and maintenance material close to the code.
-- `.github/workflows/publish.yml` publishes only from a published GitHub Release, after package validation, through npm Trusted Publishing with OIDC and provenance. npmjs.com is the public registry.
+- `.github/workflows/publish.yml` publishes only from a published GitHub Release, after package validation, through npm Trusted Publishing with OIDC and provenance. Until the first stable release, it intentionally publishes the current Public Alpha to npm `latest`; npmjs.com is the public registry. Separate stable and experimental channels require a later governed decision after a stable release exists.
 - Do not edit generated `dist/` or local `.nerv/` state directly.
 
 ## Generated and local state

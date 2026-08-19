@@ -9,6 +9,8 @@ Nerv is a Local-first Agent Work Harness for developers building software with c
 
 > [!NOTE]
 > **Nerv is currently in public alpha.** The core workflow is usable, but CLI contracts, repository artifacts, and local state formats may change before the first stable release. Backward compatibility is not guaranteed during the alpha phase.
+>
+> Until the first stable release, the newest public `0.x` release is the primary Public Alpha release: GitHub Latest, npm `latest`, and the default installation path all point to the current version. Separate stable and experimental channels may be introduced after a stable release exists.
 
 Coding-agent work often loses its approved intent, validation evidence, and review boundary between sessions. Nerv keeps that operational context small and durable so work stays recoverable and reviewable without becoming a prompt archive or a process-heavy system.
 
@@ -17,7 +19,7 @@ Nerv does not launch, control, or require a particular agent or model. It gives 
 ## Quick Start
 
 ```bash
-npm install --global @edhutech/nerv@alpha
+npm install --global @edhutech/nerv
 ```
 
 Nerv supports Node.js `>=22.14.0 <23` or `>=24.11.0 <25` and requires Git. The installed command is `nerv`; you do not need to clone this repository or install pnpm.

@@ -8,8 +8,9 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("README provides a concise documented onboarding path", () => {
   const readme = readFileSync(resolve(root, "README.md"), "utf8");
   assert.match(readme, /Nerv is currently in public alpha/);
-  assert.match(readme, /npm install --global @edhutech\/nerv@alpha/);
-  assert.doesNotMatch(readme, /npm install --global @edhutech\/nerv\n/);
+  assert.match(readme, /npm install --global @edhutech\/nerv\n/);
+  assert.doesNotMatch(readme, /npm install --global @edhutech\/nerv@alpha/);
+  assert.match(readme, /newest public `0\.x` release is the primary Public Alpha release/);
   assert.match(readme, /nerv uninstall/);
   assert.match(readme, /npm uninstall -g @edhutech\/nerv/);
    assert.match(readme, /Node\.js `>=22\.14\.0 <23` or `>=24\.11\.0 <25`/);
@@ -69,12 +70,13 @@ test("publish workflow is an intentional Trusted Publishing boundary", () => {
   assert.match(publish, /id-token: write/);
   assert.match(publish, /pnpm validate/);
   assert.match(publish, /pnpm test:package/);
-  assert.match(publish, /npm publish --provenance --tag alpha/);
-  assert.doesNotMatch(publish, /npm publish --provenance(?! --tag alpha)/);
-  assert.doesNotMatch(publish, /npm publish[^\n]*--tag latest/);
+  assert.match(publish, /npm publish --provenance --tag latest/);
+  assert.doesNotMatch(publish, /npm publish --provenance --tag alpha/);
   assert.doesNotMatch(publish, /NPM_TOKEN/);
   assert.equal(packageJson.repository.url, "git+https://github.com/edhutech/nerv.git");
   assert.equal(packageJson.publishConfig.registry, "https://registry.npmjs.org");
+  assert.equal(packageJson.author, "Edhú Nuñez Alvarado");
+  assert.equal(readFileSync(resolve(root, "NOTICE"), "utf8"), "Nerv\nCopyright 2026 Edhú Nuñez Alvarado\n");
   assert.match(publish, /package repository metadata must identify edhutech\/nerv/);
   assert.equal(packageJson.version, "0.3.0");
   assert(publish.includes('test "$(node -p \'require("./package.json").version\')" = "${GITHUB_REF_NAME#v}"'), "publish workflow must fail closed on release/tag and package version mismatch");

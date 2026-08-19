@@ -13,6 +13,7 @@ const expectedFiles = [
   ".agents/skills/nerv/SKILL.md",
   "CLAUDE.md",
   "LICENSE",
+  "NOTICE",
   "README.md",
   "dist/context.js",
   "dist/database.js",
@@ -109,6 +110,7 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     assert.equal(packed.name, sourcePackage.name);
     assert.equal(packed.version, sourcePackage.version);
     assert.deepEqual(packed.files.map((entry) => entry.path).sort(), expectedFiles);
+    assert(packed.files.some((entry) => entry.path === "NOTICE"), "archive omits NOTICE attribution");
    for (const forbidden of [".nerv/", ".nerv-context/", "test/", "test/fixtures/", ".github/", "src/", "AGENTS.md"]) {
       assert(!packed.files.some((entry) => entry.path === forbidden || entry.path.startsWith(forbidden)), `archive includes ${forbidden}`);
     }
