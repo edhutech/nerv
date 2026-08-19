@@ -48,7 +48,7 @@ Nerv governs a Work Item, which contains one or more bounded Tasks. The workflow
   request -> Plan -> approve -> automatic execution -> review -> close
 ```
 
-Planning and approval are agent-facing protocols, not commands you run yourself. The agent translates approval into the deterministic materialization primitives, then stops after execution and validation for `review`; `nerv review WORK-###` records the integrated result, and `nerv close WORK-###` creates the reviewed Git change when you request it.
+Planning and approval are agent-facing protocols, not commands you run yourself. The agent translates approval into deterministic materialization primitives, then stops after execution and validation for `review`; `nerv review <work-ref>` records the integrated result, and `nerv close <work-ref>` creates the reviewed Git change when you request it. Work refs are `W-` plus 16 uppercase UUID hex characters, not sequential numbers.
 
 ## Why Nerv
 

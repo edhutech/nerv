@@ -60,7 +60,9 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "Include material implementation decisions and proposed defaults when they make the Plan execution-ready.",
     "Recommended next action: `approve`",
     "Follow the user's language for human-facing Plans, clarification questions, findings, explanations, Review summaries, remediation proposals, and handoffs when practical; English and Spanish are supported initially.",
-    "`nerv work materialize --plan <json>`, `nerv work materialize-rework WORK-###`, `nerv review WORK-###`, `nerv close WORK-###`, `WORK-###`, `Task`, `PASS`, and `REWORK`",
+    "`nerv work materialize --plan <json>`",
+    "`nerv work materialize-rework <work-ref>`",
+    "W-` plus 16 uppercase UUID hex characters, not sequential history numbers",
     "`review` after execution and full validation",
     "After Close, no further lifecycle operation is required.",
     "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",
@@ -82,8 +84,8 @@ test("lifecycle shorthand is an unambiguous agent intent over canonical protocol
     "If no applicable Work or transition exists, explain that instead of guessing.",
     "Equivalent natural-language intent in the developer's language",
     "Explicit `nerv ...` forms remain valid",
-    "nerv review WORK-###",
-    "nerv close WORK-###",
+    "nerv review <work-ref>",
+    "nerv close <work-ref>",
   ]) assert(skill.includes(expected), `lifecycle shorthand contract omitted: ${expected}`);
   assert(!skill.includes("nerv approve"), "public skill refers to a nonexistent approve command");
   assert(!source.includes('program.command("approve")'), "conversation-only approve became a CLI command");
@@ -128,14 +130,14 @@ test("preferred handoffs and repository commit authority remain coherent", () =>
     "`close` after PASS",
     "Before Close, inspect authoritative Repo Context for a repository commit convention.",
     "the agent must construct a compliant explicit subject",
-    "`nerv close WORK-### --message <subject>`",
+    "`nerv close <work-ref> --message <subject>`",
     "valid Conventional Commit subjects include `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, `refactor: ...`, `chore: ...`, `ci: ...`, and `build: ...`",
     "When no authoritative convention exists, the generic runtime may continue using the Work title by default",
     "Nerv does not impose Conventional Commits globally.",
   ]) assert(skill.includes(expected), `handoff or commit-authority contract omitted: ${expected}`);
   assert(!skill.includes("Recommended next operation:"), "public skill retained a stale normal-handoff label");
   assert(repoContext.includes("Nerv commits use Conventional Commit subjects; this is repository authority, not runtime policy."), "Repo Context no longer states the repository commit authority");
-  assert(skill.includes("`nerv review WORK-###`") && skill.includes("`nerv close WORK-###`"), "explicit canonical lifecycle commands were not preserved");
+  assert(skill.includes("`nerv review <work-ref>`") && skill.includes("`nerv close <work-ref>`"), "explicit canonical lifecycle commands were not preserved");
 });
 
 test("Plan presentation uses current lifecycle terminology", () => {
@@ -148,10 +150,10 @@ test("Plan presentation uses current lifecycle terminology", () => {
 test("REWORK presentation is structured, durable, and approval-oriented", () => {
   for (const expected of [
     "For a developer-facing REWORK response, present this compact hierarchy",
-    "Work: WORK-###",
+    "Work: <work-ref>",
     "Outcome: REWORK",
     "Severity: <severity>",
-    "Why it blocks PASS: <blocking rationale>",
+    "PASS impact: <blocking or residual PASS impact>",
     "Evidence: <relevant persisted Review evidence or finding evidence>",
     "Affected Work-level acceptance criterion: <criterion or approved outcome boundary>",
     "Medium residual-risk decision:",

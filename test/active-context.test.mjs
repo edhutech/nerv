@@ -1,12 +1,12 @@
 import test from "node:test";
-import { assert, existsSync, finish, join, materialize, plan, readFileSync, remediation, review, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
+import { activeContextPath, assert, existsSync, finish, join, materialize, plan, readFileSync, remediation, review, rmSync, root, run, setup, writeFileSync } from "./helpers.mjs";
 
 test("active context is a compact handoff and work show retains durable detail", () => {
   const repo = setup();
   try {
     const materializeOutput = run(repo, ["work", "materialize", "--plan", JSON.stringify(plan())]);
     assert(materializeOutput.includes("Execution: Task 1 is active; completing it activates the next Task.") && !materializeOutput.includes("Recommended next action") && !materializeOutput.includes("Continue with Task"), "materialization exposed an active Task as a developer action");
-    const activePath = join(repo, ".nerv/agent/active/WORK-001.md");
+    const activePath = activeContextPath(repo);
     const active = readFileSync(activePath, "utf8");
     assert(active.includes("## Current Task\n\nTask 1 - Persist fields") && active.includes("Implementation approach:\nUse direct columns") && active.includes("## Execution\n\nTask 1 is active; completing it activates the next Task.") && !active.includes("Continue with Task"), "active Task operational contract was omitted or presented as a developer action");
     assert(active.includes("## Pending\n\n- Task 2 - Recover fields") && !active.includes("### Task 2"), "pending Task was not compact");
@@ -43,13 +43,13 @@ test("fresh-session REWORK approval preview is reconstructible from durable stat
     materialize(repo);
     finish(repo, 1, "one.txt");
     finish(repo, 2, "two.txt");
-    const finding = { severity: "medium", issue: "historical Product Context coverage is incomplete", why_blocks_pass: "the approved ownership regression boundary is not fully proven", evidence: "Review validation found no legacy Product fixture assertion", affected_work_criterion: "provenance regressions cover every supported historical scaffold", medium_residual_risk_decision: "not accepted because this is a required release-boundary regression" };
-    review(repo, "REWORK", ["--findings", JSON.stringify([finding]), "--remediation-title", "Add Product fixture", "--remediation-objective", "Prove historical Product ownership", "--remediation-approach", "Add the release fixture and classification assertions", "--remediation-touchpoints", "test/fixtures/v0.2.0/product.md; test/managed-skill.test.mjs", "--remediation-acceptance-criteria", "Historical Product ownership is classified as legacy", "--remediation-validation", "pnpm test"]);
+    const finding = { severity: "medium", issue: "Product Context coverage is incomplete", pass_impact: "the approved ownership regression boundary is not fully proven", evidence: "Review validation found no current Product scaffold assertion", affected_work_criterion: "provenance regressions cover every supported current scaffold", medium_residual_risk_decision: "not accepted because this is a required regression" };
+    review(repo, "REWORK", ["--findings", JSON.stringify([finding]), "--remediation-title", "Add Product assertion", "--remediation-objective", "Prove current Product ownership", "--remediation-approach", "Add current classification assertions", "--remediation-touchpoints", "test/managed-skill.test.mjs", "--remediation-acceptance-criteria", "Current Product ownership is classified", "--remediation-validation", "pnpm test"]);
     const shown = run(repo, ["work", "show", "WORK-001"]);
     const status = run(repo, ["work", "status", "WORK-001"]);
-    const active = readFileSync(join(repo, ".nerv/agent/active/WORK-001.md"), "utf8");
-     assert(shown.includes("WORK-001") && shown.includes("rework") && shown.includes("Severity: medium") && shown.includes("Issue: historical Product Context coverage is incomplete") && shown.includes("Why it blocks PASS: the approved ownership regression boundary is not fully proven") && shown.includes("Evidence: Review validation found no legacy Product fixture assertion") && shown.includes("Affected Work-level acceptance criterion: provenance regressions cover every supported historical scaffold") && shown.includes("Add Product fixture") && shown.includes("Prove historical Product ownership") && shown.includes("Add the release fixture and classification assertions") && shown.includes("Historical Product ownership is classified as legacy") && shown.includes("pnpm test"), "fresh-session work show omitted durable REWORK fields");
-    for (const output of [status, active]) assert(output.includes("Add Product fixture") && output.includes("Prove historical Product ownership") && output.includes("Add the release fixture and classification assertions") && output.includes("Historical Product ownership is classified as legacy") && output.includes("pnpm test"), "fresh-session derived recovery omitted durable remediation fields");
+    const active = readFileSync(activeContextPath(repo), "utf8");
+     assert(/^W-[0-9A-F]{16}:/.test(shown) && shown.includes("rework") && shown.includes("Severity: medium") && shown.includes("Issue: Product Context coverage is incomplete") && shown.includes("PASS impact: the approved ownership regression boundary is not fully proven") && shown.includes("Evidence: Review validation found no current Product scaffold assertion") && shown.includes("Affected Work-level acceptance criterion: provenance regressions cover every supported current scaffold") && shown.includes("Add Product assertion") && shown.includes("Prove current Product ownership") && shown.includes("Add current classification assertions") && shown.includes("Current Product ownership is classified") && shown.includes("pnpm test"), "fresh-session work show omitted durable REWORK fields");
+     for (const output of [status, active]) assert(output.includes("Add Product assertion") && output.includes("Prove current Product ownership") && output.includes("Add current classification assertions") && output.includes("Current Product ownership is classified") && output.includes("pnpm test"), "fresh-session derived recovery omitted durable remediation fields");
     assert(shown.includes("Scope: approved scope") && shown.includes("Acceptance criteria: contract persists"), "fresh-session recovery omitted the durable Work boundary");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });

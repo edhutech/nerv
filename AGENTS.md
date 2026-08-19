@@ -16,7 +16,7 @@
 - Canonical tracked context is `.nerv-context/product.md` and `.nerv-context/repo.md`. `.nerv/` contains local operational state and temporary active Markdown. Nerv does not own general-purpose memory, code intelligence, or discovery records.
 - The runtime CLI is agent agnostic. It must not launch, control, route, or require coding agents or models.
 - `.agents/skills/nerv/SKILL.md` is the managed public Nerv skill and the sole Nerv workflow contract.
-- Work Items have UUID stable IDs and repository-local `WORK-###` refs. Tasks have UUID identities and positions scoped to their Work Item, with no global `TASK-###` ref. Git trailers are `Nerv-Work` (UUID) and `Nerv-Work-Ref` (friendly ref). SQLite allocates refs normally; a fresh `.nerv/` may seed its initial allocator from valid paired trailers reachable from current `HEAD`, without deriving identity from Git.
+- Work Items have UUID stable IDs and repository-local `W-` plus 16 uppercase UUID hex-character refs. Tasks have UUID identities and positions scoped to their Work Item, with no global `TASK-###` ref. Git trailers are `Nerv-Work` (UUID) and `Nerv-Work-Ref` (friendly ref); refs are generated from the Work UUID and are not sequential or history-allocated.
 - `.nerv/` is local generated workspace state, excluded through Git's repository-local exclude mechanism. Create and access it through `workspace.ts` and repository helpers, never by assuming it exists or editing `dist/`.
 
 ## Test Gotchas

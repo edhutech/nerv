@@ -38,7 +38,11 @@ export function fixtureEol(text) {
   return { lf, crlf: lf.replaceAll("\n", "\r\n") };
 }
 export function run(cwd, args, expected = 0, env = {}) {
-  const result = runCommand(process.execPath, [cli, ...args], { cwd, env, expectedStatus: expected });
+  const databasePath = join(cwd, ".nerv/nerv.db");
+  let current;
+  try { const db = new Database(databasePath, { readOnly: true }); current = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref; db.close(); } catch {}
+  const translated = current ? args.map((arg) => typeof arg === "string" ? arg.replaceAll("WORK-001", current) : arg) : args;
+  const result = runCommand(process.execPath, [cli, ...translated], { cwd, env, expectedStatus: expected });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   return output;
 }
@@ -114,8 +118,10 @@ export function setup(establish = true) {
 export const plan = (title = "Persist plan") => ({ title, intent: "approved intent", goal: "approved goal", scope: "approved scope", expected_touchpoints: "src/database.ts", out_of_scope: "Git hardening", acceptance_criteria: "contract persists", validation: "pnpm validate", tasks: [{ title: "Persist fields", objective: "Store the plan", implementation_approach: "Use direct columns", expected_touchpoints: "src/repository.ts", acceptance_criteria: "fields round trip", validation: "pnpm test" }, { title: "Recover fields", objective: "Expose the plan", implementation_approach: "Render from SQLite", expected_touchpoints: "src/index.ts", acceptance_criteria: "show is complete", validation: "pnpm test" }] });
 export const minimalPlan = (title = "Minimal plan") => ({ title, goal: "approved goal", scope: "approved scope", acceptance_criteria: "contract persists", validation: "pnpm test", tasks: [{ title: "Persist fields", objective: "Store the plan", acceptance_criteria: "fields round trip", validation: "pnpm test" }] });
 export function materialize(repo, value = plan()) { return /Stable ID: ([0-9a-f-]{36})/.exec(run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]))?.[1]; }
-export function materializedRef(repo, value = plan()) { return /Materialized (WORK-[0-9]+)/.exec(run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]))?.[1]; }
-export function finish(repo, position, file, ref = "WORK-001") { writeFileSync(join(repo, file), "feature\n"); run(repo, ["work", "task", "done", ref, String(position), "--evidence", "targeted passed", "--files", file]); }
-export function review(repo, outcome, extra = [], ref = "WORK-001") { return run(repo, ["review", ref, "--outcome", outcome, "--summary", "complete", "--validation-evidence", "full", ...extra]); }
+export function materializedRef(repo, value = plan()) { return /Materialized (W-[0-9A-F]+)/.exec(run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]))?.[1]; }
+export function activeContextPath(repo) { const db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true }); const ref = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref; db.close(); return join(repo, ".nerv/agent/active", `${ref}.md`); }
+export function currentRef(repo) { const db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true }); const ref = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref; db.close(); return ref; }
+export function finish(repo, position, file, ref = currentRef(repo)) { writeFileSync(join(repo, file), "feature\n"); run(repo, ["work", "task", "done", ref, String(position), "--evidence", "targeted passed", "--files", file]); }
+export function review(repo, outcome, extra = [], ref = currentRef(repo)) { return run(repo, ["review", ref, "--outcome", outcome, "--summary", "complete", "--validation-evidence", "full", ...extra]); }
 export function historyWork(repo, ref, id = "123e4567-e89b-42d3-a456-426614174000") { git(repo, ["commit", "--allow-empty", "-m", `history\n\nNerv-Work: ${id}\nNerv-Work-Ref: ${ref}`]); }
-export const remediation = ["--findings", JSON.stringify([{ severity: "high", issue: "fix", why_blocks_pass: "The approved outcome is not met.", evidence: "Review evidence requires a fix.", affected_work_criterion: "The approved acceptance criteria." }]), "--remediation-title", "Fix", "--remediation-objective", "Resolve", "--remediation-approach", "Change", "--remediation-touchpoints", "src/index.ts", "--remediation-acceptance-criteria", "Resolved", "--remediation-validation", "pnpm test"];
+export const remediation = ["--findings", JSON.stringify([{ severity: "high", issue: "fix", pass_impact: "This finding blocks PASS because the approved outcome is not met.", evidence: "Review evidence requires a fix.", affected_work_criterion: "The approved acceptance criteria." }]), "--remediation-title", "Fix", "--remediation-objective", "Resolve", "--remediation-approach", "Change", "--remediation-touchpoints", "src/index.ts", "--remediation-acceptance-criteria", "Resolved", "--remediation-validation", "pnpm test"];

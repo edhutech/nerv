@@ -15,7 +15,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 ## Important paths
 
 - `.agents/skills/nerv/SKILL.md`: managed public Nerv skill.
-- `AGENTS.md` and `CLAUDE.md`: discovery bridges established when absent; Nerv may append a delimited managed bridge beside custom instructions, upgrades recognized managed or legacy bridges, preserves ambiguous or modified developer content, and uninstall removes only owned bridge content.
+- `AGENTS.md` and `CLAUDE.md`: discovery-only bridges established when absent or alongside custom instructions; they are not canonical setup paths and ownership-safe removal preserves custom or ambiguous content.
 - `test/`: focused built-CLI regression coverage in temporary Git repositories.
 
 ## Development rules
@@ -42,8 +42,8 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 
 ## Repository invariants
 
-The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `WORK-###` references are distinct; Tasks are positioned within their Work Item. SQLite allocates friendly refs while local state exists; fresh local state seeds only from valid paired Nerv trailers reachable from current `HEAD`. This is not distributed uniqueness, and no-diff Work refs cannot be reconstructed after local state is discarded. The first Task activates automatically and completion activates the next. Review and Close stage explicit Work paths only, block new unattributed changes, and discover untracked paths through repository `.gitignore` rules rather than mutable local Git exclusions.
+The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `W-` plus 16 uppercase UUID hex-character refs are distinct; refs are generated from the UUID and never allocated sequentially from history. Tasks are positioned within their Work Item. The first Task activates automatically and completion activates the next. Review and Close stage explicit Work paths only, block new unattributed changes, and discover untracked paths through repository `.gitignore` rules rather than mutable local Git exclusions.
 
 CI uses a shallow checkout; regression tests must be self-contained and must not depend on historical tags, remote access, or deep Git history.
 
-Managed public-artifact provenance is release-boundary based: each artifact declares one current identity and explicit legacy identities for supported public releases. Changing current content extends, rather than replaces, that legacy set; unreleased development revisions are not runtime compatibility identities.
+Managed public artifacts use one current identity; modified or unknown content is preserved rather than treated as a supported historical release.

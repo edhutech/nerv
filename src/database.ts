@@ -17,7 +17,7 @@ const SIGNATURE = new Map(STATEMENTS.map((sql) => {
   return [match![1], normalize(sql)];
 }));
 
-export function initializeDatabase(databasePath: string, nextWorkNumber = 1): void {
+export function initializeDatabase(databasePath: string): void {
   const database = new DatabaseSync(databasePath);
   try {
     database.exec("PRAGMA journal_mode = WAL");
@@ -28,7 +28,6 @@ export function initializeDatabase(databasePath: string, nextWorkNumber = 1): vo
       for (const statement of STATEMENTS) database.exec(statement);
       const timestamp = new Date().toISOString();
       database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)").run(SCHEMA_VERSION, timestamp);
-      database.prepare("INSERT INTO metadata (key, value, updated_at) VALUES ('next_work_number', ?, ?)").run(String(nextWorkNumber), timestamp);
     });
   } finally { database.close(); }
 }
@@ -50,7 +49,7 @@ function matchesSchema(database: DatabaseSync): boolean {
     const objects = database.prepare("SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger') AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string | null }[];
     if (objects.length !== SIGNATURE.size || objects.some((object) => !SIGNATURE.has(object.name) || normalize(object.sql ?? "") !== SIGNATURE.get(object.name))) return false;
     const metadata = database.prepare("SELECT key, value FROM metadata").all() as { key: string; value: string }[];
-    return metadata.every((entry) => entry.key === "schema_version" || entry.key === "next_work_number") && metadata.find((entry) => entry.key === "schema_version")?.value === SCHEMA_VERSION;
+    return metadata.every((entry) => entry.key === "schema_version") && metadata.find((entry) => entry.key === "schema_version")?.value === SCHEMA_VERSION;
   } catch { return false; }
 }
 

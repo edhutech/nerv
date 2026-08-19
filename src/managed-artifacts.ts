@@ -11,23 +11,18 @@ export function textIdentity(value: string): string {
   return createHash("sha256").update(normalizedText(value)).digest("hex");
 }
 
-// Legacy entries are supported public release boundaries, not arbitrary Git revisions.
-export const MANAGED_IDENTITIES: Record<string, { current: string; legacy: readonly string[] }> = {
-  ".agents/skills/nerv/SKILL.md": {
-    current: "296e46ef6db41a8011e35147cff3a367b8d098bf84a6e754915c8ebc9cc05fa2",
-    legacy: ["cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd"],
-  },
-  "CLAUDE.md": { current: "08c99e7cb82cc9a0520a8b3195f9583f6acc0089c6e84340fb36e5be0e4dbff5", legacy: ["baf0ecc33ac0416d1cabf88d3c3b63b06695722fe3a144c8bd9f99c64e08a26f"] },
-  ".nerv-context/product.md": { current: "ef4d149f378d4150ebde1f71fb5e6c0a66d522c49625d82e3abd0a61c70baa7b", legacy: ["a660b357f7d9f1c49287be3593fc0de20b5b74001c1b00f32b8921bcf173dab9"] },
-  ".nerv-context/repo.md": { current: "26936e8a8f05229211ccb8e628dd248aea03392ec6044a6bf657fd6fc3e41606", legacy: ["f389dfa64649f6f315eed16805bf06ea09ca5fb1179c214fba35acef8680712d"] },
+export const MANAGED_IDENTITIES: Record<string, string> = {
+  ".agents/skills/nerv/SKILL.md": "9242354ad586ff422830c09181264d0956eff270f1a2c363c190a0194952014f",
+  "CLAUDE.md": "08c99e7cb82cc9a0520a8b3195f9583f6acc0089c6e84340fb36e5be0e4dbff5",
+  ".nerv-context/product.md": "ef4d149f378d4150ebde1f71fb5e6c0a66d522c49625d82e3abd0a61c70baa7b",
+  ".nerv-context/repo.md": "26936e8a8f05229211ccb8e628dd248aea03392ec6044a6bf657fd6fc3e41606",
 };
 
-export function knownIdentity(relativePath: string, content: string): "current" | "legacy" | "unknown" {
+export function knownIdentity(relativePath: string, content: string): "current" | "unknown" {
   const policy = MANAGED_IDENTITIES[relativePath];
   const identity = textIdentity(content);
   if (!policy) return "unknown";
-  if (identity === policy.current) return "current";
-  if (policy.legacy.includes(identity)) return "legacy";
+  if (identity === policy) return "current";
   return "unknown";
 }
 

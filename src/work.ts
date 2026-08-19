@@ -19,11 +19,11 @@ export function remediationPreview(review: Pick<Review, "remediation_json"> | nu
 export function reviewFindingsPreview(review: Pick<Review, "findings"> | null): string {
   if (!review?.findings) return "";
   try {
-    const findings = JSON.parse(review.findings) as Array<{ severity: string; issue: string; why_blocks_pass: string; evidence: string; affected_work_criterion: string; medium_residual_risk_decision?: string; accepted_as_residual_risk?: boolean }>;
+    const findings = JSON.parse(review.findings) as Array<{ severity: string; issue: string; pass_impact: string; evidence: string; affected_work_criterion: string; medium_residual_risk_decision?: string; accepted_as_residual_risk?: boolean }>;
     return findings.map((finding) => [
       `Severity: ${finding.severity}`,
       `Issue: ${finding.issue}`,
-      `Why it blocks PASS: ${finding.why_blocks_pass}`,
+      `PASS impact: ${finding.pass_impact}`,
       `Evidence: ${finding.evidence}`,
       `Affected Work-level acceptance criterion: ${finding.affected_work_criterion}`,
       finding.medium_residual_risk_decision ? `Medium residual-risk decision: ${finding.medium_residual_risk_decision}` : null,
@@ -37,7 +37,7 @@ export function syncActiveContext(workspaceRoot: string, work: WorkItem, tasks: 
   const active = tasks.find((task) => task.status === "active");
   const taskList = (status: string) => tasks.filter((task) => task.status === status).map((task) => `- Task ${task.position} - ${task.title}`).join("\n") || "- None";
   const activeDetails = active ? [`Task ${active.position} - ${active.title}`, `Objective:\n${active.objective}`, active.implementation_approach && `Implementation approach:\n${active.implementation_approach}`, active.expected_touchpoints && `Expected touchpoints:\n${active.expected_touchpoints}`, `Acceptance criteria:\n${active.acceptance_criteria}`, `Targeted validation:\n${active.validation}`].filter(Boolean).join("\n\n") : "None";
-  const checkpointSection = checkpoint ? `\n\n## Checkpoint\n\n${checkpoint.summary}${checkpoint.next_step ? `\n\nNext step: ${checkpoint.next_step}` : ""}` : "";
+  const checkpointSection = checkpoint && (!checkpoint.task_id || checkpoint.task_id === active?.id) ? `\n\n## Checkpoint\n\n${checkpoint.summary}${checkpoint.next_step ? `\n\nNext step: ${checkpoint.next_step}` : ""}` : "";
   const findingsSection = work.status === "rework" && reviewFindingsPreview(review) ? `\n\n## Review findings\n\n${reviewFindingsPreview(review)}` : "";
   const remediationSection = work.status === "rework" && remediationPreview(review) ? `\n\n## Remediation proposal\n\n${remediationPreview(review)}` : "";
   const handoff = developerHandoff(work, tasks, review);

@@ -9,11 +9,11 @@ export type PlanTask = Pick<Task, "title" | "objective" | "implementation_approa
 export type ApprovedPlan = Pick<WorkItem, "title" | "intent" | "goal" | "scope" | "expected_touchpoints" | "out_of_scope" | "acceptance_criteria" | "validation"> & { tasks: PlanTask[]; git_baseline_json: string };
 export type Review = { id: number; work_item_id: string; outcome: "PASS" | "REWORK"; summary: string; findings: string | null; remediation_json: string | null; validation_evidence: string; git_fingerprint_json: string | null; verification_evidence: string | null; created_at: string };
 export type Checkpoint = { id: number; work_item_id: string; task_id: string | null; summary: string; next_step: string | null; created_at: string };
-export function workRef(number: number): string {
-  return `WORK-${String(number).padStart(3, "0")}`;
+export function workRef(id: string): string {
+  return `W-${id.replaceAll("-", "").slice(0, 16).toUpperCase()}`;
 }
 export type Repository = {
-  close(): void; getWork(reference: string): WorkItem | null; getTask(id: string): Task | null; materializePlan(plan: ApprovedPlan): WorkItem; materializeRework(workId: string): WorkItem; completeTask(taskId: string, evidence: string, attribution: string): Task; createReview(input: Omit<Review, "id" | "created_at">): Review; createCheckpoint(input: Omit<Checkpoint, "id" | "created_at">): Checkpoint; closeWork(workId: string, commitHash: string | null): WorkItem; listWork(): WorkItem[]; listTasks(workId: string): Task[]; getTaskAt(workId: string, position: number): Task | null; latestReview(workId: string): Review | null; latestCheckpoint(workId: string): Checkpoint | null;
+  close(): void; getWork(reference: string): WorkItem | null; getTask(id: string): Task | null; materializePlan(plan: ApprovedPlan): WorkItem; materializeRework(workId: string): WorkItem; completeTask(taskId: string, evidence: string, attribution: string): Task; createReview(input: Omit<Review, "id" | "created_at">): Review; createCheckpoint(input: Omit<Checkpoint, "id" | "created_at">): Checkpoint; closeWork(workId: string, commitHash: string | null): WorkItem; listWork(): WorkItem[]; listTasks(workId: string): Task[]; getTaskAt(workId: string, position: number): Task | null; latestReview(workId: string): Review | null; latestCheckpoint(workId: string): Checkpoint | null; listCheckpoints(workId: string): Checkpoint[];
 };
 const now = () => new Date().toISOString();
 
@@ -42,12 +42,6 @@ function createRepository(db: DatabaseSync): Repository {
   const getWork = (idOrRef: string) => (prepare("SELECT * FROM work_items WHERE id = ? OR ref = ?").get(idOrRef, idOrRef) as WorkItem | undefined) ?? null;
   const getTask = (id: string) => (prepare("SELECT * FROM tasks WHERE id = ?").get(id) as Task | undefined) ?? null;
   const listTasks = (workId: string) => prepare("SELECT * FROM tasks WHERE work_item_id = ? ORDER BY position").all(workId) as Task[];
-  const nextWorkRef = () => {
-    const stored = prepare("SELECT value FROM metadata WHERE key = 'next_work_number'").get() as { value: string } | undefined;
-    const value = Number(stored?.value) || 1;
-    prepare("INSERT INTO metadata (key,value,updated_at) VALUES ('next_work_number',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").run(String(value + 1), now());
-    return workRef(value);
-  };
   const setWork = (item: WorkItem, changes: Partial<WorkItem>) => {
     return prepare("UPDATE work_items SET status=@status,validation_evidence=@validation_evidence,updated_at=@updated_at,closed_at=@closed_at,commit_hash=@commit_hash WHERE id=@id").run({
       id: item.id,
@@ -79,10 +73,11 @@ function createRepository(db: DatabaseSync): Repository {
     }
     const timestamp = now();
     const { tasks, ...approved } = plan;
+    const id = randomUUID();
     const item: WorkItem = {
       ...approved,
-      id: randomUUID(),
-      ref: nextWorkRef(),
+      id,
+      ref: workRef(id),
       status: "active",
       validation_evidence: null,
       created_at: timestamp,
@@ -136,5 +131,5 @@ function createRepository(db: DatabaseSync): Repository {
     setWork(item, { status: "closed", closed_at: now(), commit_hash: commitHash });
     return getWork(item.id)!;
   });
-  return { close: () => db.close(), getWork, getTask, materializePlan, materializeRework, completeTask, createReview, createCheckpoint, closeWork, listWork: () => prepare("SELECT * FROM work_items ORDER BY ref").all() as WorkItem[], listTasks, getTaskAt: (workId: string, position: number) => (prepare("SELECT * FROM tasks WHERE work_item_id = ? AND position = ?").get(workId, position) as Task | undefined) ?? null, latestReview: (workId: string) => (prepare("SELECT * FROM work_reviews WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Review | undefined) ?? null, latestCheckpoint: (workId: string) => (prepare("SELECT * FROM checkpoints WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Checkpoint | undefined) ?? null };
+  return { close: () => db.close(), getWork, getTask, materializePlan, materializeRework, completeTask, createReview, createCheckpoint, closeWork, listWork: () => prepare("SELECT * FROM work_items ORDER BY ref").all() as WorkItem[], listTasks, getTaskAt: (workId: string, position: number) => (prepare("SELECT * FROM tasks WHERE work_item_id = ? AND position = ?").get(workId, position) as Task | undefined) ?? null, latestReview: (workId: string) => (prepare("SELECT * FROM work_reviews WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Review | undefined) ?? null, latestCheckpoint: (workId: string) => (prepare("SELECT * FROM checkpoints WHERE work_item_id=? ORDER BY id DESC LIMIT 1").get(workId) as Checkpoint | undefined) ?? null, listCheckpoints: (workId: string) => prepare("SELECT * FROM checkpoints WHERE work_item_id=? ORDER BY id").all(workId) as Checkpoint[] };
 }

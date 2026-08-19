@@ -1,5 +1,5 @@
 import test from "node:test";
-import { assert, finish, materialize, minimalPlan, plan, rmSync, run, setup } from "./helpers.mjs";
+import { assert, currentRef, finish, materialize, minimalPlan, plan, rmSync, run, setup } from "./helpers.mjs";
 
 test("minimal approved plans persist optional fields as empty strings", () => {
   const repo = setup();
@@ -45,22 +45,23 @@ test("materialize help exposes a parser-valid typed plan contract", () => {
 
 test("review help exposes and accepts the parser-valid findings contract", () => {
   const repo = setup();
-  const example = JSON.stringify([{ severity: "high", issue: "Describe the blocking issue", why_blocks_pass: "The approved outcome is not met.", evidence: "Relevant validation or review evidence.", affected_work_criterion: "The affected Work acceptance criterion." }]);
+  const example = JSON.stringify([{ severity: "high", issue: "Describe the finding", pass_impact: "This finding blocks PASS because the approved outcome is not met.", evidence: "Relevant validation or review evidence.", affected_work_criterion: "The affected Work acceptance criterion." }]);
   try {
     const help = run(repo, ["review", "--help"]);
     for (const expected of [
       "Optional non-empty JSON array of finding objects.",
-       "Required finding fields: severity, issue, why_blocks_pass, evidence, affected_work_criterion.",
+       "Required finding fields: severity, issue, pass_impact, evidence, affected_work_criterion.",
       "severity must be one of: critical, high, medium, low.",
        "Optional fields: medium_residual_risk_decision (required for medium findings); accepted_as_residual_risk (boolean; true only for medium findings).",
       example,
     ]) assert(help.includes(expected), `review help omitted ${expected}`);
     materialize(repo);
+    const ref = currentRef(repo);
     finish(repo, 1, "one.txt");
     finish(repo, 2, "two.txt");
     const unsupported = JSON.stringify([{ severity: "medium", title: "Unsupported", detail: "Wrong field" }]);
-    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "invalid", "--validation-evidence", "full", "--findings", unsupported], 1).includes("finding field"), "unsupported finding fields did not produce a useful contract error");
-    assert(run(repo, ["review", "WORK-001", "--outcome", "REWORK", "--summary", "needs correction", "--validation-evidence", "full", "--findings", example, "--remediation-title", "Fix", "--remediation-objective", "Resolve", "--remediation-acceptance-criteria", "Resolved", "--remediation-validation", "pnpm test"]).includes("REWORK"), "documented findings example was rejected by the parser");
+    assert(run(repo, ["review", ref, "--outcome", "PASS", "--summary", "invalid", "--validation-evidence", "full", "--findings", unsupported], 1).includes("finding field"), "unsupported finding fields did not produce a useful contract error");
+    assert(run(repo, ["review", ref, "--outcome", "REWORK", "--summary", "needs correction", "--validation-evidence", "full", "--findings", example, "--remediation-title", "Fix", "--remediation-objective", "Resolve", "--remediation-acceptance-criteria", "Resolved", "--remediation-validation", "pnpm test"]).includes("REWORK"), "documented findings example was rejected by the parser");
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }

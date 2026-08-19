@@ -1,13 +1,25 @@
 import test from "node:test";
-import { Database, assert, finish, git, historyWork, join, materializedRef, review, rmSync, run, setup } from "./helpers.mjs";
+import { assert, currentRef, finish, join, materializedRef, rmSync, setup } from "./helpers.mjs";
 
-test("Work sequence recovery ignores text and validates canonical trailers", () => {
-  const repo = setup(); try { git(repo, ["commit", "--allow-empty", "-m", "ordinary discussion mentions WORK-999 but has no Nerv trailers"]); rmSync(join(repo, ".nerv"), { recursive: true, force: true }); run(repo, ["init"]); assert(materializedRef(repo) === "WORK-001", "plain WORK text affected fresh sequence recovery"); } finally { rmSync(repo, { recursive: true, force: true }); }
-  const recovered = setup(); try { for (const [number, ref] of [[1, "WORK-001"], [10, "WORK-010"], [11, "WORK-011"], [999, "WORK-999"], [1000, "WORK-1000"]]) historyWork(recovered, ref, `123e4567-e89b-42d3-a456-42661417${String(number).padStart(4, "0")}`); historyWork(recovered, "WORK-001", "123e4567-e89b-42d3-a456-426614174999"); for (const ref of ["WORK-1", "WORK-01", "WORK-000", "WORK-0001", "WORK-0010", "WORK-+1", "WORK--1", "WORK-1.0", "WORK- 001", "WORK-001 ", "work-001", "WORK-09999"]) historyWork(recovered, ref, "123e4567-e89b-42d3-a456-426614174998"); git(recovered, ["commit", "--allow-empty", "-m", "arbitrary WORK-999\n\nNerv-Work: invalid\nNerv-Work-Ref: WORK-999"]); git(recovered, ["commit", "--allow-empty", "-m", "unpaired\n\nNerv-Work-Ref: WORK-998"]); git(recovered, ["commit", "--allow-empty", "-m", "malformed\n\nNerv-Work: 123e4567-e89b-42d3-a456-426614174000\nNerv-Work-Ref: WORK-000"]); rmSync(join(recovered, ".nerv"), { recursive: true, force: true }); run(recovered, ["init"]); const db = new Database(join(recovered, ".nerv/nerv.db"), { readOnly: true }); let seeded; try { seeded = db.prepare("SELECT value FROM metadata WHERE key='next_work_number'").get().value; } finally { db.close(); } const ref = materializedRef(recovered); assert(ref === "WORK-1001", `fresh state did not recover highest valid canonical HEAD trailer: ${ref}; seed ${seeded}`); } finally { rmSync(recovered, { recursive: true, force: true }); }
+test("Work refs are random UUID-derived uppercase 64-bit identifiers", () => {
+  const repo = setup();
+  try {
+    const first = materializedRef(repo);
+    assert(/^W-[0-9A-F]{16}$/.test(first), `invalid Work ref: ${first}`);
+    finish(repo, 1, "one.txt", first);
+    finish(repo, 2, "two.txt", first);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
-test("Work sequence persists locally and reconstructs reachable history", () => {
-  const allocated = setup(); try { const first = materializedRef(allocated); finish(allocated, 1, "one.txt", first); finish(allocated, 2, "two.txt", first); review(allocated, "PASS", [], first); run(allocated, ["close", first, "--message", "first"]); const second = materializedRef(allocated); finish(allocated, 1, "three.txt", second); finish(allocated, 2, "four.txt", second); review(allocated, "PASS", [], second); run(allocated, ["close", second, "--message", "second"]); assert(materializedRef(allocated) === "WORK-003", "persistent SQLite allocation did not continue through WORK-003"); } finally { rmSync(allocated, { recursive: true, force: true }); }
-  const repo = setup(); try { for (const file of [["one.txt", "two.txt"], ["three.txt", "four.txt"], ["five.txt", "six.txt"]]) { const ref = materializedRef(repo); finish(repo, 1, file[0], ref); finish(repo, 2, file[1], ref); review(repo, "PASS", [], ref); run(repo, ["close", ref, "--message", ref]); } rmSync(join(repo, ".nerv"), { recursive: true, force: true }); run(repo, ["init"]); assert(materializedRef(repo) === "WORK-004", "fresh local state did not continue after committed Work history"); } finally { rmSync(repo, { recursive: true, force: true }); }
-  const branchRepo = setup(); try { historyWork(branchRepo, "WORK-003"); const branch = git(branchRepo, ["branch", "--show-current"]).stdout.trim(); git(branchRepo, ["checkout", "-b", "other"]); historyWork(branchRepo, "WORK-999"); git(branchRepo, ["checkout", branch]); rmSync(join(branchRepo, ".nerv"), { recursive: true, force: true }); run(branchRepo, ["init"]); assert(materializedRef(branchRepo) === "WORK-004", "unreachable branch history affected sequence recovery"); } finally { rmSync(branchRepo, { recursive: true, force: true }); }
+test("Work refs do not depend on sequential history allocation", () => {
+  const repo = setup();
+  try {
+    const first = materializedRef(repo);
+    assert(first === currentRef(repo), "generated ref was not persisted");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+  const fresh = setup();
+  try {
+    const second = materializedRef(fresh);
+    assert(/^W-[0-9A-F]{16}$/.test(second) && second !== "W-0000000000000001", `ref retained sequential allocation: ${second}`);
+  } finally { rmSync(fresh, { recursive: true, force: true }); }
 });

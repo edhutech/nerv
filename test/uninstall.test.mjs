@@ -1,5 +1,5 @@
 import test from "node:test";
-import { Database, assert, existsSync, finish, fixtureEol, git, gitResult, join, materialize, remediation, readFileSync, root, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
+import { currentRef, Database, assert, existsSync, finish, git, gitResult, join, materialize, remediation, readFileSync, rmSync, review, run, setup, writeFileSync } from "./helpers.mjs";
 
 const managedPaths = ["AGENTS.md", "CLAUDE.md", ".agents/skills/nerv/SKILL.md", ".nerv-context/product.md", ".nerv-context/repo.md"];
 
@@ -49,53 +49,15 @@ test("uninstall strips only managed bridge blocks and preserves custom content",
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
-test("uninstall removes a supported historical Repo Context scaffold", () => {
-  const repo = setup(false);
-  const repository = join(repo, ".nerv-context/repo.md");
-  try {
-    const historical = fixtureEol(readFileSync(join(root, "test/fixtures/v0.2.0/repo.md"), "utf8"));
-    writeFileSync(repository, historical.lf);
-    run(repo, ["uninstall"]);
-    assert(!existsSync(repository), "uninstall retained a recognized historical LF Repo Context scaffold");
-    run(repo, ["init"]);
-    writeFileSync(repository, historical.crlf);
-    run(repo, ["uninstall"]);
-    assert(!existsSync(repository), "uninstall retained a recognized historical CRLF Repo Context scaffold");
-  } finally { rmSync(repo, { recursive: true, force: true }); }
-});
-
-test("uninstall removes a supported historical skill and preserves modified historical content", () => {
-  const repo = setup(false);
-  const skill = join(repo, ".agents/skills/nerv/SKILL.md");
-  try {
-    const fixture = readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8");
-    const historical = fixtureEol(fixture);
-    writeFileSync(skill, historical.lf);
-    run(repo, ["uninstall"]);
-    assert(!existsSync(skill), "uninstall retained a recognized historical LF skill");
-
-    run(repo, ["init"]);
-    writeFileSync(skill, historical.crlf);
-    run(repo, ["uninstall"]);
-    assert(!existsSync(skill), "uninstall retained a recognized historical CRLF skill");
-
-    run(repo, ["init"]);
-    writeFileSync(skill, `${historical.crlf}\r\nDeveloper change.\r\n`);
-    run(repo, ["uninstall"]);
-    assert(readFileSync(skill, "utf8").includes("Developer change."), "uninstall removed modified historical content");
-  } finally { rmSync(repo, { recursive: true, force: true }); }
-});
-
 test("uninstall fails closed when local state is absent but repository setup remains", () => {
   const repo = setup(false);
   try {
     rmSync(join(repo, ".nerv"), { recursive: true, force: true });
     const result = run(repo, ["uninstall"], 1);
     assert(result.includes(".nerv is absent") && existsSync(join(repo, ".agents/skills/nerv/SKILL.md")), "uninstall bypassed missing-state safety");
-    const historical = fixtureEol(readFileSync(join(root, "test/fixtures/v0.2.0/SKILL.md"), "utf8"));
-    writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), historical.lf);
+    writeFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "Historical custom skill\n");
     run(repo, ["init"]);
-    assert(readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8") === readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8"), "init could not classify setup after local state recreation");
+    assert(readFileSync(join(repo, ".agents/skills/nerv/SKILL.md"), "utf8") === "Historical custom skill\n", "init overwrote unknown setup content after local state recreation");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
@@ -128,7 +90,7 @@ test("uninstall refuses every unresolved Work state before mutation", () => {
       }
       const before = readFileSync(join(repo, ".nerv/nerv.db"));
       const result = run(repo, ["uninstall"], 1);
-      assert(result.includes(`WORK-001 (${state})`), `uninstall did not identify ${state} Work`);
+      assert(result.includes(`${currentRef(repo)} (${state})`), `uninstall did not identify ${state} Work`);
       assert(existsSync(join(repo, ".nerv/nerv.db")) && readFileSync(join(repo, ".nerv/nerv.db")).equals(before), `${state} Work uninstall mutated local state`);
       for (const path of managedPaths) assert(existsSync(join(repo, path)), `${state} Work uninstall removed ${path}`);
     } finally { rmSync(repo, { recursive: true, force: true }); }

@@ -3,12 +3,10 @@ import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { hasRequiredSchema, initializeDatabase, UNSUPPORTED_SCHEMA } from "./database.js";
-import { workRef } from "./repository.js";
-import { bridgeBlock, bridgeContent, exactSingleBridge, knownIdentity, normalizedText } from "./managed-artifacts.js";
+import { bridgeBlock, bridgeContent, exactSingleBridge, knownIdentity } from "./managed-artifacts.js";
 
 const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
 export const AGENTS_BRIDGE = bridgeContent("agents");
-const LEGACY_AGENTS_BRIDGE = "# Agent Instructions\n\nFor Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.\n";
 export const NERV_EXCLUDE_BLOCK = "# Nerv local state (managed)\n.nerv/\n# End Nerv local state\n";
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 export type SetupStatus = { path: string; established: boolean };
@@ -42,7 +40,7 @@ export function ensureWorkspace(repoRoot: string): WorkspaceStatus & { messages:
   const databasePath = join(repoRoot, ".nerv", "nerv.db");
   if (existsSync(databasePath) && !hasRequiredSchema(databasePath)) throw new Error(UNSUPPORTED_SCHEMA);
   for (const dir of DIRS) mkdirSync(join(repoRoot, dir), { recursive: true });
-  initializeDatabase(databasePath, existsSync(databasePath) ? undefined : nextWorkNumber(repoRoot));
+  initializeDatabase(databasePath);
   ensureLocalExclude(repoRoot);
   const messages = [ensurePublicSkill(repoRoot), ensureAgentsBridge(repoRoot), ensureClaudeBridge(repoRoot)].filter((message): message is string => Boolean(message));
   ensureSharedContext(repoRoot);
@@ -125,7 +123,7 @@ function removeManagedFile(repoRoot: string, relativePath: string, managed: stri
     return;
   }
   const content = readFileSync(path, "utf8");
-  const identity = relativePath === "AGENTS.md" && normalizedText(content) === normalizedText(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, content);
+  const identity = knownIdentity(relativePath, content);
   if (identity !== "unknown") {
     rmSync(path);
     removed.push(relativePath);
@@ -187,23 +185,6 @@ function ensureSharedContext(repoRoot: string): void {
 }
 function git(repoRoot: string, args: string[]): string { return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim(); }
 function gitSucceeds(repoRoot: string, args: string[]): boolean { try { git(repoRoot, args); return true; } catch { return false; } }
-function nextWorkNumber(repoRoot: string): number {
-  let entries: string[];
-  try {
-    entries = (execFileSync("git", ["log", "-z", "--format=%(trailers:key=Nerv-Work,valueonly,unfold=true)%x00%(trailers:key=Nerv-Work-Ref,valueonly,unfold=true)", "HEAD"], { cwd: repoRoot, encoding: "buffer", stdio: ["ignore", "pipe", "pipe"] }) as Buffer).toString("utf8").split("\0");
-  } catch { return 1; }
-  let highest = 0;
-  for (let index = 0; index + 1 < entries.length; index += 2) {
-    const ids = entries[index].split("\n").filter(Boolean);
-    const refs = entries[index + 1].split("\n").filter(Boolean);
-    if (ids.length !== 1 || refs.length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ids[0])) continue;
-    const match = /^WORK-([0-9]+)$/.exec(refs[0]);
-    if (!match) continue;
-    const value = Number(match[1]);
-    if (Number.isSafeInteger(value) && value > 0 && workRef(value) === refs[0]) highest = Math.max(highest, value);
-  }
-  return highest + 1;
-}
 export function ensureLocalExclude(repoRoot: string): void {
   const path = localExcludePath(repoRoot);
   mkdirSync(dirname(path), { recursive: true });
@@ -242,11 +223,7 @@ function ensureManagedFile(destination: string, packaged: string, relativePath: 
   const installed = readFileSync(destination, "utf8");
   const identity = knownIdentity(relativePath, installed);
   if (identity === "current") return `${label} already current.`;
-  if (identity === "legacy") {
-    writeFileSync(destination, packaged);
-    return `${label} upgraded from a supported Nerv-managed version.`;
-  }
-  return `${label} preserved at ${destination}; ownership is not established.`;
+   return `${label} preserved at ${destination}; ownership is not established.`;
 }
 function ensureDiscoveryBridge(destination: string, label: string): string | undefined {
   if (!existsSync(destination)) {
@@ -268,8 +245,8 @@ function ensureDiscoveryBridge(destination: string, label: string): string | und
     return `${label} could not be safely established at ${destination}; an incomplete Nerv bridge was preserved.`;
   }
   const relativePath = destination.endsWith("AGENTS.md") ? "AGENTS.md" : "CLAUDE.md";
-  const identity = relativePath === "AGENTS.md" && normalizedText(installed) === normalizedText(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, installed);
-  if (identity === "current" || identity === "legacy") {
+  const identity = knownIdentity(relativePath, installed);
+   if (identity === "current") {
     writeFileSync(destination, bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude"));
     return `${label} upgraded to an owned bridge block.`;
   }
