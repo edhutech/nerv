@@ -40,7 +40,13 @@ export function fixtureEol(text) {
 export function run(cwd, args, expected = 0, env = {}) {
   const databasePath = join(cwd, ".nerv/nerv.db");
   let current;
-  try { const db = new Database(databasePath, { readOnly: true }); current = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref; db.close(); } catch {}
+  let db;
+  try {
+    db = new Database(databasePath, { readOnly: true });
+    current = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref;
+  } catch {} finally {
+    db?.close();
+  }
   const translated = current ? args.map((arg) => typeof arg === "string" ? arg.replaceAll("WORK-001", current) : arg) : args;
   const result = runCommand(process.execPath, [cli, ...translated], { cwd, env, expectedStatus: expected });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
@@ -119,8 +125,25 @@ export const plan = (title = "Persist plan") => ({ title, intent: "approved inte
 export const minimalPlan = (title = "Minimal plan") => ({ title, goal: "approved goal", scope: "approved scope", acceptance_criteria: "contract persists", validation: "pnpm test", tasks: [{ title: "Persist fields", objective: "Store the plan", acceptance_criteria: "fields round trip", validation: "pnpm test" }] });
 export function materialize(repo, value = plan()) { return /Stable ID: ([0-9a-f-]{36})/.exec(run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]))?.[1]; }
 export function materializedRef(repo, value = plan()) { return /Materialized (W-[0-9A-F]+)/.exec(run(repo, ["work", "materialize", "--plan", JSON.stringify(value)]))?.[1]; }
-export function activeContextPath(repo) { const db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true }); const ref = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref; db.close(); return join(repo, ".nerv/agent/active", `${ref}.md`); }
-export function currentRef(repo) { const db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true }); const ref = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref; db.close(); return ref; }
+export function activeContextPath(repo) {
+  let db;
+  try {
+    db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true });
+    const ref = db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref;
+    return join(repo, ".nerv/agent/active", `${ref}.md`);
+  } finally {
+    db?.close();
+  }
+}
+export function currentRef(repo) {
+  let db;
+  try {
+    db = new Database(join(repo, ".nerv/nerv.db"), { readOnly: true });
+    return db.prepare("SELECT ref FROM work_items WHERE status <> 'closed' LIMIT 1").get()?.ref;
+  } finally {
+    db?.close();
+  }
+}
 export function finish(repo, position, file, ref = currentRef(repo)) { writeFileSync(join(repo, file), "feature\n"); run(repo, ["work", "task", "done", ref, String(position), "--evidence", "targeted passed", "--files", file]); }
 export function review(repo, outcome, extra = [], ref = currentRef(repo)) { return run(repo, ["review", ref, "--outcome", outcome, "--summary", "complete", "--validation-evidence", "full", ...extra]); }
 export function historyWork(repo, ref, id = "123e4567-e89b-42d3-a456-426614174000") { git(repo, ["commit", "--allow-empty", "-m", `history\n\nNerv-Work: ${id}\nNerv-Work-Ref: ${ref}`]); }
