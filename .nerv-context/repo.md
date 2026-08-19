@@ -22,7 +22,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 
 - Use NodeNext TypeScript with `.js` local import specifiers.
 - Use `pnpm`; the complete verification gate is `pnpm validate`.
-- For self-development CLI execution, use `pnpm cli -- <arguments>`; it rebuilds and runs the current repository `dist/index.js` without PATH-based `nerv` resolution.
+- For Nerv self-development CLI execution, always use `pnpm cli -- <arguments>` for repository runtime commands; it rebuilds and runs the current repository `dist/index.js` without PATH-based `nerv` resolution. Never invoke a globally installed `nerv` for self-development.
 - Public package identity is `@edhutech/nerv`; the installed CLI binary remains `nerv`.
 - Support Node.js `>=22.14.0 <23` or `>=24.11.0 <25`. Package builds run through `prepack`; `pnpm test:package` validates the generated tarball in an isolated installation.
 - Nerv commits use Conventional Commit subjects; this is repository authority, not runtime policy.

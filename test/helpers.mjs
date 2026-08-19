@@ -33,8 +33,11 @@ export function runCommand(command, args = [], { expectedStatus = 0, ...options 
   if (result.error || result.status !== expectedStatus) throw new Error(processDetails(command, args, options, result));
   return result;
 }
+export function normalizeLineEndings(text) {
+  return text.replace(/\r\n?/g, "\n");
+}
 export function fixtureEol(text) {
-  const lf = text.replace(/\r\n?/g, "\n");
+  const lf = normalizeLineEndings(text);
   return { lf, crlf: lf.replaceAll("\n", "\r\n") };
 }
 export function run(cwd, args, expected = 0, env = {}) {

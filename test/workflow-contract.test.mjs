@@ -3,6 +3,18 @@ import { assert, join, readFileSync } from "./helpers.mjs";
 
 const skill = readFileSync(join(process.cwd(), ".agents/skills/nerv/SKILL.md"), "utf8");
 const repoContext = readFileSync(join(process.cwd(), ".nerv-context/repo.md"), "utf8");
+const contributing = readFileSync(join(process.cwd(), "CONTRIBUTING.md"), "utf8");
+const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+
+test("self-development uses the repository-local CLI instead of a global binary", () => {
+  assert(repoContext.includes("For Nerv self-development CLI execution, always use `pnpm cli -- <arguments>`"), "Repo Context does not require the repository-local self-development CLI");
+  assert(repoContext.includes("without PATH-based `nerv` resolution"), "Repo Context does not establish PATH isolation");
+  assert(repoContext.includes("Never invoke a globally installed `nerv` for self-development"), "Repo Context does not prohibit stale global CLI usage");
+  assert(contributing.includes("For Nerv's own CLI, always use `pnpm cli -- <arguments>`"), "Contributing guidance does not require the repository-local CLI");
+  assert(contributing.includes("do not use a globally installed `nerv` or `pnpm exec nerv`"), "Contributing guidance does not prohibit global CLI usage");
+  assert(repoContext.includes("Public package identity is `@edhutech/nerv`; the installed CLI binary remains `nerv`"), "Repo Context does not distinguish installed-user CLI identity");
+  assert(/\bnerv init\b/.test(readme) && /\bnerv uninstall\b/.test(readme) && !readme.includes("pnpm cli --"), "README installed-user examples were changed to self-development commands");
+});
 
 test("public workflow contract governs context enrichment, outcome review, tool composition, and presentation", () => {
   for (const expected of [
