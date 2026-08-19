@@ -23,3 +23,7 @@
 
 - Regression tests create temporary Git repos and initialized `.nerv/` workspaces; never hard-code paths outside the temporary repo.
 - Active Work Item Markdown belongs under `.nerv/agent/active/` and is temporary. Assert its creation, synchronization, and removal where relevant.
+
+<!-- Nerv managed discovery bridge -->
+For Nerv-governed work, read `.agents/skills/nerv/SKILL.md` and follow it.
+<!-- End Nerv managed discovery bridge -->
