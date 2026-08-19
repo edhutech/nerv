@@ -2,7 +2,7 @@
 
 ## Commands
 
-- Use `pnpm` (the pinned package manager is `pnpm@10.33.4`) with Node.js 22 or 24.
+- Use `pnpm` (the pinned package manager is `pnpm@10.33.4`) with Node.js `>=22.14.0 <23` or `>=24.11.0 <25`.
 - Run `pnpm validate` for full verification; its required order is build, typecheck, then test.
 - `pnpm test` exercises built `dist/index.js`; run `pnpm build` first when invoking it alone.
 - There is intentionally no `lint` script.

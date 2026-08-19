@@ -164,7 +164,7 @@ test("REWORK presentation is structured, durable, and approval-oriented", () => 
     "### Scope continuity",
     "persisted remediation remains within the approved Work boundary",
     "latest Review outcome/findings/validation evidence",
-    "Do not rely on conversation history or invent rationale, evidence, acceptance criteria, or scope facts",
+     "Do not rely on conversation history or invent rationale, evidence, acceptance criteria, or scope facts",
     "A REWORK response has exactly one final handoff: `Recommended next action: approve`",
     "never recommend Task execution",
   ]) assert(skill.includes(expected), `REWORK presentation contract omitted: ${expected}`);

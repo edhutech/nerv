@@ -13,6 +13,22 @@ test("Close requires PASS review", () => {
   }
 });
 
+test("closed Work status is terminal and has no lifecycle recommendation", () => {
+  const repo = setup();
+  try {
+    materialize(repo);
+    finish(repo, 1, "one.txt");
+    finish(repo, 2, "two.txt");
+    review(repo, "PASS");
+    const closed = run(repo, ["close", "WORK-001", "--message", "close"]);
+    assert(closed.includes("Closed Work is terminal") && closed.includes("No further Nerv lifecycle operation is required"), "close output did not state terminal behavior");
+    const status = run(repo, ["work", "status", "WORK-001"]);
+    assert(status.includes("State: closed") && status.includes("Terminal: no further Nerv lifecycle operation is required") && !status.includes("Recommended next action"), "closed status exposed a fake next lifecycle action");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test("materialization keeps Task progression operational for one and multiple Tasks", () => {
   for (const value of [minimalPlan("One Task"), plan("Multiple Tasks")]) {
     const repo = setup();

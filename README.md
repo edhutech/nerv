@@ -17,16 +17,18 @@ Nerv does not launch, control, or require a particular agent or model. It gives 
 npm install --global @edhutech/nerv
 ```
 
-Nerv supports Node.js 22 and 24 LTS and requires Git. The installed command is `nerv`; you do not need to clone this repository or install pnpm.
+Nerv supports Node.js `>=22.14.0 <23` or `>=24.11.0 <25` and requires Git. The installed command is `nerv`; you do not need to clone this repository or install pnpm.
 
 In the Git repository you want Nerv to govern, initialize and commit its tracked setup:
 
 ```bash
 cd path/to/repository
 nerv init
-git add AGENTS.md CLAUDE.md .agents/skills/nerv/SKILL.md .nerv-context/product.md .nerv-context/repo.md
+git add .agents/skills/nerv/SKILL.md .nerv-context/product.md .nerv-context/repo.md
 git commit -m "Establish Nerv setup"
 ```
+
+`AGENTS.md` and `CLAUDE.md` are discovery bridges. `nerv init` preserves developer-owned or modified bridge content, and they are not required canonical setup paths. Review and stage bridge changes separately only when you intend to commit them.
 
 To remove Nerv from this repository without removing the global CLI:
 

@@ -130,7 +130,7 @@ export function assertProtectedBaseline(root: string, baseline: GitBaseline): vo
     throw new Error("Baseline-dirty paths changed during this Work; Nerv cannot establish the reviewed boundary.");
   }
 }
-export function assertAttributionComplete(root: string, baseline: GitBaseline, paths: string[]): void {
+function assertAttributionComplete(root: string, baseline: GitBaseline, paths: string[]): void {
   const owned = new Set(paths.map((path) => canonicalPath(root, path)));
   const protectedPaths = new Set(baseline.protected_paths);
   const unattributed = workingPaths(root, baseline.head).filter((path) => !protectedPaths.has(path) && !owned.has(path));

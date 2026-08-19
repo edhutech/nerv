@@ -24,10 +24,10 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 - Use `pnpm`; the complete verification gate is `pnpm validate`.
 - For self-development CLI execution, use `pnpm cli -- <arguments>`; it rebuilds and runs the current repository `dist/index.js` without PATH-based `nerv` resolution.
 - Public package identity is `@edhutech/nerv`; the installed CLI binary remains `nerv`.
-- Support Node.js 22 and 24 LTS. Package builds run through `prepack`; `pnpm test:package` validates the generated tarball in an isolated installation.
+- Support Node.js `>=22.14.0 <23` or `>=24.11.0 <25`. Package builds run through `prepack`; `pnpm test:package` validates the generated tarball in an isolated installation.
 - Nerv commits use Conventional Commit subjects; this is repository authority, not runtime policy.
 - OpenCode, Codex, and Cursor natively discover `AGENTS.md` and `.agents/skills`; Claude Code uses its optional bridge. No host affects runtime state or lifecycle.
-- `.github/workflows/ci.yml` uses read-only SHA-pinned GitHub Actions for Linux Node 22/24, macOS Node 24, and Windows Node 24. It runs package E2E once on Linux Node 24 and never publishes.
+- `.github/workflows/ci.yml` uses read-only SHA-pinned GitHub Actions for Node 22.14.0 and 24.11.0 minimums on Linux, Node 24.19.0 on macOS and Windows, and package E2E once on Linux Node 24.11.0. It never publishes.
 - `README.md` is the developer landing page; detailed product documentation belongs to a future dedicated documentation experience, while this repository keeps onboarding and maintenance material close to the code.
 - `.github/workflows/publish.yml` publishes only from a published GitHub Release, after package validation, through npm Trusted Publishing with OIDC and provenance. npmjs.com is the public registry.
 - Do not edit generated `dist/` or local `.nerv/` state directly.

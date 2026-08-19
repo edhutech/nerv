@@ -12,7 +12,7 @@ For substantial changes, describe the problem and intended boundary before imple
 
 ## Development
 
-Nerv uses Node.js 22 or 24 and pnpm.
+Nerv supports Node.js `>=22.14.0 <23` or `>=24.11.0 <25` and uses pnpm.
 
 For Nerv's own CLI, use `pnpm cli -- <arguments>`. It rebuilds the repository and runs the current local `dist/index.js`; do not use `pnpm exec nerv` to validate source-tree changes.
 

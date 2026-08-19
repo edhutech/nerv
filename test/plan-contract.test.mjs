@@ -34,7 +34,7 @@ test("materialize help exposes a parser-valid typed plan contract", () => {
       "Required tasks field: non-empty array of Task objects.",
       "Task object required string fields: title, objective, acceptance_criteria, validation.",
       "Optional Task string fields: implementation_approach, expected_touchpoints.",
-      JSON.stringify(example),
+       JSON.stringify({ ...example, tasks: example.tasks }),
     ]) assert(help.includes(expected), `materialize help omitted ${expected}`);
     materialize(repo, example);
     assert(run(repo, ["work", "show", "WORK-001"]).includes("Add status"), "documented materialize example was not accepted");
@@ -45,14 +45,14 @@ test("materialize help exposes a parser-valid typed plan contract", () => {
 
 test("review help exposes and accepts the parser-valid findings contract", () => {
   const repo = setup();
-  const example = JSON.stringify([{ severity: "high", finding: "Describe the blocking issue" }]);
+  const example = JSON.stringify([{ severity: "high", issue: "Describe the blocking issue", why_blocks_pass: "The approved outcome is not met.", evidence: "Relevant validation or review evidence.", affected_work_criterion: "The affected Work acceptance criterion." }]);
   try {
     const help = run(repo, ["review", "--help"]);
     for (const expected of [
       "Optional non-empty JSON array of finding objects.",
-      "Required finding fields: severity, finding.",
+       "Required finding fields: severity, issue, why_blocks_pass, evidence, affected_work_criterion.",
       "severity must be one of: critical, high, medium, low.",
-      "Optional field: accepted_as_residual_risk (boolean; true only for medium findings).",
+       "Optional fields: medium_residual_risk_decision (required for medium findings); accepted_as_residual_risk (boolean; true only for medium findings).",
       example,
     ]) assert(help.includes(expected), `review help omitted ${expected}`);
     materialize(repo);

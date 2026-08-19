@@ -14,7 +14,7 @@ export function textIdentity(value: string): string {
 // Legacy entries are supported public release boundaries, not arbitrary Git revisions.
 export const MANAGED_IDENTITIES: Record<string, { current: string; legacy: readonly string[] }> = {
   ".agents/skills/nerv/SKILL.md": {
-    current: "0c88ecb8b3c9c618f8b5e23f1395b8fb7f03b80eeae58bf472c464f642fa8511",
+    current: "296e46ef6db41a8011e35147cff3a367b8d098bf84a6e754915c8ebc9cc05fa2",
     legacy: ["cdd6d96370ce7e6af5af627249c694478ac0115d816e5909079a790d7fc126bd"],
   },
   "CLAUDE.md": { current: "08c99e7cb82cc9a0520a8b3195f9583f6acc0089c6e84340fb36e5be0e4dbff5", legacy: ["baf0ecc33ac0416d1cabf88d3c3b63b06695722fe3a144c8bd9f99c64e08a26f"] },

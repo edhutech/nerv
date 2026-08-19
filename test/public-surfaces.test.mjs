@@ -10,7 +10,9 @@ test("README provides a concise documented onboarding path", () => {
   assert.match(readme, /npm install --global @edhutech\/nerv/);
   assert.match(readme, /nerv uninstall/);
   assert.match(readme, /npm uninstall -g @edhutech\/nerv/);
-  assert.match(readme, /Node\.js 22 and 24 LTS/);
+   assert.match(readme, /Node\.js `>=22\.14\.0 <23` or `>=24\.11\.0 <25`/);
+   assert.match(readme, /git add \.agents\/skills\/nerv\/SKILL\.md \.nerv-context\/product\.md \.nerv-context\/repo\.md/);
+   assert.doesNotMatch(readme, /git add AGENTS\.md CLAUDE\.md/);
   assert.match(readme, /request -> Plan -> approve -> automatic execution -> review -> close/);
   assert.match(readme, /hands off `review`/);
   assert.match(readme, /OpenCode, Codex, Cursor, and Claude Code/);
