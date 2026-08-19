@@ -1,12 +1,13 @@
 import { accessSync, chmodSync, constants, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { delimiter, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync as Database } from "node:sqlite";
+import crossSpawn from "cross-spawn";
 import { openRepository } from "../dist/repository.js";
 
-export { chmodSync, Database, existsSync, join, mkdirSync, mkdtempSync, openRepository, readFileSync, rmSync, spawnSync, symlinkSync, tmpdir, writeFileSync };
+export { chmodSync, Database, existsSync, join, mkdirSync, mkdtempSync, nodeSpawnSync as spawnSync, openRepository, readFileSync, rmSync, symlinkSync, tmpdir, writeFileSync };
 
 export const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const cli = join(root, "dist/index.js");
@@ -18,12 +19,6 @@ export function childEnv(overrides = {}) {
   for (const key of Object.keys(overrides)) for (const existing of Object.keys(environment)) if (existing.toLowerCase() === key.toLowerCase()) delete environment[existing];
   return { ...environment, ...overrides };
 }
-function commandInvocation(command, args) {
-  if (process.platform !== "win32" || !/\.(?:cmd|bat)$/i.test(command)) return { command, args };
-  const quote = (value) => `"${String(value).replace(/(["^&|<>()])/g, "^$1").replace(/%/g, "%%")}"`;
-  const commandLine = [command, ...args].map(quote).join(" ");
-  return { command: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", `"${commandLine}"`], windowsVerbatimArguments: true };
-}
 function processDetails(command, args, options, result) {
   return `${command} ${args.join(" ")} failed\n` +
     `cwd: ${options.cwd ?? process.cwd()}\n` +
@@ -34,8 +29,7 @@ function processDetails(command, args, options, result) {
     `stderr:\n${result.stderr ?? ""}`;
 }
 export function runCommand(command, args = [], { expectedStatus = 0, ...options } = {}) {
-  const invocation = commandInvocation(command, args);
-  const result = spawnSync(invocation.command, invocation.args, { ...options, windowsVerbatimArguments: invocation.windowsVerbatimArguments, encoding: options.encoding ?? "utf8", env: childEnv(options.env) });
+  const result = crossSpawn.sync(command, args, { ...options, encoding: options.encoding ?? "utf8", env: childEnv(options.env) });
   if (result.error || result.status !== expectedStatus) throw new Error(processDetails(command, args, options, result));
   return result;
 }
@@ -48,7 +42,7 @@ export function run(cwd, args, expected = 0, env = {}) {
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   return output;
 }
-export function gitResult(cwd, args, env = {}) { return spawnSync("git", args, { cwd, encoding: "utf8", env: childEnv(env) }); }
+export function gitResult(cwd, args, env = {}) { return nodeSpawnSync("git", args, { cwd, encoding: "utf8", env: childEnv(env) }); }
 export function git(cwd, args, env = {}) {
   const result = gitResult(cwd, args, env);
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed with status ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);

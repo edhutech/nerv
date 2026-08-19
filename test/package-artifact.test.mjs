@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { runCommand } from "./helpers.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const npm = "npm";
 const expectedFiles = [
   ".agents/skills/nerv/SKILL.md",
   "CLAUDE.md",
@@ -50,6 +50,8 @@ test("CI package scripts resolve from tracked source", () => {
   assert.equal(packageJson.scripts.cli, "pnpm build && node scripts/cli.mjs");
   assert.match(readFileSync(join(root, ".nerv-context/repo.md"), "utf8"), /pnpm cli -- <arguments>/);
   assert.equal(packageJson.dependencies?.["better-sqlite3"], undefined);
+  assert.equal(packageJson.dependencies?.["cross-spawn"], undefined);
+  assert.equal(packageJson.devDependencies?.["cross-spawn"], "7.0.6");
   assert.equal(packageJson.devDependencies?.["@types/better-sqlite3"], undefined);
   assert.equal(packageJson.pnpm?.onlyBuiltDependencies?.includes("better-sqlite3"), undefined);
 });
@@ -86,7 +88,7 @@ test("local cli script ignores PATH nerv and runs the repository build", () => {
     const fake = join(temp, process.platform === "win32" ? "nerv.cmd" : "nerv");
     writeFileSync(fake, process.platform === "win32" ? "@echo FAKE_GLOBAL_NERV\r\n" : "#!/bin/sh\nprintf FAKE_GLOBAL_NERV\n");
     if (process.platform !== "win32") chmodSync(fake, 0o755);
-    const result = runCommand(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["cli", "--", "--help"], { cwd: root, env: { PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
+    const result = runCommand("pnpm", ["cli", "--", "--help"], { cwd: root, env: { PATH: `${temp}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`, npm_config_update_notifier: "false" } });
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.match(output, /Usage: nerv/);
     assert.doesNotMatch(output, /FAKE_GLOBAL_NERV/);
@@ -122,7 +124,7 @@ test("packed artifact has the exact public surface and runs in isolation", { ski
     execFileSync("git", ["add", "README.md"], { cwd: repo });
     execFileSync("git", ["commit", "-m", "initial"], { cwd: repo });
 
-    const binary = join(temp, "node_modules", ".bin", process.platform === "win32" ? "nerv.cmd" : "nerv");
+    const binary = join(temp, "node_modules", ".bin", "nerv");
     assert.equal(run(binary, ["--version"], repo).trim(), packed.version);
     assert.match(run(binary, ["--help"], repo), /Usage: nerv/);
     assert.match(run(binary, ["uninstall", "--help"], repo), /does not uninstall the global npm package/);
