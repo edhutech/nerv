@@ -55,7 +55,7 @@ test("tasks activate and progress automatically through rework", () => {
   }
 });
 
-test("blank Task and Review evidence fail without lifecycle mutation", () => {
+test("blank Task, Review, and Checkpoint evidence fail without lifecycle mutation", () => {
   const repo = setup();
   const dbPath = join(repo, ".nerv/nerv.db");
   const snapshot = () => {
@@ -64,6 +64,7 @@ test("blank Task and Review evidence fail without lifecycle mutation", () => {
       work: db.prepare("SELECT status, validation_evidence FROM work_items WHERE ref='WORK-001'").get(),
       tasks: db.prepare("SELECT position, status, validation_evidence, attribution_json FROM tasks WHERE work_item_id=(SELECT id FROM work_items WHERE ref='WORK-001') ORDER BY position").all(),
       reviews: db.prepare("SELECT COUNT(*) AS count FROM work_reviews").get(),
+      checkpoints: db.prepare("SELECT COUNT(*) AS count FROM checkpoints").get(),
     };
     db.close();
     return value;
@@ -76,12 +77,28 @@ test("blank Task and Review evidence fail without lifecycle mutation", () => {
     assert(run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "   "], 1).includes("must be non-empty"), "blank Task evidence was accepted");
     assert(JSON.stringify(snapshot()) === JSON.stringify(beforeTask) && readFileSync(activePath, "utf8") === activeBeforeTask, "blank Task evidence mutated lifecycle state");
 
+    const beforeCheckpoint = snapshot();
+    const activeBeforeCheckpoint = readFileSync(activePath, "utf8");
+    assert(run(repo, ["checkpoint", "WORK-001", "--summary", "   "], 1).includes("must be non-empty"), "blank Checkpoint summary was accepted");
+    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeCheckpoint) && readFileSync(activePath, "utf8") === activeBeforeCheckpoint, "blank Checkpoint summary mutated lifecycle state");
+    assert(run(repo, ["checkpoint", "WORK-001", "--summary", "\t\r\n"], 1).includes("must be non-empty"), "whitespace-only Checkpoint summary was accepted");
+    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeCheckpoint) && readFileSync(activePath, "utf8") === activeBeforeCheckpoint, "whitespace-only Checkpoint summary mutated lifecycle state");
+
     finish(repo, 1, "one.txt");
     finish(repo, 2, "two.txt");
     const beforeReview = snapshot();
     const activeBeforeReview = readFileSync(activePath, "utf8");
-    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "empty", "--validation-evidence", "\t"], 1).includes("must be non-empty"), "blank Review evidence was accepted");
-    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeReview) && readFileSync(activePath, "utf8") === activeBeforeReview, "blank Review evidence mutated lifecycle state");
+    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", "", "--validation-evidence", "full"], 1).includes("must be non-empty"), "blank Review summary was accepted");
+    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeReview) && readFileSync(activePath, "utf8") === activeBeforeReview, "blank Review summary mutated lifecycle state");
+    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", " \t\r\n", "--validation-evidence", "full"], 1).includes("must be non-empty"), "whitespace-only Review summary was accepted");
+    assert(JSON.stringify(snapshot()) === JSON.stringify(beforeReview) && readFileSync(activePath, "utf8") === activeBeforeReview, "whitespace-only Review summary mutated lifecycle state");
+
+    run(repo, ["checkpoint", "WORK-001", "--summary", " valid checkpoint "]);
+    const checkpoint = snapshot();
+    assert(checkpoint.checkpoints.count === 1, "valid Checkpoint summary was not persisted");
+    assert(run(repo, ["work", "show", "WORK-001"]).includes("Summary: valid checkpoint"), "valid Checkpoint summary was not trimmed and shown");
+    assert(run(repo, ["review", "WORK-001", "--outcome", "PASS", "--summary", " valid review ", "--validation-evidence", "full"]).includes("PASS"), "valid Review summary was rejected");
+    assert(run(repo, ["work", "show", "WORK-001"]).includes("Summary: valid review"), "valid Review summary was not trimmed and shown");
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }

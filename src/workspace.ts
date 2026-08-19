@@ -58,14 +58,13 @@ export function uninstallWorkspace(repoRoot: string): UninstallResult {
   }
   const removed: string[] = [];
   const preserved: string[] = [];
-  const packagedSkill = readFileSync(new URL("../.agents/skills/nerv/SKILL.md", import.meta.url), "utf8");
   const packagedClaude = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
 
-  removeManagedFile(repoRoot, ".agents/skills/nerv/SKILL.md", packagedSkill, "Public Nerv skill", removed, preserved);
-  removeManagedFile(repoRoot, "AGENTS.md", AGENTS_BRIDGE, "Agent discovery bridge", removed, preserved, true);
-  removeManagedFile(repoRoot, "CLAUDE.md", packagedClaude, "Claude Code bridge", removed, preserved, true);
-  removeManagedFile(repoRoot, ".nerv-context/product.md", CANONICAL_CONTEXT_SCAFFOLDS.product, "Product Context scaffold", removed, preserved);
-  removeManagedFile(repoRoot, ".nerv-context/repo.md", CANONICAL_CONTEXT_SCAFFOLDS.repo, "Repo Context scaffold", removed, preserved);
+  removeManagedFile(repoRoot, ".agents/skills/nerv/SKILL.md", undefined, "Public Nerv skill", removed, preserved);
+  removeManagedFile(repoRoot, "AGENTS.md", AGENTS_BRIDGE, "Agent discovery bridge", removed, preserved);
+  removeManagedFile(repoRoot, "CLAUDE.md", packagedClaude, "Claude Code bridge", removed, preserved);
+  removeManagedFile(repoRoot, ".nerv-context/product.md", undefined, "Product Context scaffold", removed, preserved);
+  removeManagedFile(repoRoot, ".nerv-context/repo.md", undefined, "Repo Context scaffold", removed, preserved);
   removeManagedExclude(repoRoot, removed);
 
   if (inspection.present) {
@@ -118,7 +117,7 @@ function inspectWorkspaceForUninstall(repoRoot: string): { present: boolean } {
   }
 }
 
-function removeManagedFile(repoRoot: string, relativePath: string, managed: string, label: string, removed: string[], preserved: string[], allowEmbedded = false): void {
+function removeManagedFile(repoRoot: string, relativePath: string, managed: string | undefined, label: string, removed: string[], preserved: string[]): void {
   const path = join(repoRoot, relativePath);
   if (!existsSync(path)) return;
   if (!isRegularFile(path)) {
@@ -127,17 +126,12 @@ function removeManagedFile(repoRoot: string, relativePath: string, managed: stri
   }
   const content = readFileSync(path, "utf8");
   const identity = relativePath === "AGENTS.md" && normalizedText(content) === normalizedText(LEGACY_AGENTS_BRIDGE) ? "legacy" : knownIdentity(relativePath, content);
-  if (identity !== "unknown" && relativePath !== "AGENTS.md" && relativePath !== "CLAUDE.md") {
+  if (identity !== "unknown") {
     rmSync(path);
     removed.push(relativePath);
     return;
   }
-  if ((relativePath === "AGENTS.md" || relativePath === "CLAUDE.md") && identity !== "unknown") {
-    rmSync(path);
-    removed.push(relativePath);
-    return;
-  }
-  if (allowEmbedded) {
+  if (managed !== undefined) {
     const crlf = managed.replaceAll("\n", "\r\n");
     const owned = bridgeBlock(content);
     const expected = relativePath === "AGENTS.md" ? AGENTS_BRIDGE : bridgeContent("claude");

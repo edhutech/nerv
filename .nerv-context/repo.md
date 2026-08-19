@@ -15,7 +15,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 ## Important paths
 
 - `.agents/skills/nerv/SKILL.md`: managed public Nerv skill.
-- `AGENTS.md` and `CLAUDE.md`: optional minimal discovery bridges, created only when absent; uninstall removes only exact Nerv-managed content and preserves custom content.
+- `AGENTS.md` and `CLAUDE.md`: discovery bridges established when absent; Nerv may append a delimited managed bridge beside custom instructions, upgrades recognized managed or legacy bridges, preserves ambiguous or modified developer content, and uninstall removes only owned bridge content.
 - `test/`: focused built-CLI regression coverage in temporary Git repositories.
 
 ## Development rules
