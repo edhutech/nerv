@@ -74,7 +74,7 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "Follow the user's language for human-facing Plans, clarification questions, findings, explanations, Review summaries, remediation proposals, and handoffs when practical; English and Spanish are supported initially.",
     "`nerv work materialize --plan <json>`",
     "`nerv work materialize-rework <work-ref>`",
-    "W-` plus 16 uppercase UUID hex characters, not sequential history numbers",
+    "W-` plus 16 uppercase hexadecimal characters deterministically derived from the Work UUID",
     "`review` after execution and full validation",
     "After Close, no further lifecycle operation is required.",
     "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",

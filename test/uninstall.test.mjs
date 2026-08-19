@@ -117,15 +117,15 @@ test("uninstall fails closed before mutation for missing, unsupported, and corru
   }
 });
 
-test("uninstall preserves unrelated dirty files and legacy unmarked exclusions", () => {
+test("uninstall preserves unrelated dirty files and pre-existing unowned exclusions", () => {
   const repo = setup(false);
   try {
     const exclude = join(repo, ".git/info/exclude");
-    writeFileSync(exclude, ".nerv/\nlegacy developer exclusion\n");
+    writeFileSync(exclude, ".nerv/\npre-existing developer exclusion\n");
     writeFileSync(join(repo, "unrelated.txt"), "developer work\n");
     run(repo, ["uninstall"]);
     assert(readFileSync(join(repo, "unrelated.txt"), "utf8") === "developer work\n", "uninstall deleted an unrelated dirty file");
-    assert(readFileSync(exclude, "utf8") === ".nerv/\nlegacy developer exclusion\n", "uninstall removed an ambiguous legacy exclusion");
+    assert(readFileSync(exclude, "utf8") === ".nerv/\npre-existing developer exclusion\n", "uninstall removed an unowned exclusion");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 

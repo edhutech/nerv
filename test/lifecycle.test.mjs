@@ -54,13 +54,13 @@ test("tasks activate and progress automatically through rework", () => {
     const statuses = () => { const db = new Database(dbPath, { readOnly: true }); const value = db.prepare("SELECT position, status FROM tasks WHERE work_item_id=(SELECT id FROM work_items WHERE ref=?) ORDER BY position").all(ref); db.close(); return value; };
     assert(JSON.stringify(statuses()) === JSON.stringify([{ position: 1, status: "active" }, { position: 2, status: "pending" }]), "first Task was not activated on materialization");
     assert(run(repo, ["review", ref, "--outcome", "PASS", "--summary", "early", "--validation-evidence", "full"], 1).includes("all Tasks done"), "Review became available before all Tasks were done");
-    assert(run(repo, ["work", "task", "done", "WORK-001", "2", "--evidence", "bad"], 1).includes("active Task"), "pending Task completed out of order");
+    assert(run(repo, ["work", "task", "done", ref, "2", "--evidence", "bad"], 1).includes("active Task"), "pending Task completed out of order");
     run(repo, ["checkpoint", ref, "--summary", "interruption", "--task", "1", "--next-step", "continue"]);
     writeFileSync(join(repo, "one.txt"), "feature\n");
-    run(repo, ["work", "task", "done", "WORK-001", "1", "--evidence", "targeted", "--files", "one.txt"]);
+    run(repo, ["work", "task", "done", ref, "1", "--evidence", "targeted", "--files", "one.txt"]);
     assert(JSON.stringify(statuses()) === JSON.stringify([{ position: 1, status: "done" }, { position: 2, status: "active" }]), "completion did not activate the next Task");
     writeFileSync(join(repo, "two.txt"), "feature\n");
-    const completed = run(repo, ["work", "task", "done", "WORK-001", "2", "--evidence", "targeted", "--files", "two.txt"]);
+    const completed = run(repo, ["work", "task", "done", ref, "2", "--evidence", "targeted", "--files", "two.txt"]);
     assert(completed.includes("Recommended next action: review"), "completed Tasks did not expose the Review handoff");
     assert(JSON.stringify(statuses()) === JSON.stringify([{ position: 1, status: "done" }, { position: 2, status: "done" }]), "final Task did not finish cleanly");
     review(repo, "REWORK", remediation);

@@ -11,7 +11,6 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const npm = "npm";
 const expectedFiles = [
   ".agents/skills/nerv/SKILL.md",
-  "CLAUDE.md",
   "LICENSE",
   "NOTICE",
   "README.md",

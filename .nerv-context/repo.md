@@ -34,7 +34,7 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 
 ## Generated and local state
 
-`.nerv/` is local operational state and temporary active context, excluded through Git's repository-local exclude mechanism. A delimited Nerv-owned exclusion block may be removed by uninstall; legacy unmarked exclusions are preserved. `.nerv-context/` is tracked shared context; `product.md` and `repo.md` are its only canonical current-truth files. Before every new Work, those files and the managed public skill must be committed and clean at `HEAD`.
+`.nerv/` is local operational state and temporary active context, excluded through Git's repository-local exclude mechanism. A delimited Nerv-owned exclusion block may be removed by uninstall; pre-existing unowned exclusions are preserved. `.nerv-context/` is tracked shared context; `product.md` and `repo.md` are its only canonical current-truth files. Before every new Work, those files and the managed public skill must be committed and clean at `HEAD`.
 
 ## Validation
 

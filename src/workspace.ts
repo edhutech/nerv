@@ -56,11 +56,9 @@ export function uninstallWorkspace(repoRoot: string): UninstallResult {
   }
   const removed: string[] = [];
   const preserved: string[] = [];
-  const packagedClaude = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
-
   removeManagedFile(repoRoot, ".agents/skills/nerv/SKILL.md", undefined, "Public Nerv skill", removed, preserved);
   removeManagedFile(repoRoot, "AGENTS.md", AGENTS_BRIDGE, "Agent discovery bridge", removed, preserved);
-  removeManagedFile(repoRoot, "CLAUDE.md", packagedClaude, "Claude Code bridge", removed, preserved);
+  removeManagedFile(repoRoot, "CLAUDE.md", bridgeContent("claude"), "Claude Code bridge", removed, preserved);
   removeManagedFile(repoRoot, ".nerv-context/product.md", undefined, "Product Context scaffold", removed, preserved);
   removeManagedFile(repoRoot, ".nerv-context/repo.md", undefined, "Repo Context scaffold", removed, preserved);
   removeManagedExclude(repoRoot, removed);
@@ -245,11 +243,6 @@ function ensureDiscoveryBridge(destination: string, label: string): string | und
     return `${label} could not be safely established at ${destination}; an incomplete Nerv bridge was preserved.`;
   }
   const relativePath = destination.endsWith("AGENTS.md") ? "AGENTS.md" : "CLAUDE.md";
-  const identity = knownIdentity(relativePath, installed);
-   if (identity === "current") {
-    writeFileSync(destination, bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude"));
-    return `${label} upgraded to an owned bridge block.`;
-  }
   const separator = installed.length && !installed.endsWith("\n") && !installed.endsWith("\r") ? "\n" : "";
   writeFileSync(destination, `${installed}${separator}\n${bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude")}`);
   return `${label} established alongside preserved custom content.`;
