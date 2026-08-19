@@ -44,7 +44,7 @@ Fresh-session REWORK recovery must use `nerv work show <work-ref>` before reques
 
 ## Repository invariants
 
-The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `W-` plus 16 uppercase UUID hex-character refs are distinct; refs are generated from the UUID and never allocated sequentially from history. Tasks are positioned within their Work Item. The first Task activates automatically and completion activates the next. Review and Close stage explicit Work paths only, block new unattributed changes, and discover untracked paths through repository `.gitignore` rules rather than mutable local Git exclusions.
+The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `W-` plus 16 uppercase hexadecimal characters deterministically derived from the UUID are distinct; refs are never allocated sequentially from history. Tasks are positioned within their Work Item. The first Task activates automatically and completion activates the next. Review and Close stage explicit Work paths only, block new unattributed changes, and discover untracked paths through repository `.gitignore` rules rather than mutable local Git exclusions.
 
 CI uses a shallow checkout; regression tests must be self-contained and must not depend on historical tags, remote access, or deep Git history.
 

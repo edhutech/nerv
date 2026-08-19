@@ -7,6 +7,9 @@
 
 Nerv is a Local-first Agent Work Harness for developers building software with coding agents.
 
+> [!NOTE]
+> **Nerv is currently in public alpha.** The core workflow is usable, but CLI contracts, repository artifacts, and local state formats may change before the first stable release. Backward compatibility is not guaranteed during the alpha phase.
+
 Coding-agent work often loses its approved intent, validation evidence, and review boundary between sessions. Nerv keeps that operational context small and durable so work stays recoverable and reviewable without becoming a prompt archive or a process-heavy system.
 
 Nerv does not launch, control, or require a particular agent or model. It gives compatible agents and developers the same local workflow and Git-safe review boundary.
@@ -14,7 +17,7 @@ Nerv does not launch, control, or require a particular agent or model. It gives 
 ## Quick Start
 
 ```bash
-npm install --global @edhutech/nerv
+npm install --global @edhutech/nerv@alpha
 ```
 
 Nerv supports Node.js `>=22.14.0 <23` or `>=24.11.0 <25` and requires Git. The installed command is `nerv`; you do not need to clone this repository or install pnpm.
@@ -48,7 +51,7 @@ Nerv governs a Work Item, which contains one or more bounded Tasks. The workflow
   request -> Plan -> approve -> automatic execution -> review -> close
 ```
 
-Planning and approval are agent-facing protocols, not commands you run yourself. The agent translates approval into deterministic materialization primitives, then stops after execution and validation for `review`; `nerv review <work-ref>` records the integrated result, and `nerv close <work-ref>` creates the reviewed Git change when you request it. Work refs are `W-` plus 16 uppercase UUID hex characters, not sequential numbers.
+Planning and approval are agent-facing protocols, not commands you run yourself. The agent translates approval into deterministic materialization primitives, then stops after execution and validation for `review`; `nerv review <work-ref>` records the integrated result, and `nerv close <work-ref>` creates the reviewed Git change when you request it. Work refs use `W-` plus 16 uppercase hexadecimal characters deterministically derived from the Work UUID.
 
 ## Why Nerv
 

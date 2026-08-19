@@ -31,4 +31,4 @@ jobs:
           test "$(node -p 'require("./package.json").version')" = "${GITHUB_REF_NAME#v}"
       - run: pnpm validate
       - run: pnpm test:package
-      - run: npm publish --provenance
+      - run: npm publish --provenance --tag alpha

@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 test("README provides a concise documented onboarding path", () => {
   const readme = readFileSync(resolve(root, "README.md"), "utf8");
-  assert.match(readme, /npm install --global @edhutech\/nerv/);
+  assert.match(readme, /Nerv is currently in public alpha/);
+  assert.match(readme, /npm install --global @edhutech\/nerv@alpha/);
+  assert.doesNotMatch(readme, /npm install --global @edhutech\/nerv\n/);
   assert.match(readme, /nerv uninstall/);
   assert.match(readme, /npm uninstall -g @edhutech\/nerv/);
    assert.match(readme, /Node\.js `>=22\.14\.0 <23` or `>=24\.11\.0 <25`/);
@@ -15,6 +17,8 @@ test("README provides a concise documented onboarding path", () => {
    assert.doesNotMatch(readme, /git add AGENTS\.md CLAUDE\.md/);
   assert.match(readme, /request -> Plan -> approve -> automatic execution -> review -> close/);
   assert.match(readme, /hands off `review`/);
+  assert.match(readme, /W-` plus 16 uppercase hexadecimal characters deterministically derived from the Work UUID/);
+  assert.doesNotMatch(readme, /UUID hex characters/);
   assert.match(readme, /OpenCode, Codex, Cursor, and Claude Code/);
   assert.match(readme, /future dedicated documentation experience/);
   assert.doesNotMatch(readme, /docs\//);
@@ -65,11 +69,15 @@ test("publish workflow is an intentional Trusted Publishing boundary", () => {
   assert.match(publish, /id-token: write/);
   assert.match(publish, /pnpm validate/);
   assert.match(publish, /pnpm test:package/);
-  assert.match(publish, /npm publish --provenance/);
+  assert.match(publish, /npm publish --provenance --tag alpha/);
+  assert.doesNotMatch(publish, /npm publish --provenance(?! --tag alpha)/);
+  assert.doesNotMatch(publish, /npm publish[^\n]*--tag latest/);
   assert.doesNotMatch(publish, /NPM_TOKEN/);
   assert.equal(packageJson.repository.url, "git+https://github.com/edhutech/nerv.git");
   assert.equal(packageJson.publishConfig.registry, "https://registry.npmjs.org");
   assert.match(publish, /package repository metadata must identify edhutech\/nerv/);
+  assert.equal(packageJson.version, "0.3.0");
+  assert(publish.includes('test "$(node -p \'require("./package.json").version\')" = "${GITHUB_REF_NAME#v}"'), "publish workflow must fail closed on release/tag and package version mismatch");
 });
 
 test("Dependabot covers npm dependencies and GitHub Actions", () => {
