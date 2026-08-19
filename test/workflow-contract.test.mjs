@@ -75,6 +75,7 @@ test("planning and multilingual interaction preserve agent intelligence and cano
     "`nerv work materialize --plan <json>`",
     "`nerv work materialize-rework <work-ref>`",
     "W-` plus 16 uppercase hexadecimal characters deterministically derived from the Work UUID",
+    "derived from the Work UUID with 64 bits of hash output",
     "`review` after execution and full validation",
     "After Close, no further lifecycle operation is required.",
     "For structured Nerv CLI inputs, inspect the relevant command's `--help` output for the exact public contract instead of inspecting implementation source.",

@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
-export const NERV_BRIDGE_START = "<!-- Nerv managed discovery bridge -->";
-export const NERV_BRIDGE_END = "<!-- End Nerv managed discovery bridge -->";
+const NERV_BRIDGE_START = "<!-- Nerv managed discovery bridge -->";
+const NERV_BRIDGE_END = "<!-- End Nerv managed discovery bridge -->";
 
-export function normalizedText(value: string): string {
+function normalizedText(value: string): string {
   return value.replaceAll("\r\n", "\n");
 }
 
@@ -12,8 +12,7 @@ export function textIdentity(value: string): string {
 }
 
 export const MANAGED_IDENTITIES: Record<string, string> = {
-  ".agents/skills/nerv/SKILL.md": "d2a80be085aaa35e9b016cf031e0dfc6bb5a9918624f01179303c55335473570",
-  "CLAUDE.md": "08c99e7cb82cc9a0520a8b3195f9583f6acc0089c6e84340fb36e5be0e4dbff5",
+  ".agents/skills/nerv/SKILL.md": "1469400644474ee031a10c1207cde9b920550f85635778902fa469e0ca9f8ab0",
   ".nerv-context/product.md": "ef4d149f378d4150ebde1f71fb5e6c0a66d522c49625d82e3abd0a61c70baa7b",
   ".nerv-context/repo.md": "26936e8a8f05229211ccb8e628dd248aea03392ec6044a6bf657fd6fc3e41606",
 };

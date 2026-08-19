@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "1";
 export const UNSUPPORTED_SCHEMA = "existing .nerv/nerv.db uses an unsupported generated schema; use a compatible/current Nerv version, or back up .nerv before intentionally discarding it";
 const STATEMENTS = [
   "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)",

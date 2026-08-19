@@ -6,8 +6,8 @@ import { hasRequiredSchema, initializeDatabase, UNSUPPORTED_SCHEMA } from "./dat
 import { bridgeBlock, bridgeContent, exactSingleBridge, knownIdentity } from "./managed-artifacts.js";
 
 const DIRS = [".nerv", ".nerv/agent", ".nerv/agent/active"] as const;
-export const AGENTS_BRIDGE = bridgeContent("agents");
-export const NERV_EXCLUDE_BLOCK = "# Nerv local state (managed)\n.nerv/\n# End Nerv local state\n";
+const AGENTS_BRIDGE = bridgeContent("agents");
+const NERV_EXCLUDE_BLOCK = "# Nerv local state (managed)\n.nerv/\n# End Nerv local state\n";
 export type WorkspaceStatus = { repoRoot: string | null; workspaceRoot: string | null; databasePath: string | null; initialized: boolean };
 export type SetupStatus = { path: string; established: boolean };
 export const CANONICAL_CONTEXT_SCAFFOLDS = {
@@ -18,9 +18,9 @@ const SHARED_CONTEXT_FILES = [
   ["product.md", CANONICAL_CONTEXT_SCAFFOLDS.product],
   ["repo.md", CANONICAL_CONTEXT_SCAFFOLDS.repo],
 ] as const;
-export const CANONICAL_SETUP_PATHS = [".agents/skills/nerv/SKILL.md", ...SHARED_CONTEXT_FILES.map(([name]) => `.nerv-context/${name}`)] as const;
+const CANONICAL_SETUP_PATHS = [".agents/skills/nerv/SKILL.md", ...SHARED_CONTEXT_FILES.map(([name]) => `.nerv-context/${name}`)] as const;
 
-export function findRepoRoot(start: string): string | null {
+function findRepoRoot(start: string): string | null {
   let current = resolve(start);
   while (true) {
     if (existsSync(join(current, ".git"))) return current;
@@ -183,7 +183,7 @@ function ensureSharedContext(repoRoot: string): void {
 }
 function git(repoRoot: string, args: string[]): string { return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim(); }
 function gitSucceeds(repoRoot: string, args: string[]): boolean { try { git(repoRoot, args); return true; } catch { return false; } }
-export function ensureLocalExclude(repoRoot: string): void {
+function ensureLocalExclude(repoRoot: string): void {
   const path = localExcludePath(repoRoot);
   mkdirSync(dirname(path), { recursive: true });
   if (!existsSync(path)) { writeFileSync(path, NERV_EXCLUDE_BLOCK, "utf8"); return; }
@@ -192,7 +192,7 @@ export function ensureLocalExclude(repoRoot: string): void {
   if (content.split(/\r?\n/).some((line) => [".nerv", ".nerv/", "/.nerv", "/.nerv/"].includes(line.trim()))) return;
   appendFileSync(path, `${content.endsWith("\n") || content.length === 0 ? "" : "\n"}${NERV_EXCLUDE_BLOCK}`);
 }
-export function canonicalSetupStatus(repoRoot: string): SetupStatus[] {
+function canonicalSetupStatus(repoRoot: string): SetupStatus[] {
   return CANONICAL_SETUP_PATHS.map((path) => ({ path, established: existsSync(join(repoRoot, path)) && gitSucceeds(repoRoot, ["ls-files", "--error-unmatch", "--", path]) && gitSucceeds(repoRoot, ["diff", "--quiet", "--cached", "HEAD", "--", path]) && gitSucceeds(repoRoot, ["diff", "--quiet", "HEAD", "--", path]) }));
 }
 export function assertCanonicalSetupEstablished(repoRoot: string): void {
@@ -242,7 +242,6 @@ function ensureDiscoveryBridge(destination: string, label: string): string | und
   if (installed.includes("<!-- Nerv managed discovery bridge -->") || installed.includes("<!-- End Nerv managed discovery bridge -->")) {
     return `${label} could not be safely established at ${destination}; an incomplete Nerv bridge was preserved.`;
   }
-  const relativePath = destination.endsWith("AGENTS.md") ? "AGENTS.md" : "CLAUDE.md";
   const separator = installed.length && !installed.endsWith("\n") && !installed.endsWith("\r") ? "\n" : "";
   writeFileSync(destination, `${installed}${separator}\n${bridgeContent(destination.endsWith("AGENTS.md") ? "agents" : "claude")}`);
   return `${label} established alongside preserved custom content.`;
