@@ -40,6 +40,8 @@ Node.js TypeScript ESM CLI using Commander and SQLite through `node:sqlite`. Bui
 
 `pnpm validate` runs build, typecheck, then test. `pnpm test` exercises built `dist/index.js`.
 
+Fresh-session REWORK recovery must use `nerv work show <work-ref>` before requesting approval; compact status and active context alone do not reconstruct durable findings or remediation facts.
+
 ## Repository invariants
 
 The runtime is agent agnostic and does not control agents. Work UUID identities and repository-local `W-` plus 16 uppercase UUID hex-character refs are distinct; refs are generated from the UUID and never allocated sequentially from history. Tasks are positioned within their Work Item. The first Task activates automatically and completion activates the next. Review and Close stage explicit Work paths only, block new unattributed changes, and discover untracked paths through repository `.gitignore` rules rather than mutable local Git exclusions.

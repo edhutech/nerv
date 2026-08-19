@@ -6,7 +6,7 @@ import { CANONICAL_CONTEXT_SCAFFOLDS } from "../dist/workspace.js";
 test("managed skill policy recognizes only the current identity", () => {
   const policy = MANAGED_IDENTITIES[".agents/skills/nerv/SKILL.md"];
   const packaged = readFileSync(join(root, ".agents/skills/nerv/SKILL.md"), "utf8");
-    assert(policy === "9242354ad586ff422830c09181264d0956eff270f1a2c363c190a0194952014f", "packaged skill current identity changed unexpectedly");
+    assert(policy === "258fe2b6b7b020f2adab63a28d3fec82a3bec51e6258c7c5823df231245e0fc1", "packaged skill current identity changed unexpectedly");
   assert(knownIdentity(".agents/skills/nerv/SKILL.md", packaged) === "current", "packaged skill is not registered as current");
 });
 

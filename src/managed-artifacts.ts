@@ -12,7 +12,7 @@ export function textIdentity(value: string): string {
 }
 
 export const MANAGED_IDENTITIES: Record<string, string> = {
-  ".agents/skills/nerv/SKILL.md": "9242354ad586ff422830c09181264d0956eff270f1a2c363c190a0194952014f",
+  ".agents/skills/nerv/SKILL.md": "258fe2b6b7b020f2adab63a28d3fec82a3bec51e6258c7c5823df231245e0fc1",
   "CLAUDE.md": "08c99e7cb82cc9a0520a8b3195f9583f6acc0089c6e84340fb36e5be0e4dbff5",
   ".nerv-context/product.md": "ef4d149f378d4150ebde1f71fb5e6c0a66d522c49625d82e3abd0a61c70baa7b",
   ".nerv-context/repo.md": "26936e8a8f05229211ccb8e628dd248aea03392ec6044a6bf657fd6fc3e41606",

@@ -38,12 +38,11 @@ export function syncActiveContext(workspaceRoot: string, work: WorkItem, tasks: 
   const taskList = (status: string) => tasks.filter((task) => task.status === status).map((task) => `- Task ${task.position} - ${task.title}`).join("\n") || "- None";
   const activeDetails = active ? [`Task ${active.position} - ${active.title}`, `Objective:\n${active.objective}`, active.implementation_approach && `Implementation approach:\n${active.implementation_approach}`, active.expected_touchpoints && `Expected touchpoints:\n${active.expected_touchpoints}`, `Acceptance criteria:\n${active.acceptance_criteria}`, `Targeted validation:\n${active.validation}`].filter(Boolean).join("\n\n") : "None";
   const checkpointSection = checkpoint && (!checkpoint.task_id || checkpoint.task_id === active?.id) ? `\n\n## Checkpoint\n\n${checkpoint.summary}${checkpoint.next_step ? `\n\nNext step: ${checkpoint.next_step}` : ""}` : "";
-  const findingsSection = work.status === "rework" && reviewFindingsPreview(review) ? `\n\n## Review findings\n\n${reviewFindingsPreview(review)}` : "";
-  const remediationSection = work.status === "rework" && remediationPreview(review) ? `\n\n## Remediation proposal\n\n${remediationPreview(review)}` : "";
+  const reworkSection = work.status === "rework" ? `\n\n## REWORK\n\nRun \`nerv work show ${work.ref}\` before requesting approval.` : "";
   const handoff = developerHandoff(work, tasks, review);
   const execution = executionStatus(tasks);
   const verification = work.status === "review" && review?.outcome === "PASS" ? "\n\nOptional additional local or user inspection may happen first; required outcome verification was part of Review." : "";
-  const content = `# ${work.ref} - ${work.title}\n\nState: ${work.status}\n\n## Goal\n\n${work.goal}\n\n## Current Task\n\n${activeDetails}\n\n## Completed\n\n${taskList("done")}\n\n## Pending\n\n${taskList("pending")}${checkpointSection}${findingsSection}${remediationSection}\n\n## Execution\n\n${execution}\n\n## Next\n\n${handoff ?? "Execution continues automatically; review follows after all Tasks and validation."}${verification}\n`;
+  const content = `# ${work.ref} - ${work.title}\n\nState: ${work.status}\n\n## Goal\n\n${work.goal}\n\n## Current Task\n\n${activeDetails}\n\n## Completed\n\n${taskList("done")}\n\n## Pending\n\n${taskList("pending")}${checkpointSection}${reworkSection}\n\n## Execution\n\n${execution}\n\n## Next\n\n${handoff ?? "Execution continues automatically; review follows after all Tasks and validation."}${verification}\n`;
   const path = activePath(workspaceRoot, work.ref);
   writeFileSync(path, content, "utf8");
   return path;

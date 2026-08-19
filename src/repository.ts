@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 export type WorkStatus = "active" | "review" | "rework" | "closed";
@@ -10,7 +10,7 @@ export type ApprovedPlan = Pick<WorkItem, "title" | "intent" | "goal" | "scope" 
 export type Review = { id: number; work_item_id: string; outcome: "PASS" | "REWORK"; summary: string; findings: string | null; remediation_json: string | null; validation_evidence: string; git_fingerprint_json: string | null; verification_evidence: string | null; created_at: string };
 export type Checkpoint = { id: number; work_item_id: string; task_id: string | null; summary: string; next_step: string | null; created_at: string };
 export function workRef(id: string): string {
-  return `W-${id.replaceAll("-", "").slice(0, 16).toUpperCase()}`;
+  return `W-${createHash("sha256").update(id).digest("hex").slice(0, 16).toUpperCase()}`;
 }
 export type Repository = {
   close(): void; getWork(reference: string): WorkItem | null; getTask(id: string): Task | null; materializePlan(plan: ApprovedPlan): WorkItem; materializeRework(workId: string): WorkItem; completeTask(taskId: string, evidence: string, attribution: string): Task; createReview(input: Omit<Review, "id" | "created_at">): Review; createCheckpoint(input: Omit<Checkpoint, "id" | "created_at">): Checkpoint; closeWork(workId: string, commitHash: string | null): WorkItem; listWork(): WorkItem[]; listTasks(workId: string): Task[]; getTaskAt(workId: string, position: number): Task | null; latestReview(workId: string): Review | null; latestCheckpoint(workId: string): Checkpoint | null; listCheckpoints(workId: string): Checkpoint[];
