@@ -45,7 +45,7 @@
     "validate": "pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
-    "@types/node": "^24.0.1",
+    "@types/node": "^26.4.0",
     "cross-spawn": "7.0.6",
     "typescript": "^5.9.3"
   },
